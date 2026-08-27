@@ -1,0 +1,219 @@
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateItemDto } from './dto/create-item.dto.js';
+import { UpdateItemDto } from './dto/update-item.dto.js';
+import { ReceiveStockDto } from './dto/receive-stock.dto.js';
+import { LogUsageDto } from './dto/log-usage.dto.js';
+import { getBatchesWithRemaining, getExpiryStatus, getFifoBatch, getItemQuantity, isLowStock } from './stock-math.js';
+
+const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
+
+@Injectable()
+export class StockService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async listItems(inventoryTypeId?: string, includeArchived = false) {
+    const items = await this.prisma.item.findMany({
+      where: {
+        ...(inventoryTypeId ? { inventoryTypeId } : {}),
+        ...(includeArchived ? {} : { archived: false }),
+      },
+      include: { inventoryType: true },
+      orderBy: { name: 'asc' },
+    });
+    if (items.length === 0) return [];
+
+    const movements = await this.prisma.movement.findMany({
+      where: { itemId: { in: items.map((i) => i.id) } },
+    });
+    const batches = await this.prisma.batch.findMany({
+      where: { itemId: { in: items.map((i) => i.id) } },
+    });
+    const today = new Date();
+
+    return items.map((item) => {
+      const quantity = getItemQuantity(movements, item.id);
+      const fifoBatch = item.inventoryType.hasBatches
+        ? getFifoBatch(getBatchesWithRemaining(batches, movements, item.id, today))
+        : null;
+      return {
+        ...item,
+        quantity,
+        low: isLowStock(quantity, item.reorderThreshold),
+        fifoBatch,
+      };
+    });
+  }
+
+  async getItem(id: string) {
+    const item = await this.prisma.item.findUnique({ where: { id }, include: { inventoryType: true } });
+    if (!item) throw new NotFoundException(`Article introuvable : ${id}`);
+    const movements = await this.prisma.movement.findMany({ where: { itemId: id } });
+    const quantity = getItemQuantity(movements, id);
+    return { ...item, quantity, low: isLowStock(quantity, item.reorderThreshold) };
+  }
+
+  async listBatches(itemId: string) {
+    await this.getItem(itemId);
+    const [batches, movements] = await Promise.all([
+      this.prisma.batch.findMany({ where: { itemId } }),
+      this.prisma.movement.findMany({ where: { itemId } }),
+    ]);
+    return getBatchesWithRemaining(batches, movements, itemId, new Date());
+  }
+
+  async listMovements(itemId: string) {
+    await this.getItem(itemId);
+    return this.prisma.movement.findMany({
+      where: { itemId },
+      include: { batch: true, supplier: true },
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async createItem(dto: CreateItemDto) {
+    const inventoryType = await this.prisma.inventoryType.findUnique({ where: { id: dto.inventoryTypeId } });
+    if (!inventoryType) throw new BadRequestException(`Type d'inventaire inconnu : ${dto.inventoryTypeId}`);
+
+    try {
+      return await this.prisma.item.create({ data: dto });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(`Un article avec la référence "${dto.reference}" existe déjà.`);
+      }
+      throw error;
+    }
+  }
+
+  async updateItem(id: string, dto: UpdateItemDto) {
+    await this.getItem(id);
+    try {
+      return await this.prisma.item.update({ where: { id }, data: dto });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(`Un article avec la référence "${dto.reference}" existe déjà.`);
+      }
+      throw error;
+    }
+  }
+
+  async setItemArchived(id: string, archived: boolean) {
+    await this.getItem(id);
+    return this.prisma.item.update({ where: { id }, data: { archived } });
+  }
+
+  async receive(itemId: string, dto: ReceiveStockDto) {
+    const item = await this.prisma.item.findUnique({ where: { id: itemId }, include: { inventoryType: true } });
+    if (!item) throw new NotFoundException(`Article introuvable : ${itemId}`);
+
+    if (item.inventoryType.hasBatches && !dto.batchNumber) {
+      throw new BadRequestException('Le numéro de lot est obligatoire pour ce type de produit.');
+    }
+    if (item.inventoryType.hasExpiry && !dto.expiryDate) {
+      throw new BadRequestException('La date de péremption est obligatoire pour ce type de produit.');
+    }
+    if (dto.supplierId) {
+      const supplier = await this.prisma.supplier.findUnique({ where: { id: dto.supplierId } });
+      if (!supplier) throw new BadRequestException(`Fournisseur introuvable : ${dto.supplierId}`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      let batchId: string | null = null;
+      if (dto.batchNumber) {
+        const batch = await tx.batch.create({
+          data: {
+            itemId,
+            batchNumber: dto.batchNumber,
+            receivedDate: new Date(dto.date),
+            expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
+          },
+        });
+        batchId = batch.id;
+      }
+
+      return tx.movement.create({
+        data: {
+          itemId,
+          batchId,
+          direction: 'IN',
+          quantity: dto.quantity,
+          date: new Date(dto.date),
+          supplierId: dto.supplierId ?? null,
+        },
+        include: { batch: true, supplier: true },
+      });
+    });
+  }
+
+  async logUsage(itemId: string, dto: LogUsageDto) {
+    const item = await this.prisma.item.findUnique({ where: { id: itemId }, include: { inventoryType: true } });
+    if (!item) throw new NotFoundException(`Article introuvable : ${itemId}`);
+
+    const movements = await this.prisma.movement.findMany({ where: { itemId } });
+
+    if (item.inventoryType.hasBatches) {
+      if (!dto.batchId) throw new BadRequestException('Choisissez un lot.');
+      const batches = await this.prisma.batch.findMany({ where: { itemId } });
+      const withRemaining = getBatchesWithRemaining(batches, movements, itemId, new Date());
+      const batch = withRemaining.find((b) => b.id === dto.batchId);
+      if (!batch) throw new BadRequestException(`Lot introuvable : ${dto.batchId}`);
+      if (dto.quantity > batch.remaining) {
+        throw new BadRequestException(`Il n'y a que ${batch.remaining} ${item.unit} disponible dans ce lot.`);
+      }
+    } else {
+      const available = getItemQuantity(movements, itemId);
+      if (dto.quantity > available) {
+        throw new BadRequestException(`Il n'y a que ${available} ${item.unit} disponible.`);
+      }
+    }
+
+    return this.prisma.movement.create({
+      data: {
+        itemId,
+        batchId: item.inventoryType.hasBatches ? (dto.batchId ?? null) : null,
+        direction: 'OUT',
+        quantity: dto.quantity,
+        date: new Date(dto.date),
+        reason: dto.reason,
+      },
+      include: { batch: true },
+    });
+  }
+
+  /** Powers the Dashboard tab with a single call, per the build plan's Phase 9 "one endpoint" rule. */
+  async getSummary() {
+    const items = await this.prisma.item.findMany({ where: { archived: false }, include: { inventoryType: true } });
+    const movements = await this.prisma.movement.findMany({ where: { itemId: { in: items.map((i) => i.id) } } });
+    const batches = await this.prisma.batch.findMany({ where: { itemId: { in: items.map((i) => i.id) } } });
+    const today = new Date();
+
+    const lowStockItems = items
+      .map((item) => ({ item, quantity: getItemQuantity(movements, item.id) }))
+      .filter(({ item, quantity }) => isLowStock(quantity, item.reorderThreshold))
+      .sort((a, b) => a.quantity - b.quantity)
+      .map(({ item, quantity }) => ({
+        id: item.id,
+        name: item.name,
+        unit: item.unit,
+        quantity,
+        reorderThreshold: item.reorderThreshold,
+        inventoryTypeLabel: item.inventoryType.label,
+      }));
+
+    const watchBatches = batches.filter((b) => {
+      const status = getExpiryStatus(b.expiryDate, today);
+      return status === 'expired' || status === 'warning';
+    });
+
+    return {
+      totalItems: items.length,
+      lowStockCount: lowStockItems.length,
+      lowStockItems,
+      watchBatchCount: watchBatches.length,
+    };
+  }
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === PRISMA_UNIQUE_CONSTRAINT;
+}

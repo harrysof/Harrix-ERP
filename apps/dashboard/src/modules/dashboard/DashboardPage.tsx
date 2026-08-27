@@ -1,53 +1,48 @@
-import { useMemo } from "react";
-import { useStock } from "../../state/StockContext";
+import { useEffect, useState } from "react";
+import { fetchStockSummary, type StockSummary } from "../../lib/stockApi";
+import { ApiError } from "../../lib/api";
 import { StatCard } from "../../components/ui/StatCard";
 import { Pill } from "../../components/ui/Pill";
-import { getInventoryType } from "../../lib/stockConfig";
-import { getExpiryStatus, getItemQuantity, isLowStock, todayIso } from "../../lib/stockEngine";
+import { Banner } from "../../components/ui/Banner";
 import { formatQuantity } from "../../lib/format";
 
 export function DashboardPage({ onGoToStock }: { onGoToStock: () => void }) {
-  const { items, batches, movements } = useStock();
-  const today = todayIso();
+  const [summary, setSummary] = useState<StockSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const lowStockItems = useMemo(
-    () =>
-      items
-        .map((item) => ({ item, quantity: getItemQuantity(movements, item.id) }))
-        .filter(({ item, quantity }) => isLowStock(quantity, item.reorderThreshold))
-        .sort((a, b) => a.quantity - b.quantity),
-    [items, movements],
-  );
+  useEffect(() => {
+    fetchStockSummary()
+      .then(setSummary)
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger le tableau de bord."));
+  }, []);
 
-  const watchBatches = useMemo(
-    () => batches.filter((b) => getExpiryStatus(b.expiryDate, today) !== "ok" && getExpiryStatus(b.expiryDate, today) !== "none"),
-    [batches, today],
-  );
+  if (error) return <Banner tone="danger">{error}</Banner>;
+  if (!summary) return <p className="loading-text">Chargement…</p>;
 
   return (
     <div className="page-stack">
       <section>
         <h2 className="section-title">Aujourd'hui</h2>
         <div className="stat-grid">
-          <StatCard label="Articles suivis" value={items.length} hint="Dans les 4 inventaires" />
+          <StatCard label="Articles suivis" value={summary.totalItems} hint="Dans les 4 inventaires" />
           <StatCard
             label="Alertes stock faible"
-            value={lowStockItems.length}
-            tone={lowStockItems.length > 0 ? "warn" : "ok"}
-            hint={lowStockItems.length > 0 ? "Sous le seuil de réapprovisionnement" : "Tout est au-dessus du seuil"}
+            value={summary.lowStockCount}
+            tone={summary.lowStockCount > 0 ? "warn" : "ok"}
+            hint={summary.lowStockCount > 0 ? "Sous le seuil de réapprovisionnement" : "Tout est au-dessus du seuil"}
             onClick={onGoToStock}
           />
           <StatCard
             label="Lots à surveiller"
-            value={watchBatches.length}
-            tone={watchBatches.length > 0 ? "danger" : "ok"}
+            value={summary.watchBatchCount}
+            tone={summary.watchBatchCount > 0 ? "danger" : "ok"}
             hint="Produits chimiques expirés ou bientôt périmés"
             onClick={onGoToStock}
           />
         </div>
       </section>
 
-      {lowStockItems.length > 0 && (
+      {summary.lowStockItems.length > 0 && (
         <section>
           <div className="panel">
             <div className="panel-header">
@@ -57,11 +52,11 @@ export function DashboardPage({ onGoToStock }: { onGoToStock: () => void }) {
               </button>
             </div>
             <ul className="alert-list">
-              {lowStockItems.slice(0, 5).map(({ item, quantity }) => (
+              {summary.lowStockItems.slice(0, 5).map((item) => (
                 <li key={item.id} className="alert-list-row">
                   <span>{item.name}</span>
-                  <span className="alert-list-type">{getInventoryType(item.inventoryTypeId).label}</span>
-                  <span className="tabular alert-list-qty">{formatQuantity(quantity, item.unit)}</span>
+                  <span className="alert-list-type">{item.inventoryTypeLabel}</span>
+                  <span className="tabular alert-list-qty">{formatQuantity(item.quantity, item.unit)}</span>
                   <Pill tone="warn">seuil {formatQuantity(item.reorderThreshold, item.unit)}</Pill>
                 </li>
               ))}

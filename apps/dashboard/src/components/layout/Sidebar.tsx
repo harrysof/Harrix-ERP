@@ -1,4 +1,4 @@
-export type TabId = "dashboard" | "stock";
+export type TabId = "dashboard" | "stock" | "production" | "orders" | "hr" | "suppliers";
 
 interface NavItem {
   id: TabId | string;
@@ -9,10 +9,10 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Tableau de bord", enabled: true },
   { id: "stock", label: "Stock", enabled: true },
-  { id: "production", label: "Production", enabled: false },
-  { id: "orders", label: "Commandes & clients", enabled: false },
-  { id: "hr", label: "Ressources humaines", enabled: false },
-  { id: "suppliers", label: "Fournisseurs", enabled: false },
+  { id: "production", label: "Production", enabled: true },
+  { id: "orders", label: "Commandes & clients", enabled: true },
+  { id: "hr", label: "Ressources humaines", enabled: true },
+  { id: "suppliers", label: "Fournisseurs", enabled: true },
   { id: "settings", label: "Paramètres", enabled: false },
 ];
 
@@ -20,8 +20,8 @@ export function Sidebar({ active, onNavigate }: { active: TabId; onNavigate: (ta
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <span className="sidebar-brand-mark">C</span>
-        <span className="sidebar-brand-name">Chelma</span>
+        <img className="sidebar-brand-mark" src="/logo.png" alt="Harrix ERP" />
+        <span className="sidebar-brand-name">Harrix</span>
       </div>
 
       <nav className="sidebar-nav">

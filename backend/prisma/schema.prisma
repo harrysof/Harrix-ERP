@@ -1,0 +1,114 @@
+// Harrix ERP — database schema.
+//
+// Local development uses SQLite (see datasource below) because this
+// environment has no Docker/PostgreSQL available. The build plan's target
+// for the factory PC is PostgreSQL. Switching later means: change
+// `provider` to "postgresql", point DATABASE_URL at the real database, and
+// re-run `npx prisma migrate dev`. Nothing in this schema uses a
+// SQLite-only feature, so the switch is mechanical — see
+// PROJECT_CONTEXT.md → "Backend" → "Moving to PostgreSQL" for the exact
+// steps.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  // Prisma 7 moved the connection URL out of this file and into
+  // prisma.config.ts (for the CLI) and the driver adapter (for the runtime
+  // client, see src/prisma/prisma.service.ts). `provider` still lives here.
+  provider = "sqlite"
+}
+
+/// The four (for now) inventories, stored as data rather than a fixed enum —
+/// see build plan Phase 4: a future factory can have a different set without
+/// a schema change.
+model InventoryType {
+  id               String  @id @default(cuid())
+  /// Stable machine key used by the frontend and seed data, e.g. "chemicals".
+  key              String  @unique
+  label            String
+  singular         String
+  description      String
+  hasBatches       Boolean @default(false)
+  hasExpiry        Boolean @default(false)
+  isProductionInput Boolean @default(false)
+  defaultUnit      String
+  sortOrder        Int     @default(0)
+
+  items Item[]
+}
+
+model Item {
+  id                String   @id @default(cuid())
+  inventoryType     InventoryType @relation(fields: [inventoryTypeId], references: [id])
+  inventoryTypeId   String
+  name              String
+  reference         String   @unique
+  unit              String
+  reorderThreshold  Float
+  archived          Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  batches   Batch[]
+  movements Movement[]
+
+  @@index([inventoryTypeId])
+}
+
+/// Only used by items whose inventory type has hasBatches = true (chemicals).
+/// A batch's remaining quantity is never stored directly — it is always the
+/// sum of its movements, computed on read (see stock/stock.service.ts).
+model Batch {
+  id            String    @id @default(cuid())
+  item          Item      @relation(fields: [itemId], references: [id])
+  itemId        String
+  batchNumber   String
+  receivedDate  DateTime
+  expiryDate    DateTime?
+
+  movements Movement[]
+
+  @@index([itemId])
+}
+
+/// The only place stock quantity comes from. An item's quantity is always
+/// SUM(IN) - SUM(OUT) over its movements — never a column that gets edited
+/// directly. This is deliberate (see build plan, "five calls that are cheap
+/// today"): it is the only way to answer "how did we get to this number?".
+model Movement {
+  id         String    @id @default(cuid())
+  item       Item      @relation(fields: [itemId], references: [id])
+  itemId     String
+  batch      Batch?    @relation(fields: [batchId], references: [id])
+  batchId    String?
+  /// "IN" | "OUT" — kept as a plain string (not a Prisma enum) so this schema
+  /// is portable to SQLite and PostgreSQL without a provider-specific type.
+  /// Validated at the API boundary (see stock/dto).
+  direction  String
+  quantity   Float
+  date       DateTime
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  supplierId String?
+  /// Only set on "OUT" movements (e.g. "Production", "Casse", "Périmé").
+  reason     String?
+  createdAt  DateTime  @default(now())
+
+  @@index([itemId])
+  @@index([batchId])
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  movements Movement[]
+}
