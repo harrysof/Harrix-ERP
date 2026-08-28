@@ -57,6 +57,44 @@ export class StockService {
     };
   }
 
+  /** The read shape every stock endpoint returns for an item. */
+  private buildItemView(
+    item: { id: string; reorderThreshold: number; inventoryType: { hasBatches: boolean; hasQuality: boolean } },
+    movements: MovementDetail[],
+    batches: BatchLike[],
+    today: Date,
+  ) {
+    const quantity = getItemQuantity(movements, item.id);
+    const purchased = movements
+      .filter((m) => m.itemId === item.id && m.direction === 'IN')
+      .reduce((sum, m) => sum + m.quantity, 0);
+    const used = movements
+      .filter((m) => m.itemId === item.id && m.direction === 'OUT')
+      .reduce((sum, m) => sum + m.quantity, 0);
+    const batchList = getBatchesWithRemaining(batches, movements, item.id, today);
+    const view: Record<string, unknown> = {
+      ...item,
+      quantity,
+      purchased,
+      used,
+      supplier: getLatestSupplier(movements, item.id),
+      low: isLowStock(quantity, item.reorderThreshold),
+      stockStatus: getStockStatus(quantity, item.reorderThreshold),
+      fifoBatch: item.inventoryType.hasBatches ? getFifoBatch(batchList) : null,
+      recommendedBatch: item.inventoryType.hasBatches ? getRecommendedBatch(batchList) : null,
+    };
+    if (item.inventoryType.hasQuality) {
+      const counts = getQualityCounts(movements, item.id);
+      view.qualityBreakdown = {
+        '1er': counts['1er'],
+        '2ème': counts['2ème'],
+        rebut: counts['rebut'],
+      };
+      view.unaccounted = getUnaccounted(counts);
+    }
+    return view;
+  }
+
   async listBatches(itemId: string) {
     await this.getItem(itemId);
     const [batches, movements] = await Promise.all([
