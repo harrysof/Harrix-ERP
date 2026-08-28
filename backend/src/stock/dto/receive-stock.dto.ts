@@ -21,4 +21,9 @@ export class ReceiveStockDto {
   @IsOptional()
   @IsISO8601()
   expiryDate?: string;
+
+  /** Production character class for finished goods ("1er"/"2ème"/"rebut") — validated in the service. */
+  @IsOptional()
+  @IsString()
+  quality?: string;
 }

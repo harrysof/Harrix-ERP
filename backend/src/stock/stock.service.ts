@@ -4,7 +4,7 @@ import { CreateItemDto } from './dto/create-item.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
 import { ReceiveStockDto } from './dto/receive-stock.dto.js';
 import { LogUsageDto } from './dto/log-usage.dto.js';
-import { getBatchesWithRemaining, getExpiryStatus, getFifoBatch, getItemQuantity, isLowStock } from './stock-math.js';
+import { getBatchesWithRemaining, getExpiryStatus, getFifoBatch, getItemQuantity, getLatestSupplier, getQualityCounts, getRecommendedBatch, getStockStatus, getUnaccounted, isLowStock, QUALITY_CLASSES, type BatchLike, type MovementDetail } from './stock-math.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 
@@ -25,6 +25,7 @@ export class StockService {
 
     const movements = await this.prisma.movement.findMany({
       where: { itemId: { in: items.map((i) => i.id) } },
+      include: { supplier: true },
     });
     const batches = await this.prisma.batch.findMany({
       where: { itemId: { in: items.map((i) => i.id) } },
@@ -33,15 +34,9 @@ export class StockService {
     const today = new Date();
 
     return items.map((item) => {
-      const quantity = getItemQuantity(movements, item.id);
-      const fifoBatch = item.inventoryType.hasBatches
-        ? getFifoBatch(getBatchesWithRemaining(batches, movements, item.id, today))
-        : null;
+      const view = this.buildItemView(item, movements, batches, today);
       return {
-        ...item,
-        quantity,
-        low: isLowStock(quantity, item.reorderThreshold),
-        fifoBatch,
+        ...view,
         deletable: !movements.some((m) => m.itemId === item.id) && !referenced.has(item.id),
       };
     });
@@ -50,13 +45,14 @@ export class StockService {
   async getItem(id: string) {
     const item = await this.prisma.item.findUnique({ where: { id }, include: { inventoryType: true } });
     if (!item) throw new NotFoundException(`Article introuvable : ${id}`);
-    const movements = await this.prisma.movement.findMany({ where: { itemId: id } });
+    const [movements, batches] = await Promise.all([
+      this.prisma.movement.findMany({ where: { itemId: id }, include: { supplier: true } }),
+      this.prisma.batch.findMany({ where: { itemId: id } }),
+    ]);
     const referenced = await this.findProductionReferences([id]);
-    const quantity = getItemQuantity(movements, id);
+    const view = this.buildItemView(item, movements, batches, new Date());
     return {
-      ...item,
-      quantity,
-      low: isLowStock(quantity, item.reorderThreshold),
+      ...view,
       deletable: movements.length === 0 && !referenced.has(id),
     };
   }
@@ -172,6 +168,7 @@ export class StockService {
       const supplier = await this.prisma.supplier.findUnique({ where: { id: dto.supplierId } });
       if (!supplier) throw new BadRequestException(`Fournisseur introuvable : ${dto.supplierId}`);
     }
+    const quality = validateQuality(dto.quality, item.inventoryType.hasQuality);
 
     return this.prisma.$transaction(async (tx) => {
       let batchId: string | null = null;
@@ -195,6 +192,7 @@ export class StockService {
           quantity: dto.quantity,
           date: new Date(dto.date),
           supplierId: dto.supplierId ?? null,
+          quality,
         },
         include: { batch: true, supplier: true },
       });
@@ -223,6 +221,8 @@ export class StockService {
       }
     }
 
+    const quality = validateQuality(dto.quality, item.inventoryType.hasQuality);
+
     return this.prisma.movement.create({
       data: {
         itemId,
@@ -231,6 +231,11 @@ export class StockService {
         quantity: dto.quantity,
         date: new Date(dto.date),
         reason: dto.reason,
+        quality,
+        machine: dto.machine ?? null,
+        maintenanceRef: dto.maintenanceRef ?? null,
+        employee: dto.employee ?? null,
+        notes: dto.notes ?? null,
       },
       include: { batch: true },
     });
@@ -272,4 +277,16 @@ export class StockService {
 
 function isUniqueConstraintError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: string }).code === PRISMA_UNIQUE_CONSTRAINT;
+}
+
+/** Validate a production-quality tag against the item's type — returns the value to store (or null). */
+function validateQuality(quality: string | undefined, hasQuality: boolean): string | null {
+  if (!quality) return null;
+  if (!hasQuality) {
+    throw new BadRequestException('Ce type de produit ne classifie pas la qualité de production.');
+  }
+  if (!QUALITY_CLASSES.includes(quality as (typeof QUALITY_CLASSES)[number])) {
+    throw new BadRequestException(`Classe de qualité inconnue : ${quality} (attendue : ${QUALITY_CLASSES.join(', ')})`);
+  }
+  return quality;
 }

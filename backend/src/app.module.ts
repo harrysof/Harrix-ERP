@@ -5,6 +5,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { SupplierOrdersModule } from './supplier-orders/supplier-orders.module.js';
 import { SuppliersModule } from './suppliers/suppliers.module.js';
 import { StockModule } from './stock/stock.module.js';
 import { ProductionModule } from './production/production.module.js';
@@ -26,6 +27,7 @@ import { AuditInterceptor } from './audit/audit.interceptor.js';
     AuditModule,
     SettingsModule,
     SuppliersModule,
+    SupplierOrdersModule,
     StockModule,
     ProductionModule,
     PurchasingModule,
