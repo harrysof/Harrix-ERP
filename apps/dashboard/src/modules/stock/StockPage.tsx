@@ -3,7 +3,7 @@ import { useInventoryTypes } from "../../state/InventoryTypesContext";
 import { createItem, deleteItem, fetchItems, logUsage, receiveStock, setItemArchived, updateItem, type ApiItem } from "../../lib/stockApi";
 import { fetchSuppliers, type Supplier } from "../../lib/suppliersApi";
 import { ApiError } from "../../lib/api";
-import { formatDate, formatQuantity } from "../../lib/format";
+import { formatCurrency, formatDate, formatQuantity } from "../../lib/format";
 import { Button } from "../../components/ui/Button";
 import { Pill } from "../../components/ui/Pill";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -11,7 +11,33 @@ import { Banner } from "../../components/ui/Banner";
 import { AddItemModal } from "./AddItemModal";
 import { ReceiveStockModal } from "./ReceiveStockModal";
 import { LogUsageModal } from "./LogUsageModal";
-import { ItemHistoryModal } from "./ItemHistoryModal";
+import { ItemDetailModal } from "./ItemDetailModal";
+import { SupplierOrdersModal } from "./SupplierOrdersModal";
+
+function CriticalityPill({ value }: { value: string }) {
+  const tone = value === "Haute" ? "danger" : value === "Moyenne" ? "warn" : value === "Basse" ? "ok" : "neutral";
+  return <Pill tone={tone}>{value}</Pill>;
+}
+
+/** Compact per-product quality classification: 1er / 2ème / rebut, plus the
+ * unaccounted warning that surfaces the reconciliation problem at a glance. */
+function QualityCell({ item }: { item: ApiItem }) {
+  const q = item.qualityBreakdown;
+  if (!q) return null;
+  const bits = [`1er ${q["1er"]}`, `2e ${q["2ème"]}`, `rebut ${q.rebut}`];
+  return (
+    <div className="fifo-cell">
+      <span className="quality-bits">
+        {bits.map((b) => (
+          <span key={b} className="cell-truncate">
+            {b}
+          </span>
+        ))}
+      </span>
+      {!!item.unaccounted && <Pill tone="danger">{item.unaccounted} inconnues</Pill>}
+    </div>
+  );
+}
 
 type ModalState =
   | { kind: "none" }
@@ -19,7 +45,8 @@ type ModalState =
   | { kind: "edit"; item: ApiItem }
   | { kind: "receive"; item: ApiItem }
   | { kind: "usage"; item: ApiItem }
-  | { kind: "history"; item: ApiItem };
+  | { kind: "orders" }
+  | { kind: "detail"; item: ApiItem };
 
 export function StockPage() {
   const { types, loading: typesLoading, error: typesError } = useInventoryTypes();
@@ -154,6 +181,9 @@ export function StockPage() {
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
             Afficher les archivés
           </label>
+          <Button variant="secondary" onClick={() => setModal({ kind: "orders" })}>
+            Commandes fournisseurs
+          </Button>
           <Button variant="primary" onClick={() => setModal({ kind: "add" })}>
             + Nouvel article
           </Button>
@@ -185,21 +215,81 @@ export function StockPage() {
           <table className="stock-table">
             <thead>
               <tr>
+                <th>Photo</th>
                 <th>Article</th>
                 <th>Référence</th>
-                {inventoryType.hasBatches ? <th>Prochain lot (FIFO)</th> : null}
-                <th>Quantité</th>
+                {inventoryType.hasColor ? <th>Couleur</th> : null}
+                {inventoryType.hasSize ? <th>Taille</th> : null}
+                {inventoryType.hasGender ? <th>Sexe</th> : null}
+                {inventoryType.hasPrice ? <th>Prix (DZD)</th> : null}
+                {inventoryType.hasDescription ? <th>Description</th> : null}
+                {inventoryType.hasMachineInfo ? <th>Machine</th> : null}
+                {inventoryType.hasMachineInfo ? <th>Fabricant</th> : null}
+                {inventoryType.hasMachineInfo ? <th>Localisation</th> : null}
+                {inventoryType.hasMachineInfo ? <th>Criticité</th> : null}
+                {inventoryType.hasBatches ? <th>{inventoryType.hasExpiry ? "Prochain lot (FEFO)" : "Prochain lot (FIFO)"}</th> : null}
+                {inventoryType.hasQuality ? <th>Qualité</th> : null}
+                <th>Fournisseur</th>
+                <th>Acheté</th>
+                <th>Utilisé</th>
+                <th>Restant</th>
+                <th>Réapp.</th>
                 <th>Statut</th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
               {visibleItems.map((item) => (
-                <tr key={item.id}>
+                <tr
+                  key={item.id}
+                  className="stock-row-clickable"
+                  onClick={() => setModal({ kind: "detail", item })}
+                  title="Voir les détails"
+                >
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {item.photoUrl ? (
+                      <img className="stock-thumb" src={item.photoUrl} alt={item.name} />
+                    ) : (
+                      <span className="stock-thumb stock-thumb-none" aria-hidden="true">
+                        {item.name.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </td>
                   <td>{item.name}</td>
                   <td className="tabular">{item.reference}</td>
-                  {inventoryType.hasBatches ? (
+                  {inventoryType.hasColor ? (
                     <td>
+                      {item.color ? <span className="variant-chip">{item.color}</span> : <span className="field-hint">—</span>}
+                    </td>
+                  ) : null}
+                  {inventoryType.hasSize ? (
+                    <td className="tabular">{item.size ? <span className="variant-chip">{item.size}</span> : <span className="field-hint">—</span>}</td>
+                  ) : null}
+                  {inventoryType.hasGender ? (
+                    <td className="tabular">{item.gender ? <span className="variant-chip">{item.gender}</span> : <span className="field-hint">—</span>}</td>
+                  ) : null}
+                  {inventoryType.hasPrice ? (
+                    <td className="tabular">{item.price != null ? formatCurrency(item.price) : <span className="field-hint">—</span>}</td>
+                  ) : null}
+                  {inventoryType.hasDescription ? (
+                    <td title={item.description ?? undefined}>
+                      {item.description ? <span className="cell-truncate">{item.description}</span> : <span className="field-hint">—</span>}
+                    </td>
+                  ) : null}
+                  {inventoryType.hasMachineInfo ? (
+                    <td>{item.machine ? <span className="cell-truncate">{item.machine}</span> : <span className="field-hint">—</span>}</td>
+                  ) : null}
+                  {inventoryType.hasMachineInfo ? (
+                    <td>{item.manufacturer ? item.manufacturer : <span className="field-hint">—</span>}</td>
+                  ) : null}
+                  {inventoryType.hasMachineInfo ? (
+                    <td>{item.location ? <span className="cell-truncate">{item.location}</span> : <span className="field-hint">—</span>}</td>
+                  ) : null}
+                  {inventoryType.hasMachineInfo ? (
+                    <td>{item.criticality ? <CriticalityPill value={item.criticality} /> : <span className="field-hint">—</span>}</td>
+                  ) : null}
+                  {inventoryType.hasBatches ? (
+                    <td onClick={(e) => e.stopPropagation()}>
                       {item.fifoBatch ? (
                         <span className="fifo-cell">
                           <span>
@@ -214,15 +304,35 @@ export function StockPage() {
                       )}
                     </td>
                   ) : null}
-                  <td className="tabular">{formatQuantity(item.quantity, item.unit)}</td>
+                  {inventoryType.hasQuality ? (
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <QualityCell item={item} />
+                    </td>
+                  ) : null}
+                  <td>{item.supplier ? item.supplier.name : <span className="field-hint">—</span>}</td>
+                  <td className="tabular">{formatQuantity(item.purchased, item.unit)}</td>
+                  <td className="tabular">{formatQuantity(item.used, item.unit)}</td>
+                  <td className="tabular stock-row-remaining">{formatQuantity(item.quantity, item.unit)}</td>
+                  <td className="tabular" title={`Seuil de réapprovisionnement : ${formatQuantity(item.reorderThreshold, item.unit)}`}>
+                    {formatQuantity(item.reorderThreshold, item.unit)}
+                  </td>
                   <td>
                     {item.archived ? (
                       <Pill tone="neutral">Archivé</Pill>
                     ) : (
-                      <Pill tone={item.low ? "warn" : "ok"}>{item.low ? `Faible (seuil ${formatQuantity(item.reorderThreshold, item.unit)})` : "OK"}</Pill>
+                      <span className="fifo-cell">
+                        {item.stockStatus === "low" ? (
+                          <Pill tone="danger">Faible</Pill>
+                        ) : item.stockStatus === "mid" ? (
+                          <Pill tone="warn">Moyen</Pill>
+                        ) : (
+                          <Pill tone="ok">Bien</Pill>
+                        )}
+                        {item.low ? <Pill tone="danger">Réapprovisionner</Pill> : null}
+                      </span>
                     )}
                   </td>
-                  <td>
+                  <td onClick={(e) => e.stopPropagation()}>
                     <div className="row-actions">
                       <Button variant="secondary" onClick={() => setModal({ kind: "receive", item })} disabled={item.archived}>
                         Réception
@@ -230,8 +340,8 @@ export function StockPage() {
                       <Button variant="secondary" onClick={() => setModal({ kind: "usage", item })} disabled={item.archived || item.quantity <= 0}>
                         Sortie
                       </Button>
-                      <Button variant="ghost" onClick={() => setModal({ kind: "history", item })}>
-                        Historique
+                      <Button variant="ghost" onClick={() => setModal({ kind: "detail", item })}>
+                        Détails
                       </Button>
                       <Button variant="ghost" onClick={() => setModal({ kind: "edit", item })}>
                         Modifier
@@ -299,6 +409,7 @@ export function StockPage() {
           itemName={modal.item.name}
           itemUnit={modal.item.unit}
           itemQuantity={modal.item.quantity}
+          itemMachine={modal.item.machine ?? ""}
           inventoryType={inventoryType}
           onClose={() => setModal({ kind: "none" })}
           onSubmit={async (input) => {
@@ -309,9 +420,16 @@ export function StockPage() {
         />
       )}
 
-      {modal.kind === "history" && (
-        <ItemHistoryModal itemId={modal.item.id} itemName={modal.item.name} itemUnit={modal.item.unit} onClose={() => setModal({ kind: "none" })} />
+      {modal.kind === "orders" && (
+        <SupplierOrdersModal
+          suppliers={suppliers}
+          items={activeItems}
+          onClose={() => setModal({ kind: "none" })}
+          onStockChanged={loadItems}
+        />
       )}
+
+      {modal.kind === "detail" && <ItemDetailModal item={modal.item} onClose={() => setModal({ kind: "none" })} />}
     </div>
   );
 }

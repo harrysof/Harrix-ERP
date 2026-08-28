@@ -12,7 +12,7 @@ interface ReceiveStockModalProps {
   inventoryType: InventoryTypeConfig;
   suppliers: Supplier[];
   onClose: () => void;
-  onSubmit: (input: { quantity: number; date: string; supplierId: string | null; batchNumber?: string; expiryDate?: string | null }) => Promise<void> | void;
+  onSubmit: (input: { quantity: number; date: string; supplierId: string | null; batchNumber?: string; expiryDate?: string | null; quality?: string | null }) => Promise<void> | void;
 }
 
 export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers, onClose, onSubmit }: ReceiveStockModalProps) {
@@ -21,6 +21,7 @@ export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers
   const [supplierId, setSupplierId] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
+  const [quality, setQuality] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,6 +52,7 @@ export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers
         supplierId: supplierId || null,
         batchNumber: inventoryType.hasBatches ? batchNumber.trim() : undefined,
         expiryDate: inventoryType.hasExpiry ? expiryDate : undefined,
+        quality: inventoryType.hasQuality ? quality || null : undefined,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue.");
@@ -105,6 +107,17 @@ export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers
               </Field>
             ) : null}
           </div>
+        ) : null}
+
+        {inventoryType.hasQuality ? (
+          <Field label="Classe de qualité" hint="Comment ces unités sont classées à leur sortie de production">
+            <select className="input" value={quality} onChange={(e) => setQuality(e.target.value)}>
+              <option value="">— Non classé —</option>
+              <option value="1er">1er choix</option>
+              <option value="2ème">2ème choix</option>
+              <option value="rebut">Rebut</option>
+            </select>
+          </Field>
         ) : null}
 
         {error ? <p className="form-error">{error}</p> : null}

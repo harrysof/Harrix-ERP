@@ -10,19 +10,30 @@ import { formatDate, formatQuantity } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import { ApiError } from "../../lib/api";
 
-const REASONS = ["Production", "Maintenance", "Casse", "Périmé", "Ajustement d'inventaire", "Autre"];
+const REASONS = ["Vente", "Production", "Maintenance", "Casse", "Périmé", "Ajustement d'inventaire", "Autre"];
 
 interface LogUsageModalProps {
   itemId: string;
   itemName: string;
   itemUnit: string;
   itemQuantity: number;
+  itemMachine: string;
   inventoryType: InventoryTypeConfig;
   onClose: () => void;
-  onSubmit: (input: { batchId: string | null; quantity: number; date: string; reason: string }) => Promise<void> | void;
+  onSubmit: (input: {
+    batchId: string | null;
+    quantity: number;
+    date: string;
+    reason: string;
+    machine?: string | null;
+    maintenanceRef?: string | null;
+    employee?: string | null;
+    notes?: string | null;
+    quality?: string | null;
+  }) => Promise<void> | void;
 }
 
-export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, inventoryType, onClose, onSubmit }: LogUsageModalProps) {
+export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, itemMachine, inventoryType, onClose, onSubmit }: LogUsageModalProps) {
   const [batches, setBatches] = useState<ApiBatch[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -35,8 +46,13 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, invent
 
   const [quantity, setQuantity] = useState("");
   const [date, setDate] = useState(todayIso());
-  const [reason, setReason] = useState(REASONS[0]);
+  const [reason, setReason] = useState(inventoryType.hasMachineInfo ? "Maintenance" : inventoryType.hasQuality ? "Vente" : REASONS[0]);
   const [customReason, setCustomReason] = useState("");
+  const [machine, setMachine] = useState(itemMachine);
+  const [maintenanceRef, setMaintenanceRef] = useState("");
+  const [employee, setEmployee] = useState("");
+  const [notes, setNotes] = useState("");
+  const [quality, setQuality] = useState("");
   const [batchId, setBatchId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -66,7 +82,17 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, invent
     setSubmitting(true);
     const finalReason = reason === "Autre" ? customReason.trim() || "Autre" : reason;
     try {
-      await onSubmit({ batchId: inventoryType.hasBatches ? batchId : null, quantity: quantityValue, date, reason: finalReason });
+      await onSubmit({
+        batchId: inventoryType.hasBatches ? batchId : null,
+        quantity: quantityValue,
+        date,
+        reason: finalReason,
+        machine: inventoryType.hasMachineInfo ? machine.trim() || null : null,
+        maintenanceRef: inventoryType.hasMachineInfo ? maintenanceRef.trim() || null : null,
+        employee: inventoryType.hasMachineInfo ? employee.trim() || null : null,
+        notes: inventoryType.hasMachineInfo ? notes.trim() || null : null,
+        quality: inventoryType.hasQuality ? quality || null : null,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue.");
       setSubmitting(false);
@@ -114,12 +140,12 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, invent
     >
       <div className="form-stack">
         {inventoryType.hasBatches ? (
-          <Field label="Lot à utiliser" hint="Le plus ancien est proposé en premier (FIFO)">
+          <Field label="Lot à utiliser" hint="Priorité au lot qui expire le plus tôt (FEFO) ; à défaut, le plus ancien (FIFO)">
             <select className="input" value={batchId ?? ""} onChange={(e) => setBatchId(e.target.value)}>
               {batches!.map((b, i) => (
                 <option key={b.id} value={b.id}>
                   {b.batchNumber} — reçu le {formatDate(b.receivedDate)} · {formatQuantity(b.remaining, itemUnit)} restant
-                  {i === 0 ? " (le plus ancien)" : ""}
+                  {i === 0 ? " (prioritaire)" : ""}
                 </option>
               ))}
             </select>
@@ -155,6 +181,39 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, invent
           <Field label="Préciser">
             <input className="input" value={customReason} onChange={(e) => setCustomReason(e.target.value)} />
           </Field>
+        ) : null}
+
+        {inventoryType.hasQuality ? (
+          <Field label="Classe de qualité" hint="Si ces sorties concernent une classe précise (1er choix, 2ème choix, rebut)">
+            <select className="input" value={quality} onChange={(e) => setQuality(e.target.value)}>
+              <option value="">— Non classé —</option>
+              <option value="1er">1er choix</option>
+              <option value="2ème">2ème choix</option>
+              <option value="rebut">Rebut</option>
+            </select>
+          </Field>
+        ) : null}
+
+        {inventoryType.hasMachineInfo ? (
+          <>
+            <p className="detail-type" style={{ margin: 0 }}>
+              Détails maintenance
+            </p>
+            <Field label="Machine">
+              <input className="input" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder="Machine concernée" />
+            </Field>
+            <div className="form-row">
+              <Field label="Référence maintenance" hint="Ex. MT-2026-021">
+                <input className="input" value={maintenanceRef} onChange={(e) => setMaintenanceRef(e.target.value)} />
+              </Field>
+              <Field label="Employé / intervenant">
+                <input className="input" value={employee} onChange={(e) => setEmployee(e.target.value)} />
+              </Field>
+            </div>
+            <Field label="Notes">
+              <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Panne constatée, pièce remplacée…" />
+            </Field>
+          </>
         ) : null}
 
         {error ? <p className="form-error">{error}</p> : null}

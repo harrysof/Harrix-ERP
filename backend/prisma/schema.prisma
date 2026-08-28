@@ -34,6 +34,24 @@ model InventoryType {
   hasBatches       Boolean @default(false)
   hasExpiry        Boolean @default(false)
   isProductionInput Boolean @default(false)
+  /// Whether items in this inventory carry a colour / size variant (e.g. tige).
+  hasColor         Boolean @default(false)
+  hasSize          Boolean @default(false)
+  /// Whether items carry a free-text description (e.g. spare parts).
+  hasDescription   Boolean @default(false)
+  /// Whether items carry maintenance-oriented machine info (machine,
+  /// compatibility, manufacturer, location, criticality) and their usages
+  /// record maintenance context (reference, employee, notes). Used by spare
+  /// parts.
+  hasMachineInfo   Boolean @default(false)
+  /// Whether items carry a gender variant — "M"/"F". Used by finished goods.
+  hasGender        Boolean @default(false)
+  /// Whether items carry a sale price (in DZD). Used by finished goods.
+  hasPrice         Boolean @default(false)
+  /// Whether movements distinguish production quality ("1er"/"2ème"/"rebut").
+  /// Used by finished goods — the classified buckets reconcile against the
+  /// computed quantity to surface unaccounted units.
+  hasQuality       Boolean @default(false)
   defaultUnit      String
   sortOrder        Int     @default(0)
 
@@ -48,11 +66,31 @@ model Item {
   reference         String   @unique
   unit              String
   reorderThreshold  Float
-  archived          Boolean  @default(false)
+/// Optional photo — a URL (http/https) or a data-URI (inline image).
+  photoUrl          String?
+  /// Optional variant attributes (relevant for e.g. tige des chaussures).
+  color             String?
+  size              String?
+  /// Optional free-text description (relevant for e.g. spare parts).
+  description       String?
+  /// Maintenance-oriented attributes (relevant for spare parts; gated in the
+  /// UI by InventoryType.hasMachineInfo).
+  machine           String?
+  compatibility     String?
+  manufacturer      String?
+  location          String?
+  criticality       String?
+  /// Optional gender variant "M"/"F" (relevant for e.g. produced footwear;
+  /// gated in the UI by InventoryType.hasGender).
+  gender            String?
+  /// Optional sale price in DZD (gated in the UI by InventoryType.hasPrice).
+  price             Float?
+  archived          Boolean @default(false)
   createdAt         DateTime @default(now())
 
-  batches   Batch[]
-  movements Movement[]
+  batches           Batch[]
+  movements         Movement[]
+  supplierOrderLines SupplierOrderLine[]
 
   /// Batches where this item is the finished product being made.
   producedIn    ProductionBatch[]
@@ -100,6 +138,17 @@ model Movement {
   supplierId String?
   /// Only set on "OUT" movements (e.g. "Production", "Casse", "Périmé").
   reason     String?
+  /// Maintenance context recorded on OUT usages of spare parts
+  /// (gated in the UI by InventoryType.hasMachineInfo).
+  machine        String?
+  maintenanceRef String?
+  employee       String?
+  notes          String?
+  /// Production character classification for finished goods
+  /// (gated by InventoryType.hasQuality): "1er", "2ème" or "rebut".
+  /// Movements left untagged are exactly what the reconciliation flags as
+  /// unaccounted units — stock whose presence no production record explains.
+  quality        String?
   createdAt  DateTime  @default(now())
 
   @@index([itemId])
@@ -118,6 +167,42 @@ model Supplier {
   createdAt   DateTime @default(now())
 
   movements Movement[]
+  supplierOrders SupplierOrder[]
+}
+
+/// A purchase order placed with a supplier. Stock only actually enters the
+/// inventory when the order is received (see POST /supplier-orders/:id/receive,
+/// which creates the IN movements and batch records). "regular inventory"
+/// (tige, spare parts) has no expiry; chemicals orders carry per-line batch
+/// info captured at receive time.
+model SupplierOrder {
+  id           String   @id @default(cuid())
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  supplierId   String
+  orderDate    DateTime
+  /// "open" | "received" — plain string, validated at the API boundary.
+  status       String   @default("open")
+  receivedDate DateTime?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  lines SupplierOrderLine[]
+
+  @@index([supplierId])
+}
+
+model SupplierOrderLine {
+  id              String        @id @default(cuid())
+  order           SupplierOrder @relation(fields: [orderId], references: [id])
+  orderId         String
+  item            Item          @relation(fields: [itemId], references: [id])
+  itemId          String
+  quantityOrdered Float
+  /// Batch details captured when the order is received (chemicals only).
+  batchNumber     String?
+  expiryDate      DateTime?
+
+  @@index([orderId])
 }
 
 /// A single production activity: one product, one machine, one shift.
