@@ -7,10 +7,15 @@ export interface Supplier {
   phone: string | null;
   email: string | null;
   address: string | null;
+  /** Free-text registre de commerce / NIF / NIS — §13. */
+  registration: string | null;
   notes: string | null;
   archived: boolean;
   createdAt: string;
 }
+
+/** Alias used by purchasingApi's supplier-detail payload. */
+export type ApiSupplier = Supplier;
 
 export interface SupplierInput {
   name: string;
@@ -18,6 +23,7 @@ export interface SupplierInput {
   phone?: string;
   email?: string;
   address?: string;
+  registration?: string;
   notes?: string;
 }
 

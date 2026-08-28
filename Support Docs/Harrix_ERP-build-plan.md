@@ -136,15 +136,19 @@ These five answers change how everything else gets built. Guessing wrong here me
 
 *The selling side. It draws stock down out of finished goods and feeds the revenue figures on the dashboard.*
 
-- [ ] **Build the customer record: nom complet, email, téléphone, adresse, date de création** — Plus a customer detail page showing their full order history.
-- [ ] **Build the order record: numéro, date, client, statut d'expédition, statut de paiement, total** — Shipment: expédié / en attente / annulé. Payment: payé / en attente / annulé. Two separate statuses — an order can be paid but not yet shipped.
-- [ ] **Build the order lines: product, quantity, unit price, line total** — Prices are copied onto the order at the moment it is created, not looked up live; otherwise last year's invoices change when you update a price.
-- [ ] **Build the invoice view: sous-total, livraison, remise, taxe, total, customer details** — Make it print cleanly to A4. He will want paper copies.
-- [ ] **Make marking an order shipped reduce finished-goods stock** — The other half of Phase 6's increase. Now finished stock has a full in-and-out story.
-- [ ] **Build the orders list with search and status filters** — Sorted newest first, with the two statuses as coloured labels so the pending ones stand out.
-- [ ] **Warn when an order exceeds available stock** — A warning, not a block; factories take orders they will produce next week. But he should know.
+- [x] **Build the customer record: nom complet, email, téléphone, adresse, date de création** — Plus a customer detail page showing their full order history.
+- [x] **Build the order record: numéro, date, client, statut d'expédition, statut de paiement, total** — Shipment: expédié / en attente / annulé. Payment: payé / en attente / annulé. Two separate statuses — an order can be paid but not yet shipped.
+- [x] **Build the order lines: product, quantity, unit price, line total** — Prices are copied onto the order at the moment it is created, not looked up live; otherwise last year's invoices change when you update a price.
+- [x] **Build the invoice view: sous-total, livraison, remise, taxe, total, customer details** — Make it print cleanly to A4. He will want paper copies.
+- [x] **Make marking an order shipped reduce finished-goods stock** — The other half of Phase 6's increase. Now finished stock has a full in-and-out story.
+- [x] **Build the orders list with search and status filters** — Sorted newest first, with the two statuses as coloured labels so the pending ones stand out.
+- [x] **Warn when an order exceeds available stock** — A warning, not a block; factories take orders they will produce next week. But he should know.
 
 **Done when:** a real order goes in, prints as a proper invoice, and marking it shipped drops finished stock by exactly the right amount.
+
+---
+
+> **Done 2026-08-28.** Backend module + §15–19 frontend. Shipping is one transaction. Stock shortage is a *warning* on the order (`stockWarnings` on every pending order) and a hard error only at ship time, per the bullet above. **Purchasing (§13–14) was built alongside it** — supplier detail, purchase orders, and receiving that records lot + expiry for chemicals — though the build plan never had a phase for it. Not done: product catalogue fields on order lines (image/colour/size), payments ledger, returns/credit notes — see PROJECT_CONTEXT.md §9.
 
 ---
 

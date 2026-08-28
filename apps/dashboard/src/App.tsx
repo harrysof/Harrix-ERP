@@ -9,7 +9,8 @@ import { ChangePasswordModal } from "./modules/auth/ChangePasswordModal";
 import { DashboardPage } from "./modules/dashboard/DashboardPage";
 import { StockPage } from "./modules/stock/StockPage";
 import { ProductionPage } from "./modules/production/ProductionPage";
-import { OrdersPage } from "./modules/orders/OrdersPage";
+import { PurchasingPage } from "./modules/purchasing/PurchasingPage";
+import { SalesPage } from "./modules/sales/SalesPage";
 import { HRPage } from "./modules/hr/HRPage";
 import { SuppliersPage } from "./modules/suppliers/SuppliersPage";
 import { UsersPage } from "./modules/admin/UsersPage";
@@ -19,7 +20,8 @@ const PAGE_COPY: Record<TabId, { title: string; subtitle: string }> = {
   dashboard: { title: "Tableau de bord", subtitle: "Vue d'ensemble de l'usine" },
   stock: { title: "Stock", subtitle: "Les 4 inventaires : produits chimiques, tige, pièces détachées, produits finis" },
   production: { title: "Production", subtitle: "Lots de production, traçabilité des matières, écarts et pertes" },
-  orders: { title: "Commandes & clients", subtitle: "Suivi des commandes et de la clientèle" },
+  purchasing: { title: "Achats", subtitle: "Fournisseur → bon de commande → réception → stock" },
+  orders: { title: "Ventes & clients", subtitle: "Commandes, factures et base clients" },
   hr: { title: "Ressources humaines", subtitle: "Employés, heures travaillées et absences" },
   suppliers: { title: "Fournisseurs", subtitle: "Fournisseurs de matières premières et de pièces détachées" },
   users: { title: "Utilisateurs", subtitle: "Comptes, rôles et permissions" },
@@ -80,7 +82,8 @@ function MainApp() {
       {tab === "dashboard" && <DashboardPage onGoToStock={() => can("stock:read") && setTab("stock")} />}
       {tab === "stock" && <StockPage />}
       {tab === "production" && <ProductionPage />}
-      {tab === "orders" && <OrdersPage />}
+      {tab === "purchasing" && <PurchasingPage />}
+      {tab === "orders" && <SalesPage />}
       {tab === "hr" && <HRPage />}
       {tab === "suppliers" && <SuppliersPage />}
       {tab === "users" && <UsersPage />}

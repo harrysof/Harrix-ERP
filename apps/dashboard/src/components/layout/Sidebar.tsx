@@ -1,7 +1,7 @@
 import type { Permission } from "../../lib/authApi";
 import { useAuth } from "../../state/AuthContext";
 
-export type TabId = "dashboard" | "stock" | "production" | "orders" | "hr" | "suppliers" | "users" | "audit";
+export type TabId = "dashboard" | "stock" | "production" | "purchasing" | "orders" | "hr" | "suppliers" | "users" | "audit";
 
 interface NavItem {
   id: TabId;
@@ -18,7 +18,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Tableau de bord" },
   { id: "stock", label: "Stock", permission: "stock:read" },
   { id: "production", label: "Production", permission: "production:read" },
-  { id: "orders", label: "Commandes & clients", permission: "orders:read" },
+  { id: "purchasing", label: "Achats", permission: "purchasing:read" },
+  { id: "orders", label: "Ventes & clients", permission: "orders:read" },
   { id: "hr", label: "Ressources humaines", permission: "hr:read" },
   { id: "suppliers", label: "Fournisseurs", permission: "suppliers:read" },
   { id: "users", label: "Utilisateurs", permission: "users:manage" },

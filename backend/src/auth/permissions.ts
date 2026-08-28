@@ -23,6 +23,11 @@ export const PERMISSIONS = {
   SUPPLIERS_READ: 'suppliers:read',
   SUPPLIERS_WRITE: 'suppliers:write',
 
+  PURCHASING_READ: 'purchasing:read',
+  PURCHASING_WRITE: 'purchasing:write',
+  /// Approving a purchase order is a spending decision, separate from writing one.
+  PURCHASING_APPROVE: 'purchasing:approve',
+
   ORDERS_READ: 'orders:read',
   ORDERS_WRITE: 'orders:write',
 
@@ -59,6 +64,14 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: Array<{ key:
     permissions: [
       { key: PERMISSIONS.SUPPLIERS_READ, label: 'Consulter les fournisseurs' },
       { key: PERMISSIONS.SUPPLIERS_WRITE, label: 'Créer et modifier les fournisseurs' },
+    ],
+  },
+  {
+    label: 'Achats',
+    permissions: [
+      { key: PERMISSIONS.PURCHASING_READ, label: 'Consulter les bons de commande' },
+      { key: PERMISSIONS.PURCHASING_WRITE, label: 'Créer des bons de commande et enregistrer les réceptions' },
+      { key: PERMISSIONS.PURCHASING_APPROVE, label: 'Approuver et annuler les bons de commande' },
     ],
   },
   {

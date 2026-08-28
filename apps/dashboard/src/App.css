@@ -1266,6 +1266,174 @@ button.topbar-user:hover {
   opacity: 0.55;
 }
 
+/* ---------- purchasing & sales ---------- */
+
+/* Money totals block, shared by purchase orders and customer invoices so the
+   two always read identically. */
+.totals-panel {
+  margin-left: auto;
+  width: min(340px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 3px 0;
+}
+
+.totals-row-muted {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-left: 12px;
+}
+
+.totals-row-strong {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* One editable order line: product, qty, price, discount, running total. */
+.order-line {
+  display: grid;
+  grid-template-columns: 2fr 0.9fr 1fr 1fr auto auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.order-line:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.order-line-total {
+  padding-bottom: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* One line of the receiving form, grouped so lot + expiry stay with their item. */
+.receive-line {
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+}
+
+.receive-line-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+/* Invoice header and the two address columns. */
+.invoice-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-label {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+
+.invoice-code {
+  margin: 2px 0;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.invoice-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.invoice-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.invoice-block {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.invoice-block p {
+  margin: 0 0 3px;
+}
+
+.invoice-block-strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Printing an invoice or purchase order: drop the app chrome, keep the page. */
+@media print {
+  .sidebar,
+  .topbar,
+  .toolbar,
+  .filter-bar,
+  .tab-strip,
+  .modal-footer,
+  .modal-close,
+  .banner {
+    display: none !important;
+  }
+  .modal-overlay {
+    position: static;
+    background: none;
+    padding: 0;
+  }
+  .modal-panel {
+    max-width: none !important;
+    box-shadow: none;
+    border: none;
+  }
+  .app-content {
+    padding: 0;
+  }
+}
+
 /* ---------- responsive ---------- */
 
 @media (max-width: 760px) {
@@ -1296,6 +1464,13 @@ button.topbar-user:hover {
   }
   .form-row {
     grid-template-columns: 1fr;
+  }
+  .order-line,
+  .material-line {
+    grid-template-columns: 1fr 1fr;
+  }
+  .totals-panel {
+    width: 100%;
   }
   .filter-bar .field {
     min-width: 0;

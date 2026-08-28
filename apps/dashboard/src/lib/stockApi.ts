@@ -40,6 +40,8 @@ export interface ApiMovement {
   createdAt: string;
   batch: { batchNumber: string } | null;
   supplier: { name: string } | null;
+  /** Present only where the endpoint joins it (supplier detail); absent elsewhere. */
+  item?: { id: string; name: string; reference: string; unit: string };
 }
 
 export interface StockSummary {

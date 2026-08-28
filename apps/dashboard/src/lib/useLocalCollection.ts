@@ -3,11 +3,11 @@ import { loadFromStorage, saveToStorage } from "./storage";
 
 /**
  * A list of records persisted to localStorage, for modules that don't have
- * a backend module yet (Customers, Orders, HR — see
+ * a backend module yet (HR only, now that Orders moved to the API — see
  * PROJECT_CONTEXT.md → "What's backend-wired vs. local-only"). Once a
  * module gets a real API, its page switches to fetch/mutate calls like
- * Stock, Suppliers and Production did, and this hook goes away for that
- * module.
+ * Stock, Suppliers, Production and Sales did, and this hook goes away for
+ * that module. HR is the last remaining user.
  */
 export function useLocalCollection<T extends { id: string }>(storageKey: string) {
   const [items, setItems] = useState<T[]>(() => loadFromStorage(storageKey, [] as T[]));

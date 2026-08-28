@@ -135,6 +135,20 @@ Seeded roles: `gerant` (all 13 permissions, protected), `stock` / Magasinier, `p
 
 Append-only in spirit, like `Movement`.
 
+### `PurchaseOrder` / `PurchaseOrderLine`
+§14. `code` is unique and generated per year (`"BC-2026-0007"`). Lines hold `quantity` and `unitCost`; **no `received` column** — that is summed from `ReceiptLine`. Order-level `shipping`/`discount`/`tax` are stored, every total is computed.
+
+Status is one of `DRAFT`, `SUBMITTED`, `APPROVED`, `PARTIALLY_RECEIVED`, `RECEIVED`, `CANCELLED`. The last two are set by the service, never the caller (§4).
+
+### `Receipt` / `ReceiptLine`
+One delivery against a PO (`"BR-2026-0007"`). Posting a receipt is the only purchasing action that moves stock: it writes the IN `Movement`s and, for chemicals, the `Batch` carrying lot number and expiry (§14's "receiving should also record the relevant lot and expiration information"). `ReceiptLine.movementId` and `.batchId` are plain ids, not relations, so nothing can cascade into the append-only ledger.
+
+### `Customer`
+§18. `code` unique (`"CLI-2026-0001"`), plus the structured address §17 needs: `address`, `city`, `province`, `country`, `postalCode`. Archived rather than deleted once they have orders; a customer with none can be deleted outright.
+
+### `Order` / `OrderLine`
+§15–17. `code` unique (`"CMD-2026-0007"`). `shipmentStatus` is `PENDING`/`SHIPPED`/`CANCELLED`; `paymentStatus` is `PENDING`/`PAID`/`CANCELLED`. Lines hold `quantity`, `unitPrice` and a per-line `discount`; totals are computed. `shipTo*` is the address snapshot (§4). `shippedAt` and `OrderLine.movementId` are set when the order ships — creating an order writes no movements at all.
+
 ### 5.3 The math (`backend/src/stock/stock-math.ts`)
 Pure functions, unit tested in `stock-math.spec.ts`:
 - `getItemQuantity(movements, itemId)` — the sum.
@@ -152,6 +166,20 @@ Pure data and pure functions, unit tested in `permissions.spec.ts` (13 tests). T
 `stock:read|write|manage`, `production:read|write`, `suppliers:read|write`, `orders:read|write`, `hr:read|write`, `users:manage`, `audit:read`.
 
 Note `write` does **not** imply `manage` — a magasinier records receptions and usage but cannot create or delete articles. `parsePermissions`/`serializePermissions` are the only code that knows the comma-separated storage format, and both drop unknown strings rather than trusting the database. `PERMISSION_GROUPS` is what the UI renders, so the frontend doesn't hardcode the list.
+
+### 5.6 The purchasing math (`backend/src/purchasing/purchasing-math.ts`)
+Pure functions, 14 tests in `purchasing-math.spec.ts`:
+- `receivedForLine` / `outstandingForLine` — summed from receipts; outstanding never goes negative on an over-delivery.
+- `poTotals` — subtotal from lines, then + shipping + tax − discount.
+- `statusAfterReceipt` — `RECEIVED` only when *every* line is complete, `PARTIALLY_RECEIVED` when any is, and `CANCELLED` stays `CANCELLED`.
+- `outstandingCommitment` — §13's figure: the value of everything ordered but not delivered, on POs that are neither received nor cancelled.
+
+### 5.7 The sales math (`backend/src/sales/sales-math.ts`)
+Pure functions, 13 tests in `sales-math.spec.ts`:
+- `lineTotal` — quantity × price − line discount, clamped at zero.
+- `orderTotals` — §16's calculation. The order total is also clamped at zero, so an over-large discount can't produce a negative invoice.
+- `canShip` / `canEdit` / `canCancel` — the lifecycle rules. A shipped order can't be edited, re-shipped, cancelled or deleted, because its lines already moved real stock. These three are returned on every order payload so the UI never offers a button the server will refuse.
+- `summarizeCustomer` — §19's three figures. `outstandingBalance` is whole-order (payment `PENDING`), not partial: there is no payments ledger, by decision.
 
 ---
 
@@ -179,6 +207,28 @@ All routes are prefixed `/api`. All bodies are JSON, validated with `class-valid
 | GET | `/users/permissions` | `users:manage` | The permission vocabulary, grouped, so the UI doesn't hardcode it |
 | GET | `/audit` `?userId=&entity=&action=&from=&to=&limit=` | `audit:read` | Newest first, capped at 500 |
 | GET | `/audit/filter-options` | `audit:read` | Distinct entities and actions actually present |
+| GET | `/purchasing/orders` `?supplierId=&status=&from=&to=` | `purchasing:read` | Purchase orders, each with computed `totals` and per-line `received`/`outstanding` |
+| GET | `/purchasing/orders/:id` | `purchasing:read` | One PO, same computed shape, with its receipts |
+| POST | `/purchasing/orders` | `purchasing:write` | `CreatePurchaseOrderDto`. Creates the PO — **does not touch stock** |
+| PATCH | `/purchasing/orders/:id` | `purchasing:write` | Edit. Lines may only be replaced while `DRAFT` or `SUBMITTED` |
+| PATCH | `/purchasing/orders/:id/status` | `purchasing:approve` | `DRAFT`/`SUBMITTED`/`APPROVED`/`CANCELLED` only. 400 on `RECEIVED`/`PARTIALLY_RECEIVED`; 409 cancelling a PO that already has receipts |
+| POST | `/purchasing/orders/:id/receive` | `purchasing:write` | **The transactional one.** Writes the receipt, its lines, the IN movements and (for chemicals) the `Batch` with lot + expiry, then recomputes the PO status. 409 unless the PO is `APPROVED`/`PARTIALLY_RECEIVED`; 400 on a missing lot, missing expiry, or over-delivery without `allowOverDelivery` |
+| DELETE | `/purchasing/orders/:id` | `purchasing:write` | Only an untouched `DRAFT`; anything else must be cancelled |
+| GET | `/purchasing/suppliers/:id` | `purchasing:read` | §13's supplier detail: info, supplied items, POs, receipts, full IN-movement history, and the summary (total purchased, outstanding commitment, last purchase) |
+| GET | `/sales/customers` `?includeArchived=` | `orders:read` | Customers with §19's `orderCount`/`totalPurchased`/`outstandingBalance` |
+| GET | `/sales/customers/:id` | `orders:read` | §19's detail: profile, order history, summaries |
+| POST | `/sales/customers` | `orders:write` | Create (`CreateCustomerDto`) — email validated only if supplied |
+| PATCH | `/sales/customers/:id` | `orders:write` | Partial update |
+| PATCH | `/sales/customers/:id/archive` / `/unarchive` | `orders:write` | Toggle archived |
+| DELETE | `/sales/customers/:id` | `orders:write` | Only for a customer with **no** orders; 409 otherwise |
+| GET | `/sales/orders` `?customerId=&shipmentStatus=&paymentStatus=&from=&to=&search=` | `orders:read` | §15's list. `search` matches order code, customer name and customer email |
+| GET | `/sales/orders/:id` | `orders:read` | §17's invoice payload, with `totals` and the `canEdit`/`canShip`/`canCancel` flags |
+| GET | `/sales/orders/summary` `?<same filters>` | `orders:read` | Counts, revenue, outstanding |
+| POST | `/sales/orders` | `orders:write` | `CreateOrderDto`. **Does not touch stock.** Snapshots the customer's address. Accepts no total — §16 |
+| PATCH | `/sales/orders/:id` | `orders:write` | Edit. 409 once shipped or cancelled |
+| PATCH | `/sales/orders/:id/status` | `orders:write` | Payment status, or cancel. 400 on `shipmentStatus: SHIPPED` — that must go through the ship endpoint |
+| POST | `/sales/orders/:id/ship` | `orders:write` | **The transactional one.** One OUT movement per line + the status change, in one transaction. 400 naming the product if stock is short; 409 if already shipped |
+| DELETE | `/sales/orders/:id` | `orders:write` | 409 once shipped — it has a stock trail |
 | GET | `/settings/inventory-types` | `connecté` | The 4 inventory types, sorted |
 | GET | `/suppliers?includeArchived=` | `suppliers:read` | List suppliers |
 | GET | `/suppliers/:id` | `suppliers:read` | One supplier |
@@ -236,7 +286,8 @@ One folder per tab. Inside, a `<Name>Page.tsx` composes the page; forms are sepa
 | **Stock** | Backend (SQLite/Postgres) | Fully wired. Reference implementation for how a module should look. |
 | **Suppliers** | Backend | Fully wired. Simplest reference implementation (no computed fields, no FIFO). |
 | **Production** | Browser (`harrix.production-runs.v1`) | The run record itself (worker, machine, shift, 1er/2ème/rebut, gap reason) is local. **But** logging a run makes real `POST /stock/items/:id/usage` calls for every material consumed and a real `POST /stock/items/:id/receive` call for the finished goods produced (1er + 2ème choix only — rebut is recorded but never added to sellable stock). See `modules/production/ProductionForm.tsx`. |
-| **Commandes & clients** | Browser (`harrix.customers.v1`, `harrix.orders.v1`) | Same pattern: order/customer records are local, but marking an order "Expédié" makes a real `POST /stock/items/:id/usage` call per line (reason `"Vente"`) against the real finished-goods stock. See `modules/orders/OrderInvoiceModal.tsx` → `markShipped`. |
+| **Achats** | Backend | Fully wired. Purchase orders, receipts, supplier activity. Receiving is one transaction. |
+| **Ventes & clients** | Backend | Fully wired as of 2026-08-28. `modules/orders/` is deleted; `harrix.customers.v1` and `harrix.orders.v1` are dead keys and are not migrated. Shipping is one transaction. |
 | **Ressources humaines** | Browser (`harrix.employees.v1`, `harrix.time-entries.v1`, `harrix.absences.v1`) | Fully local — no dependency on Stock, no backend module. |
 
 ### 8.2 The pattern to copy when giving a module a real backend
@@ -279,7 +330,7 @@ Production and Orders make **multiple separate API calls** for one logical actio
 | 2 — Auth/roles | **Done.** Users table with bcrypt hashes, roles-as-data with permission strings, French login screen, backend enforcement on every endpoint, gérant screen to create/deactivate users, and an audit log. Acceptance test verified: a magasinier account gets 403 on `/users` and `/audit` even calling the API directly. Remaining gaps in §9 (no `userId` on movements, no login rate limiting). |
 | 3 — App shell | Done — sidebar (now filtered by permission), topbar with user menu and logout. Only the desktop shell exists so far (no phone-first PWA shell yet) |
 | 4 — Stock system | Backend + frontend done, including suppliers. Real starting counts have **not** been loaded — it's still demo data (`prisma:seed`) |
-| 5 — Product catalogue & pricing | Not started — see §9's "finished-goods item stands in for product" |
+| 5 — Product catalogue & pricing | Not started — and now the largest remaining gap: it is what §17's image/colour/size and any real pricing depend on — see §9's "finished-goods item stands in for product" |
 | 6 — Production | Frontend + real stock integration done; **backend module not built** (§8.3) |
 | 7 — Orders & customers | Frontend + real stock integration (on ship) done; backend module not built |
 | 8 — HR | Frontend done, fully local, no backend module |

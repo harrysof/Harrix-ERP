@@ -1,0 +1,338 @@
+import { useCallback, useEffect, useState } from "react";
+import { Banner } from "../../components/ui/Banner";
+import { Button } from "../../components/ui/Button";
+import { Field } from "../../components/ui/Field";
+import { Pill } from "../../components/ui/Pill";
+import { EmptyState } from "../../components/ui/EmptyState";
+import { StatCard } from "../../components/ui/StatCard";
+import { ApiError } from "../../lib/api";
+import { formatCurrency, formatDate } from "../../lib/format";
+import { fetchItems, type ApiItem } from "../../lib/stockApi";
+import {
+  fetchCustomers,
+  fetchOrders,
+  fetchOrdersSummary,
+  PAYMENT_LABELS,
+  PAYMENT_STATUSES,
+  PAYMENT_TONES,
+  SHIPMENT_LABELS,
+  SHIPMENT_STATUSES,
+  SHIPMENT_TONES,
+  type ApiCustomer,
+  type ApiOrder,
+  type OrderFilters,
+  type OrdersSummary,
+} from "../../lib/salesApi";
+import { useAuth } from "../../state/AuthContext";
+import { OrderModal } from "./OrderModal";
+import { OrderDetailModal } from "./OrderDetailModal";
+import { CustomerModal } from "./CustomerModal";
+import { CustomerDetailModal } from "./CustomerDetailModal";
+
+type Tab = "orders" | "customers";
+type Modal =
+  | { kind: "none" }
+  | { kind: "newOrder" }
+  | { kind: "editOrder"; order: ApiOrder }
+  | { kind: "orderDetail"; id: string }
+  | { kind: "newCustomer" }
+  | { kind: "editCustomer"; customer: ApiCustomer }
+  | { kind: "customerDetail"; customer: ApiCustomer };
+
+/** §15–19: the sales module — order list, order details, and customers. */
+export function SalesPage() {
+  const { can } = useAuth();
+  const [tab, setTab] = useState<Tab>("orders");
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [customers, setCustomers] = useState<ApiCustomer[]>([]);
+  const [products, setProducts] = useState<ApiItem[]>([]);
+  const [summary, setSummary] = useState<OrdersSummary | null>(null);
+  const [filters, setFilters] = useState<OrderFilters>({});
+  const [showArchived, setShowArchived] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<Modal>({ kind: "none" });
+
+  const load = useCallback(() => {
+    setLoading(true);
+    return Promise.all([fetchOrders(filters), fetchCustomers(true), fetchOrdersSummary(filters), fetchItems()])
+      .then(([nextOrders, nextCustomers, nextSummary, items]) => {
+        setOrders(nextOrders);
+        setCustomers(nextCustomers);
+        setSummary(nextSummary);
+        setProducts(items.filter((i) => i.inventoryType.key === "finished-goods"));
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les ventes."))
+      .finally(() => setLoading(false));
+  }, [filters]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const set = (patch: Partial<OrderFilters>) => setFilters((prev) => ({ ...prev, ...patch }));
+  const hasFilters = Object.values(filters).some(Boolean);
+  const writable = can("orders:write");
+
+  const activeCustomers = customers.filter((c) => !c.archived);
+  const visibleCustomers = showArchived ? customers : activeCustomers;
+  const openOrder = modal.kind === "orderDetail" ? orders.find((o) => o.id === modal.id) ?? null : null;
+
+  return (
+    <div className="page-stack">
+      {error ? <Banner tone="danger">{error}</Banner> : null}
+
+      {summary ? (
+        <div className="stat-grid">
+          <StatCard label="Commandes" value={summary.orderCount} hint={`${summary.pendingShipment} en attente`} />
+          <StatCard label="Expédiées" value={summary.shipped} tone="ok" />
+          <StatCard label="Chiffre d'affaires" value={formatCurrency(summary.revenue)} hint="Hors commandes annulées" />
+          <StatCard
+            label="Impayé"
+            value={formatCurrency(summary.outstanding)}
+            hint="Commandes non réglées"
+            tone={summary.outstanding > 0 ? "danger" : "ok"}
+          />
+        </div>
+      ) : null}
+
+      <div className="toolbar">
+        <div className="tab-strip">
+          <button type="button" className={`tab-strip-item ${tab === "orders" ? "tab-strip-item-active" : ""}`} onClick={() => setTab("orders")}>
+            Commandes
+            {orders.length > 0 ? <span className="tab-strip-badge">{orders.length}</span> : null}
+          </button>
+          <button
+            type="button"
+            className={`tab-strip-item ${tab === "customers" ? "tab-strip-item-active" : ""}`}
+            onClick={() => setTab("customers")}
+          >
+            Clients
+            {activeCustomers.length > 0 ? <span className="tab-strip-badge">{activeCustomers.length}</span> : null}
+          </button>
+        </div>
+        {writable ? (
+          <div className="toolbar-actions">
+            {tab === "orders" ? (
+              <Button variant="primary" onClick={() => setModal({ kind: "newOrder" })} disabled={activeCustomers.length === 0}>
+                + Nouvelle commande
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => setModal({ kind: "newCustomer" })}>
+                + Nouveau client
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {tab === "orders" && activeCustomers.length === 0 && !loading ? (
+        <Banner tone="info">Créez d'abord un client — une commande doit être rattachée à quelqu'un.</Banner>
+      ) : null}
+
+      {tab === "orders" ? (
+        <>
+          <div className="filter-bar">
+            <Field label="Recherche" hint="N° de commande, nom ou email">
+              <input className="input" value={filters.search ?? ""} onChange={(e) => set({ search: e.target.value })} placeholder="CMD-2026-… " />
+            </Field>
+            <Field label="Expédition">
+              <select className="input" value={filters.shipmentStatus ?? ""} onChange={(e) => set({ shipmentStatus: e.target.value })}>
+                <option value="">Toutes</option>
+                {SHIPMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {SHIPMENT_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Paiement">
+              <select className="input" value={filters.paymentStatus ?? ""} onChange={(e) => set({ paymentStatus: e.target.value })}>
+                <option value="">Tous</option>
+                {PAYMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {PAYMENT_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Du">
+              <input className="input" type="date" value={filters.from ?? ""} onChange={(e) => set({ from: e.target.value })} />
+            </Field>
+            <Field label="Au">
+              <input className="input" type="date" value={filters.to ?? ""} onChange={(e) => set({ to: e.target.value })} />
+            </Field>
+            {hasFilters ? (
+              <Button variant="ghost" onClick={() => setFilters({})}>
+                Réinitialiser
+              </Button>
+            ) : null}
+          </div>
+
+          {loading ? (
+            <p className="loading-text">Chargement des commandes…</p>
+          ) : orders.length === 0 ? (
+            <EmptyState
+              title={hasFilters ? "Aucune commande ne correspond" : "Aucune commande"}
+              description={hasFilters ? "Élargissez la recherche ou réinitialisez les filtres." : undefined}
+            />
+          ) : (
+            <div className="table-scroll">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>N° commande</th>
+                    <th>Date</th>
+                    <th>Client</th>
+                    <th>Email</th>
+                    <th>Expédition</th>
+                    <th>Paiement</th>
+                    <th className="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className={
+                        order.shipmentStatus === "CANCELLED"
+                          ? "row-muted"
+                          : order.stockWarnings.length > 0
+                            ? "row-attention"
+                            : undefined
+                      }
+                    >
+                      <td>
+                        <button type="button" className="link-button" onClick={() => setModal({ kind: "orderDetail", id: order.id })}>
+                          {order.code}
+                        </button>
+                        {order.stockWarnings.length > 0 ? (
+                          <span className="muted" title="Stock insuffisant pour expédier maintenant">
+                            {" "}
+                            ⚠
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="tabular">{formatDate(order.date)}</td>
+                      <td>{order.customer.fullName}</td>
+                      <td>{order.customer.email ?? <span className="muted">—</span>}</td>
+                      <td>
+                        <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>{SHIPMENT_LABELS[order.shipmentStatus]}</Pill>
+                      </td>
+                      <td>
+                        <Pill tone={PAYMENT_TONES[order.paymentStatus]}>{PAYMENT_LABELS[order.paymentStatus]}</Pill>
+                      </td>
+                      <td className="tabular num">{formatCurrency(order.totals.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="toolbar">
+            <label className="checkbox-row">
+              <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+              <span>Afficher les clients archivés</span>
+            </label>
+          </div>
+
+          {loading ? (
+            <p className="loading-text">Chargement des clients…</p>
+          ) : visibleCustomers.length === 0 ? (
+            <EmptyState title="Aucun client" description="Ajoutez vos clients pour pouvoir créer des commandes." />
+          ) : (
+            <div className="table-scroll">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>Nom complet</th>
+                    <th>Email</th>
+                    <th>Téléphone</th>
+                    <th className="num">Commandes</th>
+                    <th className="num">Total acheté</th>
+                    <th className="num">Solde dû</th>
+                    <th>Statut</th>
+                    <th>Créé le</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleCustomers.map((customer) => (
+                    <tr key={customer.id} className={customer.archived ? "row-muted" : undefined}>
+                      <td>
+                        <button type="button" className="link-button" onClick={() => setModal({ kind: "customerDetail", customer })}>
+                          {customer.fullName}
+                        </button>
+                      </td>
+                      <td>{customer.email ?? <span className="muted">—</span>}</td>
+                      <td className="tabular">{customer.phone ?? <span className="muted">—</span>}</td>
+                      <td className="tabular num">{customer.orderCount}</td>
+                      <td className="tabular num">{formatCurrency(customer.totalPurchased)}</td>
+                      <td className="tabular num">
+                        {customer.outstandingBalance > 0 ? (
+                          <strong>{formatCurrency(customer.outstandingBalance)}</strong>
+                        ) : (
+                          formatCurrency(0)
+                        )}
+                      </td>
+                      <td>
+                        <Pill tone={customer.archived ? "neutral" : "ok"}>{customer.archived ? "Archivé" : "Actif"}</Pill>
+                      </td>
+                      <td className="tabular">{formatDate(customer.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {modal.kind === "newOrder" || modal.kind === "editOrder" ? (
+        <OrderModal
+          customers={activeCustomers}
+          products={products}
+          order={modal.kind === "editOrder" ? modal.order : undefined}
+          onClose={() => setModal({ kind: "none" })}
+          onSaved={() => {
+            setModal({ kind: "none" });
+            load();
+          }}
+        />
+      ) : null}
+
+      {openOrder ? (
+        <OrderDetailModal
+          order={openOrder}
+          onClose={() => setModal({ kind: "none" })}
+          onChanged={load}
+          onEdit={() => setModal({ kind: "editOrder", order: openOrder })}
+        />
+      ) : null}
+
+      {modal.kind === "newCustomer" || modal.kind === "editCustomer" ? (
+        <CustomerModal
+          customer={modal.kind === "editCustomer" ? modal.customer : null}
+          onClose={() => setModal({ kind: "none" })}
+          onSaved={() => {
+            setModal({ kind: "none" });
+            load();
+          }}
+        />
+      ) : null}
+
+      {modal.kind === "customerDetail" ? (
+        <CustomerDetailModal
+          customer={modal.customer}
+          onClose={() => setModal({ kind: "none" })}
+          onChanged={load}
+          onEdit={(customer) => setModal({ kind: "editCustomer", customer })}
+          onOpenOrder={(id) => setModal({ kind: "orderDetail", id })}
+        />
+      ) : null}
+    </div>
+  );
+}

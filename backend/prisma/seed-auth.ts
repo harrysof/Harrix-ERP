@@ -39,10 +39,10 @@ const ROLES = [
   {
     key: 'stock',
     label: 'Magasinier',
-    description: 'Réceptions, sorties et consultation du stock. Voit les fournisseurs, pas les salaires.',
+    description: 'Réceptions, sorties, consultation du stock, bons de commande et réceptions fournisseurs. Ne peut pas approuver un achat ni voir les salaires.',
     isProtected: false,
     sortOrder: 1,
-    permissions: [P.STOCK_READ, P.STOCK_WRITE, P.SUPPLIERS_READ, P.PRODUCTION_READ],
+    permissions: [P.STOCK_READ, P.STOCK_WRITE, P.SUPPLIERS_READ, P.PRODUCTION_READ, P.PURCHASING_READ, P.PURCHASING_WRITE],
   },
   {
     key: 'production',

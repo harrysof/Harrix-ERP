@@ -18,6 +18,7 @@ export function SupplierModal({
   const [phone, setPhone] = useState(supplier?.phone ?? "");
   const [email, setEmail] = useState(supplier?.email ?? "");
   const [address, setAddress] = useState(supplier?.address ?? "");
+  const [registration, setRegistration] = useState(supplier?.registration ?? "");
   const [notes, setNotes] = useState(supplier?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +37,7 @@ export function SupplierModal({
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
         address: address.trim() || undefined,
+        registration: registration.trim() || undefined,
         notes: notes.trim() || undefined,
       });
     } catch (e) {
@@ -77,6 +79,10 @@ export function SupplierModal({
         <Field label="Adresse">
           <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
         </Field>
+        <Field label="Immatriculation" hint="Registre de commerce, NIF, NIS…">
+          <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value)} />
+        </Field>
+
         <Field label="Notes">
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>

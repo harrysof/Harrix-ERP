@@ -6,10 +6,13 @@ import { Pill } from "../../components/ui/Pill";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Banner } from "../../components/ui/Banner";
 import { SupplierModal } from "./SupplierModal";
+import { SupplierDetailModal } from "./SupplierDetailModal";
+import { useAuth } from "../../state/AuthContext";
 
-type ModalState = { kind: "none" } | { kind: "add" } | { kind: "edit"; supplier: Supplier };
+type ModalState = { kind: "none" } | { kind: "add" } | { kind: "edit"; supplier: Supplier } | { kind: "detail"; supplier: Supplier };
 
 export function SuppliersPage() {
+  const { can } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
@@ -94,7 +97,15 @@ export function SuppliersPage() {
             <tbody>
               {visible.map((s) => (
                 <tr key={s.id}>
-                  <td>{s.name}</td>
+                  <td>
+                    {can("purchasing:read") ? (
+                      <button type="button" className="link-button" onClick={() => setModal({ kind: "detail", supplier: s })}>
+                        {s.name}
+                      </button>
+                    ) : (
+                      s.name
+                    )}
+                  </td>
                   <td>{s.contactName ?? "—"}</td>
                   <td className="tabular">{s.phone ?? "—"}</td>
                   <td>
@@ -102,6 +113,11 @@ export function SuppliersPage() {
                   </td>
                   <td>
                     <div className="row-actions">
+                      {can("purchasing:read") ? (
+                        <Button variant="ghost" onClick={() => setModal({ kind: "detail", supplier: s })}>
+                          Fiche
+                        </Button>
+                      ) : null}
                       <Button variant="secondary" onClick={() => setModal({ kind: "edit", supplier: s })}>
                         Modifier
                       </Button>
@@ -127,6 +143,10 @@ export function SuppliersPage() {
             setModal({ kind: "none" });
           }}
         />
+      )}
+
+      {modal.kind === "detail" && (
+        <SupplierDetailModal supplier={modal.supplier} onClose={() => setModal({ kind: "none" })} />
       )}
 
       {modal.kind === "edit" && (

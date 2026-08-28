@@ -58,6 +58,9 @@ model Item {
   producedIn    ProductionBatch[]
   /// Lines where this item was consumed as a raw material.
   consumedIn    ProductionConsumption[]
+  /// Purchase-order lines and customer-order lines naming this item.
+  purchaseLines PurchaseOrderLine[]
+  orderLines    OrderLine[]
 
   @@index([inventoryTypeId])
 }
@@ -114,10 +117,15 @@ model Supplier {
   email       String?
   address     String?
   notes       String?
+  /// Free-text registration details (registre de commerce, NIF, NIS…). One
+  /// field rather than four columns: the exact set differs by country, and
+  /// nothing computes on them.
+  registration String?
   archived    Boolean  @default(false)
   createdAt   DateTime @default(now())
 
-  movements Movement[]
+  movements       Movement[]
+  purchaseOrders  PurchaseOrder[]
 }
 
 /// A single production activity: one product, one machine, one shift.
@@ -281,4 +289,181 @@ model AuditEntry {
   @@index([userId])
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// ===========================================================================
+// PURCHASING  —  Supplier → PurchaseOrder → Receipt → Inventory
+// ===========================================================================
+
+/// A purchase order sent to a supplier. The commitment side of buying: it
+/// records what was ORDERED. What actually arrived is a Receipt, and stock
+/// only moves when a receipt is posted — never when a PO is created.
+///
+/// Received quantities are never stored on the line. They are always summed
+/// from ReceiptLine, the same rule as stock quantity and production variance:
+/// a stored "received so far" can drift from the receipts it claims to total.
+model PurchaseOrder {
+  id             String   @id @default(cuid())
+  /// Human-readable, unique, generated per calendar year: "BC-2026-0007".
+  /// "BC" = bon de commande.
+  code           String   @unique
+  supplier       Supplier @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  date           DateTime
+  expectedDate   DateTime?
+  /// DRAFT | SUBMITTED | APPROVED | PARTIALLY_RECEIVED | RECEIVED | CANCELLED
+  /// Plain string, same portability reason as Movement.direction.
+  status         String   @default("DRAFT")
+  /// Order-level money, in DZD. Line amounts live on the lines.
+  shipping       Float    @default(0)
+  discount       Float    @default(0)
+  tax            Float    @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  lines    PurchaseOrderLine[]
+  receipts Receipt[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([date])
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  item            Item          @relation(fields: [itemId], references: [id])
+  itemId          String
+  quantity        Float
+  unitCost        Float
+
+  receiptLines ReceiptLine[]
+
+  @@index([purchaseOrderId])
+  @@index([itemId])
+}
+
+/// One delivery against a purchase order. Posting a receipt is what actually
+/// moves stock — it creates the IN movements (and, for chemicals, the Batch
+/// carrying the lot number and expiry date).
+model Receipt {
+  id              String        @id @default(cuid())
+  code            String        @unique
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  date            DateTime
+  /// Supplier's own delivery-note number, for matching paperwork.
+  deliveryNote    String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  lines ReceiptLine[]
+
+  @@index([purchaseOrderId])
+}
+
+model ReceiptLine {
+  id                  String            @id @default(cuid())
+  receipt             Receipt           @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptId           String
+  purchaseOrderLine   PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id])
+  purchaseOrderLineId String
+  quantity            Float
+  /// The Movement this line created. Plain id, not a relation: Movement is an
+  /// append-only ledger and nothing may cascade into it.
+  movementId          String?
+  /// The Batch created for a chemical delivery, carrying lot + expiry.
+  batchId             String?
+
+  @@index([receiptId])
+  @@index([purchaseOrderLineId])
+}
+
+// ===========================================================================
+// SALES  —  Customer → Order → Shipment → Inventory
+// ===========================================================================
+
+model Customer {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  fullName   String
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  province   String?
+  country    String?
+  postalCode String?
+  notes      String?
+  /// Archived rather than deleted: a customer with orders must stay
+  /// attributable, same rule as items and suppliers.
+  archived   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orders Order[]
+}
+
+/// A customer order. Money is stored per line and per order; every TOTAL is
+/// computed on read (orders-math.ts) rather than stored, so a subtotal can
+/// never disagree with the lines it claims to sum.
+model Order {
+  id             String   @id @default(cuid())
+  /// "CMD-2026-0007", unique, generated per calendar year.
+  code           String   @unique
+  customer       Customer @relation(fields: [customerId], references: [id])
+  customerId     String
+  date           DateTime
+  /// PENDING | SHIPPED | CANCELLED
+  shipmentStatus String   @default("PENDING")
+  /// PENDING | PAID | CANCELLED
+  paymentStatus  String   @default("PENDING")
+  shipping       Float    @default(0)
+  discount       Float    @default(0)
+  tax            Float    @default(0)
+  notes          String?
+
+  /// The delivery address, SNAPSHOT from the customer when the order is
+  /// created. Deliberately copied rather than joined: editing a customer's
+  /// address must never silently rewrite where a past order was sent.
+  shipToName       String?
+  shipToPhone      String?
+  shipToEmail      String?
+  shipToAddress    String?
+  shipToCity       String?
+  shipToProvince   String?
+  shipToCountry    String?
+  shipToPostalCode String?
+
+  /// Set when the order ships — the OUT movements are created then, not at
+  /// order time, because an unshipped order hasn't left the building.
+  shippedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines OrderLine[]
+
+  @@index([customerId])
+  @@index([shipmentStatus])
+  @@index([paymentStatus])
+  @@index([date])
+}
+
+model OrderLine {
+  id         String  @id @default(cuid())
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  item       Item    @relation(fields: [itemId], references: [id])
+  itemId     String
+  quantity   Float
+  unitPrice  Float
+  /// Per-line discount in DZD, on top of any order-level discount.
+  discount   Float   @default(0)
+  /// The OUT movement created when the order shipped. Plain id — see ReceiptLine.
+  movementId String?
+
+  @@index([orderId])
+  @@index([itemId])
 }

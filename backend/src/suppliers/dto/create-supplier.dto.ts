@@ -21,6 +21,15 @@ export class CreateSupplierDto {
   @IsString()
   address?: string;
 
+  /**
+   * Free-text registration details (registre de commerce, NIF, NIS…). One
+   * field rather than four columns: the exact set differs by country and
+   * nothing computes on them.
+   */
+  @IsOptional()
+  @IsString()
+  registration?: string;
+
   @IsOptional()
   @IsString()
   notes?: string;
