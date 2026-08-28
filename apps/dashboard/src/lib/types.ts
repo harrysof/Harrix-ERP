@@ -10,6 +10,13 @@ export interface InventoryTypeConfig {
   hasBatches: boolean;
   hasExpiry: boolean;
   isProductionInput: boolean;
+  hasColor: boolean;
+  hasSize: boolean;
+  hasDescription: boolean;
+  hasMachineInfo: boolean;
+  hasGender: boolean;
+  hasPrice: boolean;
+  hasQuality: boolean;
   defaultUnit: string;
   sortOrder: number;
 }

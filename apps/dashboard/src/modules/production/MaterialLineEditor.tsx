@@ -54,7 +54,7 @@ export function MaterialLineEditor({ materialItems, line, onChange, onRemove }: 
       </Field>
 
       {needsBatch ? (
-        <Field label="Lot (FIFO)">
+        <Field label="Lot (FEFO)" hint="Priorité au lot qui expire le plus tôt ; sinon le plus ancien (FIFO)">
           <select
             className="input"
             value={line.batchId ?? ""}

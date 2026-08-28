@@ -8,12 +8,32 @@ export interface ApiItem {
   reference: string;
   unit: string;
   reorderThreshold: number;
+  photoUrl: string | null;
+  color: string | null;
+  size: string | null;
+  description: string | null;
+  machine: string | null;
+  compatibility: string | null;
+  manufacturer: string | null;
+  location: string | null;
+  criticality: string | null;
+  gender: string | null;
+  price: number | null;
   archived: boolean;
   createdAt: string;
   inventoryType: InventoryTypeConfig;
   quantity: number;
+  purchased: number;
+  used: number;
+  supplier: { id: string; name: string } | null;
   low: boolean;
+  stockStatus: "good" | "mid" | "low";
   fifoBatch: ApiBatch | null;
+  recommendedBatch: ApiBatch | null;
+  /** Finished goods only (InventoryType.hasQuality): remaining per production class. */
+  qualityBreakdown?: { "1er": number; "2ème": number; rebut: number };
+  /** Finished goods only: units in stock no production record explains. */
+  unaccounted?: number;
 }
 
 export interface ApiBatch {
@@ -35,6 +55,11 @@ export interface ApiMovement {
   date: string;
   supplierId: string | null;
   reason: string | null;
+  machine: string | null;
+  maintenanceRef: string | null;
+  employee: string | null;
+  notes: string | null;
+  quality: string | null;
   createdAt: string;
   batch: { batchNumber: string } | null;
   supplier: { name: string } | null;
@@ -75,11 +100,44 @@ export function fetchStockSummary(): Promise<StockSummary> {
   return api.get<StockSummary>("/stock/summary");
 }
 
-export function createItem(input: { inventoryTypeId: string; name: string; reference: string; unit: string; reorderThreshold: number }) {
+export function createItem(input: {
+  inventoryTypeId: string;
+  name: string;
+  reference: string;
+  unit: string;
+  reorderThreshold: number;
+  photoUrl?: string | null;
+  color?: string | null;
+  size?: string | null;
+  description?: string | null;
+  machine?: string | null;
+  compatibility?: string | null;
+  manufacturer?: string | null;
+  location?: string | null;
+  criticality?: string | null;
+  gender?: string | null;
+  price?: number | null;
+}) {
   return api.post<ApiItem>("/stock/items", input);
 }
 
-export function updateItem(id: string, input: { name?: string; reference?: string; unit?: string; reorderThreshold?: number }) {
+export function updateItem(id: string, input: {
+  name?: string;
+  reference?: string;
+  unit?: string;
+  reorderThreshold?: number;
+  photoUrl?: string | null;
+  color?: string | null;
+  size?: string | null;
+  description?: string | null;
+  machine?: string | null;
+  compatibility?: string | null;
+  manufacturer?: string | null;
+  location?: string | null;
+  criticality?: string | null;
+  gender?: string | null;
+  price?: number | null;
+}) {
   return api.patch<ApiItem>(`/stock/items/${id}`, input);
 }
 
@@ -89,11 +147,24 @@ export function setItemArchived(id: string, archived: boolean) {
 
 export function receiveStock(
   itemId: string,
-  input: { quantity: number; date: string; supplierId: string | null; batchNumber?: string; expiryDate?: string | null },
+  input: { quantity: number; date: string; supplierId: string | null; batchNumber?: string; expiryDate?: string | null; quality?: string | null },
 ) {
   return api.post(`/stock/items/${itemId}/receive`, input);
 }
 
-export function logUsage(itemId: string, input: { quantity: number; date: string; reason: string; batchId?: string | null }) {
+export function logUsage(
+  itemId: string,
+  input: {
+    quantity: number;
+    date: string;
+    reason: string;
+    batchId?: string | null;
+    machine?: string | null;
+    maintenanceRef?: string | null;
+    employee?: string | null;
+    notes?: string | null;
+    quality?: string | null;
+  },
+) {
   return api.post(`/stock/items/${itemId}/usage`, input);
 }
