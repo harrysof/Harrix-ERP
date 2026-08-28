@@ -20,6 +20,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
+if not exist "%BACKEND%\.env" (
+    echo First-time setup: creating backend\.env from the example...
+    copy "%BACKEND%\.env.example" "%BACKEND%\.env" >nul
+    if errorlevel 1 goto :error
+)
+
 if not exist "%BACKEND%\node_modules" (
     echo First-time setup: installing backend dependencies, this can take a minute...
     call npm install --prefix "%BACKEND%"
