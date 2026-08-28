@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useInventoryTypes } from "../../state/InventoryTypesContext";
-import { createItem, fetchItems, logUsage, receiveStock, setItemArchived, updateItem, type ApiItem } from "../../lib/stockApi";
+import { createItem, deleteItem, fetchItems, logUsage, receiveStock, setItemArchived, updateItem, type ApiItem } from "../../lib/stockApi";
 import { fetchSuppliers, type Supplier } from "../../lib/suppliersApi";
 import { ApiError } from "../../lib/api";
 import { formatDate, formatQuantity } from "../../lib/format";
@@ -48,6 +48,24 @@ export function StockPage() {
   async function toggleArchive(item: ApiItem) {
     await setItemArchived(item.id, !item.archived);
     await loadItems();
+  }
+
+  /**
+   * Only offered for items the backend says are deletable (no movements, no
+   * production references). Everything with history is archived instead — see
+   * PROJECT_CONTEXT.md §4.
+   */
+  async function removeItem(item: ApiItem) {
+    if (!window.confirm(`Supprimer définitivement « ${item.name} » ? Cet article n'a aucun historique, la suppression est donc sans effet sur le stock.`)) {
+      return;
+    }
+    setLoadError(null);
+    try {
+      await deleteItem(item.id);
+      await loadItems();
+    } catch (e) {
+      setLoadError(e instanceof ApiError ? e.message : "Suppression impossible.");
+    }
   }
 
   useEffect(() => {
@@ -221,6 +239,11 @@ export function StockPage() {
                       <Button variant="ghost" onClick={() => toggleArchive(item)}>
                         {item.archived ? "Désarchiver" : "Archiver"}
                       </Button>
+                      {item.deletable ? (
+                        <Button variant="danger" onClick={() => removeItem(item)}>
+                          Supprimer
+                        </Button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

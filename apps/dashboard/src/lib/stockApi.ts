@@ -14,6 +14,8 @@ export interface ApiItem {
   quantity: number;
   low: boolean;
   fifoBatch: ApiBatch | null;
+  /** True only when the item has no movements and no production references. */
+  deletable: boolean;
 }
 
 export interface ApiBatch {
@@ -81,6 +83,14 @@ export function createItem(input: { inventoryTypeId: string; name: string; refer
 
 export function updateItem(id: string, input: { name?: string; reference?: string; unit?: string; reorderThreshold?: number }) {
   return api.patch<ApiItem>(`/stock/items/${id}`, input);
+}
+
+/**
+ * Hard delete. The backend allows it only for an item with no history at all;
+ * anything else comes back as a 409 telling you to archive instead.
+ */
+export function deleteItem(id: string) {
+  return api.del<{ id: string; deleted: boolean }>(`/stock/items/${id}`);
 }
 
 export function setItemArchived(id: string, archived: boolean) {

@@ -26,6 +26,8 @@ function daysFromNow(days: number): Date {
 
 async function main() {
   console.log('Wiping existing data…');
+  await prisma.productionConsumption.deleteMany();
+  await prisma.productionBatch.deleteMany();
   await prisma.movement.deleteMany();
   await prisma.batch.deleteMany();
   await prisma.item.deleteMany();

@@ -7,15 +7,16 @@ interface AppShellProps {
   onNavigate: (tab: TabId) => void;
   title: string;
   subtitle: string;
+  onChangePassword: () => void;
   children: ReactNode;
 }
 
-export function AppShell({ active, onNavigate, title, subtitle, children }: AppShellProps) {
+export function AppShell({ active, onNavigate, title, subtitle, onChangePassword, children }: AppShellProps) {
   return (
     <div className="app-shell">
       <Sidebar active={active} onNavigate={onNavigate} />
       <div className="app-main">
-        <Topbar title={title} subtitle={subtitle} />
+        <Topbar title={title} subtitle={subtitle} onChangePassword={onChangePassword} />
         <main className="app-content">{children}</main>
       </div>
     </div>

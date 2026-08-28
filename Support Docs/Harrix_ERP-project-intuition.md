@@ -1,10 +1,10 @@
-# Chelma Factory ERP — Project Intuition & Architecture Plan
+# Harrix ERP Factory ERP — Project Intuition & Architecture Plan
 
 This is a living specification: what the system needs to do, and how to build it so it stays maintainable, reusable for future factory clients, and doesn't collapse under its own complexity.
 
 ## 1. Context and Problem
 
-**Chelma** is a shoe factory in Algeria currently run entirely manually. The owner (gérant) has no reliable visibility into where materials and finished products actually go — raw materials, work-in-progress, and finished goods are all tracked informally, on paper or by memory.
+**Harrix ERP** is a shoe factory in Algeria currently run entirely manually. The owner (gérant) has no reliable visibility into where materials and finished products actually go — raw materials, work-in-progress, and finished goods are all tracked informally, on paper or by memory.
 
 Core problem: the owner **cannot reconcile finished-product quantities**. Example given: the machine produces 120 units, but a physical count turns up only 110. He wants to know where the missing units went — waste? unrecorded rejects? theft?
 

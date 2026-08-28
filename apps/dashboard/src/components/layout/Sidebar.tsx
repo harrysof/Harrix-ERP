@@ -1,22 +1,39 @@
-export type TabId = "dashboard" | "stock" | "production" | "orders" | "hr" | "suppliers";
+import type { Permission } from "../../lib/authApi";
+import { useAuth } from "../../state/AuthContext";
+
+export type TabId = "dashboard" | "stock" | "production" | "orders" | "hr" | "suppliers" | "users" | "audit";
 
 interface NavItem {
-  id: TabId | string;
+  id: TabId;
   label: string;
-  enabled: boolean;
+  /**
+   * The permission that reveals this tab. Undefined means any logged-in user
+   * can see it. Hiding a tab is a convenience — the backend refuses the
+   * request regardless (build plan Phase 2).
+   */
+  permission?: Permission;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Tableau de bord", enabled: true },
-  { id: "stock", label: "Stock", enabled: true },
-  { id: "production", label: "Production", enabled: true },
-  { id: "orders", label: "Commandes & clients", enabled: true },
-  { id: "hr", label: "Ressources humaines", enabled: true },
-  { id: "suppliers", label: "Fournisseurs", enabled: true },
-  { id: "settings", label: "Paramètres", enabled: false },
+  { id: "dashboard", label: "Tableau de bord" },
+  { id: "stock", label: "Stock", permission: "stock:read" },
+  { id: "production", label: "Production", permission: "production:read" },
+  { id: "orders", label: "Commandes & clients", permission: "orders:read" },
+  { id: "hr", label: "Ressources humaines", permission: "hr:read" },
+  { id: "suppliers", label: "Fournisseurs", permission: "suppliers:read" },
+  { id: "users", label: "Utilisateurs", permission: "users:manage" },
+  { id: "audit", label: "Journal d'activité", permission: "audit:read" },
 ];
 
+/** The tabs this user is allowed to see, in order. */
+export function visibleTabs(can: (permission: Permission) => boolean): TabId[] {
+  return NAV_ITEMS.filter((item) => !item.permission || can(item.permission)).map((item) => item.id);
+}
+
 export function Sidebar({ active, onNavigate }: { active: TabId; onNavigate: (tab: TabId) => void }) {
+  const { can } = useAuth();
+  const items = NAV_ITEMS.filter((item) => !item.permission || can(item.permission));
+
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -25,17 +42,14 @@ export function Sidebar({ active, onNavigate }: { active: TabId; onNavigate: (ta
       </div>
 
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <button
             key={item.id}
             type="button"
             className={`sidebar-link ${active === item.id ? "sidebar-link-active" : ""}`}
-            disabled={!item.enabled}
-            title={item.enabled ? undefined : "Ce module arrive dans une prochaine phase"}
-            onClick={() => item.enabled && onNavigate(item.id as TabId)}
+            onClick={() => onNavigate(item.id)}
           >
             <span>{item.label}</span>
-            {!item.enabled ? <span className="sidebar-soon">bientôt</span> : null}
           </button>
         ))}
       </nav>

@@ -29,6 +29,7 @@ export class StockService {
     const batches = await this.prisma.batch.findMany({
       where: { itemId: { in: items.map((i) => i.id) } },
     });
+    const referenced = await this.findProductionReferences(items.map((i) => i.id));
     const today = new Date();
 
     return items.map((item) => {
@@ -41,6 +42,7 @@ export class StockService {
         quantity,
         low: isLowStock(quantity, item.reorderThreshold),
         fifoBatch,
+        deletable: !movements.some((m) => m.itemId === item.id) && !referenced.has(item.id),
       };
     });
   }
@@ -49,8 +51,14 @@ export class StockService {
     const item = await this.prisma.item.findUnique({ where: { id }, include: { inventoryType: true } });
     if (!item) throw new NotFoundException(`Article introuvable : ${id}`);
     const movements = await this.prisma.movement.findMany({ where: { itemId: id } });
+    const referenced = await this.findProductionReferences([id]);
     const quantity = getItemQuantity(movements, id);
-    return { ...item, quantity, low: isLowStock(quantity, item.reorderThreshold) };
+    return {
+      ...item,
+      quantity,
+      low: isLowStock(quantity, item.reorderThreshold),
+      deletable: movements.length === 0 && !referenced.has(id),
+    };
   }
 
   async listBatches(itemId: string) {
@@ -100,6 +108,54 @@ export class StockService {
   async setItemArchived(id: string, archived: boolean) {
     await this.getItem(id);
     return this.prisma.item.update({ where: { id }, data: { archived } });
+  }
+
+  /**
+   * Hard-delete an item — but ONLY one that has no history at all.
+   *
+   * The rule that an item is archived rather than deleted exists to protect
+   * its movement ledger (see PROJECT_CONTEXT.md §4). An item with zero
+   * movements and no production references has no ledger to protect, so
+   * refusing to delete it was just friction: it left mistyped or unwanted
+   * articles stuck in the list forever with no way out.
+   *
+   * Anything with history still can't be deleted, and says so.
+   */
+  async deleteItem(id: string) {
+    const item = await this.prisma.item.findUnique({ where: { id } });
+    if (!item) throw new NotFoundException(`Article introuvable : ${id}`);
+
+    const movementCount = await this.prisma.movement.count({ where: { itemId: id } });
+    if (movementCount > 0) {
+      throw new ConflictException(
+        `"${item.name}" a ${movementCount} mouvement(s) de stock et ne peut pas être supprimé — son historique serait orphelin. Archivez-le à la place.`,
+      );
+    }
+
+    const referenced = await this.findProductionReferences([id]);
+    if (referenced.has(id)) {
+      throw new ConflictException(
+        `"${item.name}" est utilisé par au moins un lot de production et ne peut pas être supprimé. Archivez-le à la place.`,
+      );
+    }
+
+    // Batches with no movements are the item's own scaffolding, not history.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.batch.deleteMany({ where: { itemId: id } });
+      await tx.item.delete({ where: { id } });
+    });
+
+    return { id, deleted: true };
+  }
+
+  /** Item ids referenced by production, either as a product or as a consumed material. */
+  private async findProductionReferences(itemIds: string[]): Promise<Set<string>> {
+    if (itemIds.length === 0) return new Set();
+    const [consumed, produced] = await Promise.all([
+      this.prisma.productionConsumption.findMany({ where: { itemId: { in: itemIds } }, select: { itemId: true } }),
+      this.prisma.productionBatch.findMany({ where: { productItemId: { in: itemIds } }, select: { productItemId: true } }),
+    ]);
+    return new Set([...consumed.map((c) => c.itemId), ...produced.map((p) => p.productItemId)]);
   }
 
   async receive(itemId: string, dto: ReceiveStockDto) {

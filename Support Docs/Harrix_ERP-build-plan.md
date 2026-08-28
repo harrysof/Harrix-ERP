@@ -1,4 +1,4 @@
-# Chelma ERP — Build Plan
+# Harrix ERP ERP — Build Plan
 
 A build order in plain language. Each phase produces something you can open, click, and show to the gérant — and no phase is finished until a real person at the factory can use it.
 
@@ -24,7 +24,7 @@ These five answers change how everything else gets built. Guessing wrong here me
 2. **Who logs in, and what can each person touch?** Confirmed so far: gérant, stock worker, production worker, RH. Is there also a salesperson for orders and customers? Anyone else?
 3. **Phones or computers on the floor?** A production worker logging a batch on a phone needs big buttons and few fields. On a desktop you can show more at once. Pick one as the main target.
 4. **Do suppliers need their own list?** Right now they are mentioned only as "stock arrived from someone." If you want purchase orders and supplier history, say so now — it adds a small module in Phase 4.
-5. **How many factories, how soon?** If Chelma is the only client for the next year, build for Chelma and generalise later. If a second factory is already interested, the data model needs to be flexible from Phase 4 onward.
+5. **How many factories, how soon?** If Harrix ERP is the only client for the next year, build for Harrix ERP and generalise later. If a second factory is already interested, the data model needs to be flexible from Phase 4 onward.
 
 ---
 
@@ -47,14 +47,16 @@ These five answers change how everything else gets built. Guessing wrong here me
 
 *Login, roles, and permissions. Built second because every screen after this has to ask "who is this person?"*
 
-- [ ] **Build the users table: name, login, password, role** — Passwords stored scrambled (hashed), never as plain text. Non-negotiable.
-- [ ] **Define the roles: gérant, stock, production, RH (+ sales if Phase 0 said yes)** — Store roles as data in a table, not written into the code; the next factory will have different job titles.
-- [ ] **Build the login screen in French** — Connexion, mot de passe, "identifiants incorrects". One screen, shared by all four apps.
-- [ ] **Enforce permissions on the backend, not just by hiding buttons** — Hiding a button stops an honest mistake. Only the backend stops someone who is curious.
-- [ ] **Give the gérant a screen to create and deactivate users** — Workers leave. He needs to cut access himself without calling you.
-- [ ] **Log who did what, and when** — One table recording every change. When the numbers disagree, this is the only thing that settles it.
+- [x] **Build the users table: name, login, password, role** — Passwords stored scrambled (hashed), never as plain text. Non-negotiable.
+- [x] **Define the roles: gérant, stock, production, RH (+ sales if Phase 0 said yes)** — Store roles as data in a table, not written into the code; the next factory will have different job titles.
+- [x] **Build the login screen in French** — Connexion, mot de passe, "identifiants incorrects". One screen, shared by all four apps.
+- [x] **Enforce permissions on the backend, not just by hiding buttons** — Hiding a button stops an honest mistake. Only the backend stops someone who is curious.
+- [x] **Give the gérant a screen to create and deactivate users** — Workers leave. He needs to cut access himself without calling you.
+- [x] **Log who did what, and when** — One table recording every change. When the numbers disagree, this is the only thing that settles it.
 
 **Done when:** a stock worker logs in and physically cannot reach HR data, even if they type the address by hand.
+
+> **Done 2026-08-28.** Verified by calling the API directly with a magasinier token: `GET /users`, `GET /audit`, `POST /stock/items` all return 403; `GET /stock/items` returns 200. Deactivating an account kills its existing session on the next request. See PROJECT_CONTEXT.md §5 (Role/User/AuditEntry), §6 (permission column) and §9 (what is still missing).
 
 ---
 
@@ -77,7 +79,7 @@ These five answers change how everything else gets built. Guessing wrong here me
 
 *Four inventories, four separate screens, one shared engine underneath. The first phase that delivers real value to the factory.*
 
-- [ ] **Model "inventory types" as rows in a table, not as four fixed things in the code** — Chelma has 4. The next factory might have 3 or 6. This one decision is what makes the system resellable.
+- [ ] **Model "inventory types" as rows in a table, not as four fixed things in the code** — Harrix ERP has 4. The next factory might have 3 or 6. This one decision is what makes the system resellable.
 - [ ] **Build the item record: name, reference, unit (kg, litre, pièce), current quantity, reorder threshold** — Shared shape across all four inventories, with extra fields only where a specific inventory needs them.
 - [ ] **Build the movements table — every in and out, and never edit a quantity directly** — Quantity is always calculated from the movements. This is the rule that lets you answer "how did we get to this number?"
 - [ ] **Screen 1 — Produits chimiques, with batches and expiry dates** — Each delivery is its own batch with its own date. The screen shows which batch to use next (FIFO — oldest first) and flags anything expiring soon.
@@ -199,13 +201,13 @@ These five answers change how everything else gets built. Guessing wrong here me
 
 ## Phase 11 — Making it sellable to the next factory
 
-*Only after Chelma is running well. Generalising before you have one happy client means guessing at needs you have never seen.*
+*Only after Harrix ERP is running well. Generalising before you have one happy client means guessing at needs you have never seen.*
 
-- [ ] **Go find everything still hardcoded as "Chelma"** — Factory name, logo, the four inventory names, the quality grades, DZD. Move each one into settings.
+- [ ] **Go find everything still hardcoded as "Harrix ERP"** — Factory name, logo, the four inventory names, the quality grades, DZD. Move each one into settings.
 - [ ] **Build a setup screen for a new factory** — Name, currency, inventory types, quality grades, roles. Turns a two-week custom job into an afternoon.
 - [ ] **Decide: a separate installation per client, or one system serving many** — Separate is far simpler and safer to start with. One system serving many is a real architectural project — only worth it past several clients.
 - [ ] **Write the installation guide for yourself** — You will forget. Six months from now you will thank yourself for this page.
-- [ ] **Package the Chelma data as a demo you can show live** — Realistic numbers, no real customer names. Far more convincing than slides.
+- [ ] **Package the Harrix ERP data as a demo you can show live** — Realistic numbers, no real customer names. Far more convincing than slides.
 
 **Done when:** you can stand up a working system for a new factory in a day, using only the setup screen.
 
@@ -235,4 +237,4 @@ If you remember nothing else from this page, remember these.
 1. **Stock quantity is always calculated from movements**, never edited directly. It is the only way to ever answer "how did we get to this number?"
 2. **The gap-reason field in Phase 6 is not optional.** Without it you know units are missing but never why, and the system answers the gérant's question with a shrug.
 3. **HR hours go into a generic time-entries table from day one.** A hand-typed "hours worked" field means rebuilding HR when the fingerprint clock arrives.
-4. **The four inventories are rows in a table, not four things written into the code.** This single choice is the difference between a Chelma app and a product you can sell.
+4. **The four inventories are rows in a table, not four things written into the code.** This single choice is the difference between a Harrix ERP app and a product you can sell.
