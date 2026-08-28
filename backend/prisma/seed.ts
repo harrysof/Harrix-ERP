@@ -32,6 +32,8 @@ function svgPhoto(ref: string, caption = 'Produit chimique'): string {
 
 async function main() {
   console.log('Wiping existing data…');
+  await prisma.productionConsumption.deleteMany();
+  await prisma.productionBatch.deleteMany();
   await prisma.supplierOrderLine.deleteMany();
   await prisma.supplierOrder.deleteMany();
   await prisma.movement.deleteMany();

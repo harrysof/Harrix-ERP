@@ -8,12 +8,33 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * How the fetch wrapper gets the current token, and how it reports that the
+ * session died. Set once by AuthContext at startup.
+ *
+ * This indirection exists so `api.ts` stays free of React and of
+ * `authApi.ts` — otherwise the two would import each other in a circle.
+ */
+let getToken: () => string | null = () => null;
+let onUnauthenticated: (() => void) | null = null;
+
+export function configureAuth(options: { getToken: () => string | null; onUnauthenticated: () => void }) {
+  getToken = options.getToken;
+  onUnauthenticated = options.onUnauthenticated;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+
   let response: Response;
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
     });
   } catch {
     throw new ApiError(0, "Impossible de joindre le serveur. Vérifiez que le backend est démarré.");
@@ -22,6 +43,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const message = Array.isArray(body?.message) ? body.message.join(" ") : body?.message;
+
+    // 401 means the token is gone, expired, or the account was deactivated —
+    // handled in one place so every screen reacts the same way instead of
+    // each one inventing its own "you were logged out" behaviour. Login
+    // itself is excluded: a wrong password there is a form error, not an
+    // expired session.
+    if (response.status === 401 && !path.startsWith("/auth/login")) {
+      onUnauthenticated?.();
+    }
+
     throw new ApiError(response.status, message || `Erreur ${response.status}`);
   }
 

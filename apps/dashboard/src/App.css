@@ -1109,7 +1109,96 @@ textarea.input {
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- production: variance, monitoring, losses ---------- */
+
+/* Used on every figure the factory reads as a number, so digits line up
+   column-to-column. Previously referenced by the tables without ever being
+   defined. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  text-align: right;
+}
+
+.muted {
+  color: var(--ink-faint);
+}
+
+/* The unknown-units formula, shown as a formula:
+   Attendu - 1er - 2eme - Rebut = Non comptabilise. */
+.variance-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.variance-term {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 96px;
+}
+
+.variance-term-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+
+.variance-term-value {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
+}
+
+.variance-term-unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+.variance-term-ok .variance-term-value {
+  color: var(--ok);
+}
+
+.variance-term-danger .variance-term-value {
+  color: var(--danger);
+}
+
+.variance-operator {
+  align-self: center;
+  padding-top: 14px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .quality-card-hint {
@@ -1155,74 +1244,358 @@ textarea.input {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
 }
 
-.order-card-head {
+.filter-bar .field {
+  min-width: 150px;
+  flex: 0 1 auto;
+}
+
+/* A row whose numbers don't add up. Tinted, not shouted — the point is to
+   draw the eye, not to accuse the operator on it. */
+.stock-table tbody tr.row-attention td {
+  background: var(--danger-soft);
+}
+
+.batch-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunk);
+}
+
+.batch-meta-item {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.batch-meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+
+.batch-meta-value {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.batch-notes {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.rate-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 
-.order-notes {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-
-.order-card-foot {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.order-table td,
-.order-table th {
-  padding: 8px 10px;
-}
-
-.order-lines-editor,
-.order-batches {
+.rate-item {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
-.order-lines-title {
-  margin: 0;
-  font-size: 13px;
+.rate-item-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
   font-weight: 600;
+}
+
+.rate-item-value {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-item-ok .rate-item-value {
+  color: var(--ok);
+}
+
+.rate-item-danger .rate-item-value {
+  color: var(--danger);
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  margin-top: 2px;
+}
+
+.checkbox-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* ---------- login & session ---------- */
+
+.boot-screen,
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
   color: var(--ink-soft);
 }
 
-.order-line-editor {
-  display: grid;
-  grid-template-columns: 1fr 130px auto;
-  gap: 10px;
-  align-items: center;
-}
-
-.order-line-qty {
-  text-align: right;
-}
-
-.order-batch-block {
+.login-card {
+  width: min(400px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 16px;
+  padding: 32px;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface-sunken);
+  box-shadow: var(--shadow-md);
 }
 
-.order-batch-block-name {
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.login-brand-mark {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.login-title {
+  margin: 0;
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.login-subtitle {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.login-submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.login-help {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* ---------- user menu ---------- */
+
+.user-menu {
+  position: relative;
+}
+
+button.topbar-user {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  font: inherit;
+  font-weight: 600;
+}
+
+button.topbar-user:hover {
+  border-color: var(--border-strong);
+}
+
+.user-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.user-menu-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-menu-name {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.user-menu-role {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.user-menu-login {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.user-menu-item {
+  padding: 10px 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.user-menu-item:hover {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.user-menu-item-danger {
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- roles & permissions ---------- */
+
+.role-card {
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.role-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.role-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.role-card-desc {
   margin: 0;
   font-size: 13px;
+  color: var(--ink-soft);
+  max-width: 60ch;
+}
+
+.role-card-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.permission-group-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
   font-weight: 600;
+}
+
+.permission-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.permission-row-on {
+  color: var(--ink);
+}
+
+.permission-row input:not(:disabled) {
+  cursor: pointer;
+}
+
+.permission-row:has(input:not(:disabled)) {
+  cursor: pointer;
+}
+
+/* ---------- audit log ---------- */
+
+audit-changes {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  max-width: 460px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--surface-sunk);
+  border-radius: var(--radius-sm);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* A deactivated account still appears in the list, just visibly retired. */
+.stock-table tbody tr.row-muted td {
+  opacity: 0.55;
 }
 
 /* ---------- responsive ---------- */
@@ -1255,5 +1628,15 @@ textarea.input {
   }
   .form-row {
     grid-template-columns: 1fr;
+  }
+  .filter-bar .field {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+  .variance-strip {
+    gap: 8px 12px;
+  }
+  .variance-operator {
+    padding-top: 0;
   }
 }
