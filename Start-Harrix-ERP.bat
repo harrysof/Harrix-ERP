@@ -24,12 +24,22 @@ if not exist "%BACKEND%\.env" (
     echo First-time setup: creating backend\.env from the example...
     copy "%BACKEND%\.env.example" "%BACKEND%\.env" >nul
     if errorlevel 1 goto :error
+
+    echo First-time setup: generating a random JWT secret...
+    for /f "delims=" %%S in ('node -e "console.log(require(\"crypto\").randomBytes(48).toString(\"base64url\"))"') do set "JWTSECRET=%%S"
+    if "%JWTSECRET%"=="" goto :error
+
+    powershell -NoProfile -Command "(Get-Content -Raw '%BACKEND%\.env') -replace 'changez-moi-par-une-longue-chaine-aleatoire', '%JWTSECRET%' | Set-Content -NoNewline -Encoding utf8 '%BACKEND%\.env'"
+    if errorlevel 1 goto :error
 )
 
 if not exist "%BACKEND%\node_modules" (
     echo First-time setup: installing backend dependencies, this can take a minute...
     call npm install --prefix "%BACKEND%"
     if errorlevel 1 goto :error
+
+    echo First-time setup: approving native module builds...
+    call npm approve-scripts --prefix "%BACKEND%" "@prisma/engines" bcrypt better-sqlite3 esbuild prisma
 )
 
 if not exist "%FRONTEND%\node_modules" (
@@ -49,6 +59,10 @@ if not exist "%BACKEND%\dev.db" (
     call npm run prisma:deploy --prefix "%BACKEND%"
     if errorlevel 1 goto :error
     call npm run prisma:seed --prefix "%BACKEND%"
+    if errorlevel 1 goto :error
+
+    echo First-time setup: creating the first login account...
+    call npm run seed:auth --prefix "%BACKEND%"
     if errorlevel 1 goto :error
 )
 
@@ -71,6 +85,10 @@ echo ============================================
 echo   Harrix ERP is running.
 echo   Keep the two new windows open ("Server" and "App").
 echo   To stop everything, close those two windows (or press Ctrl+C in each).
+echo.
+echo   First login (change the password after signing in):
+echo     Username: gerant
+echo     Password: harrix2026
 echo ============================================
 echo.
 pause
