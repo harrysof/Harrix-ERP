@@ -23,6 +23,9 @@ export type Permission =
   | "orders:write"
   | "hr:read"
   | "hr:write"
+  | "finance:read"
+  | "finance:write"
+  | "finance:manage"
   | "users:manage"
   | "audit:read";
 

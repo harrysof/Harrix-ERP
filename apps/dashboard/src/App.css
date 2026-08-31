@@ -1930,3 +1930,205 @@ audit-changes {
   flex-direction: column;
   gap: 6px;
 }
+
+
+/* ---------- finance ---------- */
+
+/*
+ * The period picker sits opposite the Coûts/Prix tabs. Its arrows are square
+ * so a month can be stepped through without the layout shifting.
+ */
+.period-picker {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.period-picker .field {
+  min-width: 150px;
+}
+
+.section-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+/*
+ * The allocation division, printed in full. This is the one number on the
+ * Prix view that is a judgement rather than a fact, so it is shown as the
+ * arithmetic that produced it and never as a bare figure.
+ */
+.allocation-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-sunk);
+}
+
+.allocation-formula {
+  margin: 6px 0 4px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+/* A cell whose label opens the row's detail. */
+.link-cell {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-cell:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.link-cell:disabled {
+  cursor: default;
+}
+
+/* Secondary text under a cell's main value. */
+.cell-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  max-width: 52ch;
+}
+
+.cell-note-warn {
+  color: var(--warn);
+}
+
+.cell-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* The computed figure, kept visible beside the accountant's correction. */
+.cell-strike {
+  text-decoration: line-through;
+}
+
+.stock-table tbody tr.row-derived td {
+  background: var(--surface-sunk);
+}
+
+/* An expanded detail row, indented under the line it belongs to. */
+.stock-table tbody tr.row-child td,
+.stock-table tfoot tr.row-child td {
+  background: var(--surface-sunk);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.child-label {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* The cost build-up: matières + directs + quote-part = coût de revient. */
+.cost-breakdown {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+
+.cost-breakdown-terms {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.cost-breakdown-totals {
+  flex: 1;
+  min-width: 260px;
+}
+
+.cost-breakdown-totals p {
+  margin: 0 0 6px;
+}
+
+.cost-term {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+}
+
+.cost-term-label {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.cost-term-value {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.cost-term-note {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.cost-term-total .cost-term-value {
+  font-weight: 600;
+}
+
+/* Computed against corrected, side by side, in the correction dialog. */
+.override-compare {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-sunk);
+}
+
+.override-compare > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.override-arrow {
+  color: var(--ink-soft);
+  font-size: 18px;
+}
+
+.override-computed {
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+
+.override-kept {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .allocation-card,
+  .override-compare {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cost-breakdown {
+    flex-direction: column;
+    gap: 12px;
+  }
+}

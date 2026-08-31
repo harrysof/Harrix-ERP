@@ -11,6 +11,7 @@ import { StockModule } from './stock/stock.module.js';
 import { ProductionModule } from './production/production.module.js';
 import { PurchasingModule } from './purchasing/purchasing.module.js';
 import { SalesModule } from './sales/sales.module.js';
+import { FinanceModule } from './finance/finance.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuditModule } from './audit/audit.module.js';
@@ -32,6 +33,7 @@ import { AuditInterceptor } from './audit/audit.interceptor.js';
     ProductionModule,
     PurchasingModule,
     SalesModule,
+    FinanceModule,
   ],
   controllers: [AppController],
   providers: [

@@ -91,6 +91,10 @@ model Item {
   /// valuation actually reports is the weighted average of what was really
   /// paid (see stock/stock-math.ts) — this column is only the starting point.
   unitCost          Float?
+  /// Target markup on the computed cost price, as a fraction (0.25 = +25%),
+  /// overriding FinanceSetting.defaultMargin for this product only. Null
+  /// means "use the factory default".
+  targetMargin      Float?
   archived          Boolean @default(false)
   createdAt         DateTime @default(now())
 
@@ -105,6 +109,8 @@ model Item {
   /// Purchase-order lines and customer-order lines naming this item.
   purchaseLines PurchaseOrderLine[]
   orderLines    OrderLine[]
+  /// Costs the accountant attributed to this product specifically.
+  costEntries   CostEntry[]
 
   @@index([inventoryTypeId])
 }
@@ -584,4 +590,107 @@ model OrderLine {
 
   @@index([orderId])
   @@index([itemId])
+}
+
+// ===========================================================================
+// FINANCE  —  Cost register → absorption → suggested price
+// ===========================================================================
+
+/// A kind of cost the factory carries, stored as data rather than an enum —
+/// the same reasoning as InventoryType: the accountant adds "gardiennage" or
+/// "assurance machine" without a migration.
+///
+/// Two independent axes, because "direct / indirect / fixe" is really two
+/// questions and collapsing them into one list is how cost registers become
+/// unusable:
+///   nature   — can this cost be traced to a product, or must it be shared out?
+///   behavior — does it move with volume, or is it there whatever we make?
+model CostCategory {
+  id          String  @id @default(cuid())
+  /// Stable machine key, e.g. "loyer". Referenced by seed data.
+  key         String  @unique
+  label       String
+  description String  @default("")
+  /// "DIRECT" | "INDIRECT" — plain string, same portability reason as
+  /// Movement.direction. Validated at the API boundary (see finance/dto).
+  nature      String
+  /// "FIXED" | "VARIABLE".
+  behavior    String
+  /// The raw-material category. Its amount is NEVER typed: it is summed from
+  /// what production actually consumed. At most one category carries this,
+  /// and the service refuses manual entries against it — a correction goes
+  /// through MaterialCostOverride, which keeps the computed figure visible
+  /// beside it.
+  isMaterials Boolean @default(false)
+  /// Seeded categories the accountant can rename but not delete, so the
+  /// register always keeps a home for the obvious costs.
+  isProtected Boolean @default(false)
+  sortOrder   Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  entries CostEntry[]
+}
+
+/// One cost the accountant recorded, on a date.
+///
+/// Dated rather than stamped with a month: a monthly view is then just the
+/// default range, and a quarter or a year costs nothing extra.
+model CostEntry {
+  id            String       @id @default(cuid())
+  category      CostCategory @relation(fields: [categoryId], references: [id])
+  categoryId    String
+  label         String
+  /// In DZD. Always positive — a correction is an entry with its own label,
+  /// not a negative number hiding inside a total.
+  amount        Float
+  date          DateTime
+  /// The finished product this cost belongs to, when it belongs to exactly
+  /// one (a mould cut for a single model, a sub-contracted operation). Null
+  /// means it goes into the pool that gets shared across everything produced
+  /// — which is also what happens to a DIRECT cost nobody attributed, since
+  /// an unattributed direct cost is, in practice, an overhead.
+  productItem   Item?        @relation(fields: [productItemId], references: [id])
+  productItemId String?
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([categoryId])
+  @@index([date])
+  @@index([productItemId])
+}
+
+/// The accountant's correction to a month's computed raw-material cost.
+///
+/// Deliberately a row of its own instead of an editable amount: the computed
+/// figure — what production really consumed — stays visible next to what was
+/// substituted, together with the reason. Overwriting the derived number in
+/// place would be the same mistake as storing a stock quantity.
+///
+/// Keyed on a calendar month because that is the accounting unit; a quarter
+/// view sums three monthly figures, each with its own correction.
+model MaterialCostOverride {
+  id        String   @id @default(cuid())
+  /// "YYYY-MM". A string, not a DateTime: this names a month, and a date
+  /// would invite timezone arithmetic on something that has no time.
+  month     String   @unique
+  amount    Float
+  /// Why the computed figure was not used. Required — a correction without a
+  /// reason is indistinguishable from a typo six months later.
+  reason    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Factory-wide pricing defaults. One row (id "default"), upserted.
+model FinanceSetting {
+  id             String @id @default("default")
+  /// Target markup on cost, as a fraction: 0.25 means "sell at cost + 25%".
+  /// Markup, not commercial margin — the two differ and the UI names both.
+  defaultMargin  Float  @default(0.25)
+  /// How the pooled costs are shared across products: "UNITS" | "MATERIAL_COST".
+  /// See finance/finance-math.ts — the choice is an accounting judgement, so
+  /// it is a visible setting rather than a constant buried in the code.
+  allocationBasis String @default("UNITS")
+  updatedAt      DateTime @updatedAt
 }

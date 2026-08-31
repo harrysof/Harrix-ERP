@@ -53,11 +53,27 @@ const ROLES = [
     permissions: [P.PRODUCTION_READ, P.PRODUCTION_WRITE, P.STOCK_READ, P.STOCK_WRITE],
   },
   {
+    key: 'comptable',
+    label: 'Comptable',
+    description:
+      "Tient le registre des coûts et fixe les prix de revient. Consulte la production et les achats, dont il a besoin pour juger le coût des matières, sans pouvoir les modifier.",
+    isProtected: false,
+    sortOrder: 3,
+    permissions: [
+      P.FINANCE_READ,
+      P.FINANCE_WRITE,
+      P.FINANCE_MANAGE,
+      P.PRODUCTION_READ,
+      P.STOCK_READ,
+      P.PURCHASING_READ,
+    ],
+  },
+  {
     key: 'rh',
     label: 'Ressources humaines',
     description: 'Employés, heures et absences. Aucun accès au stock ni à la production.',
     isProtected: false,
-    sortOrder: 3,
+    sortOrder: 4,
     permissions: [P.HR_READ, P.HR_WRITE],
   },
 ];
