@@ -160,7 +160,7 @@ export class PurchasingService {
           status: dto.status ?? 'DRAFT',
           shipping: dto.shipping ?? 0,
           discount: dto.discount ?? 0,
-          tax: dto.tax ?? 0,
+          taxRate: dto.taxRate ?? 0,
           notes: dto.notes ?? null,
           lines: { create: dto.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost })) },
         },
@@ -200,7 +200,7 @@ export class PurchasingService {
           ...(dto.expectedDate !== undefined ? { expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null } : {}),
           ...(dto.shipping !== undefined ? { shipping: dto.shipping } : {}),
           ...(dto.discount !== undefined ? { discount: dto.discount } : {}),
-          ...(dto.tax !== undefined ? { tax: dto.tax } : {}),
+          ...(dto.taxRate !== undefined ? { taxRate: dto.taxRate } : {}),
           ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
         },
       });
@@ -407,7 +407,7 @@ function decorate<
   T extends {
     shipping: number;
     discount: number;
-    tax: number;
+    taxRate: number;
     lines: Array<{ id: string; quantity: number; unitCost: number; receiptLines: Array<{ purchaseOrderLineId: string; quantity: number }> }>;
   },
 >(po: T) {

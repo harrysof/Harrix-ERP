@@ -11,7 +11,6 @@ import { StockPage } from "./modules/stock/StockPage";
 import { ProductionPage } from "./modules/production/ProductionPage";
 import { PurchasingPage } from "./modules/purchasing/PurchasingPage";
 import { SalesPage } from "./modules/sales/SalesPage";
-import { FinancePage } from "./modules/finance/FinancePage";
 import { HRPage } from "./modules/hr/HRPage";
 import { SuppliersPage } from "./modules/suppliers/SuppliersPage";
 import { UsersPage } from "./modules/admin/UsersPage";
@@ -23,10 +22,6 @@ const PAGE_COPY: Record<TabId, { title: string; subtitle: string }> = {
   production: { title: "Production", subtitle: "Lots de production, traçabilité des matières, écarts et pertes" },
   purchasing: { title: "Achats", subtitle: "Fournisseur → bon de commande → réception → stock" },
   orders: { title: "Ventes & clients", subtitle: "Commandes, factures et base clients" },
-  finance: {
-    title: "Finance",
-    subtitle: "Registre des coûts, coût de revient et prix de vente conseillé",
-  },
   hr: { title: "Ressources humaines", subtitle: "Employés, heures travaillées et absences" },
   suppliers: { title: "Fournisseurs", subtitle: "Fournisseurs de matières premières et de pièces détachées" },
   users: { title: "Utilisateurs", subtitle: "Comptes, rôles et permissions" },
@@ -89,7 +84,6 @@ function MainApp() {
       {tab === "production" && <ProductionPage />}
       {tab === "purchasing" && <PurchasingPage />}
       {tab === "orders" && <SalesPage />}
-      {tab === "finance" && <FinancePage />}
       {tab === "hr" && <HRPage />}
       {tab === "suppliers" && <SuppliersPage />}
       {tab === "users" && <UsersPage />}

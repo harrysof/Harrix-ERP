@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -112,10 +113,18 @@ export class CreatePurchaseOrderDto {
   @Min(0)
   discount?: number;
 
+  /**
+   * A fraction, not a DZD amount — 0.19 for 19 %. The system computes the
+   * actual tax from this and the order's other figures (see
+   * purchasing-math.ts's poTotals); typing a rate rather than a total keeps
+   * the amount from drifting whenever a line, the shipping or the discount
+   * changes.
+   */
   @IsOptional()
   @IsNumber()
   @Min(0)
-  tax?: number;
+  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  taxRate?: number;
 
   @IsOptional()
   @IsString()
@@ -152,10 +161,18 @@ export class UpdatePurchaseOrderDto {
   @Min(0)
   discount?: number;
 
+  /**
+   * A fraction, not a DZD amount — 0.19 for 19 %. The system computes the
+   * actual tax from this and the order's other figures (see
+   * purchasing-math.ts's poTotals); typing a rate rather than a total keeps
+   * the amount from drifting whenever a line, the shipping or the discount
+   * changes.
+   */
   @IsOptional()
   @IsNumber()
   @Min(0)
-  tax?: number;
+  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  taxRate?: number;
 
   @IsOptional()
   @IsString()

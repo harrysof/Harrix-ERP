@@ -25,81 +25,77 @@ datasource db {
 /// see build plan Phase 4: a future factory can have a different set without
 /// a schema change.
 model InventoryType {
-  id               String  @id @default(cuid())
+  id                String  @id @default(cuid())
   /// Stable machine key used by the frontend and seed data, e.g. "chemicals".
-  key              String  @unique
-  label            String
-  singular         String
-  description      String
-  hasBatches       Boolean @default(false)
-  hasExpiry        Boolean @default(false)
+  key               String  @unique
+  label             String
+  singular          String
+  description       String
+  hasBatches        Boolean @default(false)
+  hasExpiry         Boolean @default(false)
   isProductionInput Boolean @default(false)
   /// Whether items in this inventory carry a colour / size variant (e.g. tige).
-  hasColor         Boolean @default(false)
-  hasSize          Boolean @default(false)
+  hasColor          Boolean @default(false)
+  hasSize           Boolean @default(false)
   /// Whether items carry a free-text description (e.g. spare parts).
-  hasDescription   Boolean @default(false)
+  hasDescription    Boolean @default(false)
   /// Whether items carry maintenance-oriented machine info (machine,
   /// compatibility, manufacturer, location, criticality) and their usages
   /// record maintenance context (reference, employee, notes). Used by spare
   /// parts.
-  hasMachineInfo   Boolean @default(false)
+  hasMachineInfo    Boolean @default(false)
   /// Whether items carry a gender variant — "M"/"F". Used by finished goods.
-  hasGender        Boolean @default(false)
+  hasGender         Boolean @default(false)
   /// Whether items carry a sale price (in DZD). Used by finished goods.
-  hasPrice         Boolean @default(false)
+  hasPrice          Boolean @default(false)
   /// Whether movements distinguish production quality ("1er"/"2ème"/"rebut").
   /// Used by finished goods — the classified buckets reconcile against the
   /// computed quantity to surface unaccounted units.
-  hasQuality       Boolean @default(false)
-  defaultUnit      String
-  sortOrder        Int     @default(0)
+  hasQuality        Boolean @default(false)
+  defaultUnit       String
+  sortOrder         Int     @default(0)
 
   items Item[]
 }
 
 model Item {
-  id                String   @id @default(cuid())
-  inventoryType     InventoryType @relation(fields: [inventoryTypeId], references: [id])
-  inventoryTypeId   String
-  name              String
-  reference         String   @unique
-  unit              String
-  reorderThreshold  Float
-/// Optional photo — a URL (http/https) or a data-URI (inline image).
-  photoUrl          String?
+  id               String        @id @default(cuid())
+  inventoryType    InventoryType @relation(fields: [inventoryTypeId], references: [id])
+  inventoryTypeId  String
+  name             String
+  reference        String        @unique
+  unit             String
+  reorderThreshold Float
+  /// Optional photo — a URL (http/https) or a data-URI (inline image).
+  photoUrl         String?
   /// Optional variant attributes (relevant for e.g. tige des chaussures).
-  color             String?
-  size              String?
+  color            String?
+  size             String?
   /// Optional free-text description (relevant for e.g. spare parts).
-  description       String?
+  description      String?
   /// Maintenance-oriented attributes (relevant for spare parts; gated in the
   /// UI by InventoryType.hasMachineInfo).
-  machine           String?
-  compatibility     String?
-  manufacturer      String?
-  location          String?
-  criticality       String?
+  machine          String?
+  compatibility    String?
+  manufacturer     String?
+  location         String?
+  criticality      String?
   /// Optional gender variant "M"/"F" (relevant for e.g. produced footwear;
   /// gated in the UI by InventoryType.hasGender).
-  gender            String?
+  gender           String?
   /// Optional sale price in DZD (gated in the UI by InventoryType.hasPrice).
-  price             Float?
+  price            Float?
   /// Standard purchase cost per unit, in DZD. What a reception defaults to
   /// when nothing more precise is known, and the fallback the valuation uses
   /// for movements recorded before costs were tracked. The figure the
   /// valuation actually reports is the weighted average of what was really
   /// paid (see stock/stock-math.ts) — this column is only the starting point.
-  unitCost          Float?
-  /// Target markup on the computed cost price, as a fraction (0.25 = +25%),
-  /// overriding FinanceSetting.defaultMargin for this product only. Null
-  /// means "use the factory default".
-  targetMargin      Float?
-  archived          Boolean @default(false)
-  createdAt         DateTime @default(now())
+  unitCost         Float?
+  archived         Boolean       @default(false)
+  createdAt        DateTime      @default(now())
 
-  batches           Batch[]
-  movements         Movement[]
+  batches            Batch[]
+  movements          Movement[]
   supplierOrderLines SupplierOrderLine[]
 
   /// Batches where this item is the finished product being made.
@@ -109,8 +105,6 @@ model Item {
   /// Purchase-order lines and customer-order lines naming this item.
   purchaseLines PurchaseOrderLine[]
   orderLines    OrderLine[]
-  /// Costs the accountant attributed to this product specifically.
-  costEntries   CostEntry[]
 
   @@index([inventoryTypeId])
 }
@@ -119,14 +113,14 @@ model Item {
 /// A batch's remaining quantity is never stored directly — it is always the
 /// sum of its movements, computed on read (see stock/stock.service.ts).
 model Batch {
-  id            String    @id @default(cuid())
-  item          Item      @relation(fields: [itemId], references: [id])
-  itemId        String
-  batchNumber   String
-  receivedDate  DateTime
-  expiryDate    DateTime?
+  id           String    @id @default(cuid())
+  item         Item      @relation(fields: [itemId], references: [id])
+  itemId       String
+  batchNumber  String
+  receivedDate DateTime
+  expiryDate   DateTime?
 
-  movements Movement[]
+  movements  Movement[]
   /// Production lines that drew from this specific stock lot.
   consumedIn ProductionConsumption[]
 
@@ -138,21 +132,21 @@ model Batch {
 /// directly. This is deliberate (see build plan, "five calls that are cheap
 /// today"): it is the only way to answer "how did we get to this number?".
 model Movement {
-  id         String    @id @default(cuid())
-  item       Item      @relation(fields: [itemId], references: [id])
-  itemId     String
-  batch      Batch?    @relation(fields: [batchId], references: [id])
-  batchId    String?
+  id             String    @id @default(cuid())
+  item           Item      @relation(fields: [itemId], references: [id])
+  itemId         String
+  batch          Batch?    @relation(fields: [batchId], references: [id])
+  batchId        String?
   /// "IN" | "OUT" — kept as a plain string (not a Prisma enum) so this schema
   /// is portable to SQLite and PostgreSQL without a provider-specific type.
   /// Validated at the API boundary (see stock/dto).
-  direction  String
-  quantity   Float
-  date       DateTime
-  supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  supplierId String?
+  direction      String
+  quantity       Float
+  date           DateTime
+  supplier       Supplier? @relation(fields: [supplierId], references: [id])
+  supplierId     String?
   /// Only set on "OUT" movements (e.g. "Production", "Casse", "Périmé").
-  reason     String?
+  reason         String?
   /// Maintenance context recorded on OUT usages of spare parts
   /// (gated in the UI by InventoryType.hasMachineInfo).
   machine        String?
@@ -173,39 +167,39 @@ model Movement {
   /// Stored per movement rather than only on the item because that is the
   /// only way to answer "where did this value come from?" — the item's
   /// average cost is derived from these rows, never the other way round.
-  unitCost   Float?
+  unitCost       Float?
   /// Where this movement came from: "MANUAL" | "SUPPLIER_ORDER" | "PURCHASE"
   /// | "PRODUCTION" | "SALE". Plain string, same portability reason as
   /// `direction`. Null on rows written before provenance was recorded.
-  sourceType String?
+  sourceType     String?
   /// The human-readable document behind it, e.g. "BC-2026-0007" or
   /// "LOT-2026-0012". Denormalised on purpose: the detail view must stay
   /// readable without joining four tables.
-  sourceRef  String?
-  createdAt  DateTime  @default(now())
+  sourceRef      String?
+  createdAt      DateTime  @default(now())
 
   @@index([itemId])
   @@index([batchId])
 }
 
 model Supplier {
-  id          String   @id @default(cuid())
-  name        String
-  contactName String?
-  phone       String?
-  email       String?
-  address     String?
-  notes       String?
+  id           String   @id @default(cuid())
+  name         String
+  contactName  String?
+  phone        String?
+  email        String?
+  address      String?
+  notes        String?
   /// Free-text registration details (registre de commerce, NIF, NIS…). One
   /// field rather than four columns: the exact set differs by country, and
   /// nothing computes on them.
   registration String?
-  archived    Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  archived     Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
-  movements       Movement[]
-  purchaseOrders  PurchaseOrder[]
-  supplierOrders  SupplierOrder[]
+  movements      Movement[]
+  purchaseOrders PurchaseOrder[]
+  supplierOrders SupplierOrder[]
 }
 
 /// A purchase order placed with a supplier. Stock only actually enters the
@@ -214,15 +208,15 @@ model Supplier {
 /// (tige, spare parts) has no expiry; chemicals orders carry per-line batch
 /// info captured at receive time.
 model SupplierOrder {
-  id           String   @id @default(cuid())
-  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  id           String    @id @default(cuid())
+  supplier     Supplier  @relation(fields: [supplierId], references: [id])
   supplierId   String
   orderDate    DateTime
   /// "open" | "received" — plain string, validated at the API boundary.
-  status       String   @default("open")
+  status       String    @default("open")
   receivedDate DateTime?
   notes        String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   lines SupplierOrderLine[]
 
@@ -309,15 +303,15 @@ model ProductionBatch {
 /// One raw material line consumed by one production batch: which item, which
 /// stock lot (for chemicals), how much. Answers "what went into this batch".
 model ProductionConsumption {
-  id                String   @id @default(cuid())
+  id                String          @id @default(cuid())
   productionBatch   ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
   productionBatchId String
-  item              Item     @relation(fields: [itemId], references: [id])
+  item              Item            @relation(fields: [itemId], references: [id])
   itemId            String
   /// The stock lot drawn from — only set for items whose inventory type has
   /// batches (chemicals). FEFO/FIFO order is *recommended* by the UI, not
   /// enforced here: a factory sometimes has a real reason to break the order.
-  stockBatch        Batch?   @relation(fields: [stockBatchId], references: [id])
+  stockBatch        Batch?          @relation(fields: [stockBatchId], references: [id])
   stockBatchId      String?
   quantity          Float
   /// What one unit of this material cost when it was drawn, in DZD — a
@@ -329,7 +323,7 @@ model ProductionConsumption {
   /// can always be traced to each other. Plain id, not a relation: Movement is
   /// an append-only ledger and nothing should be able to cascade into it.
   movementId        String?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime        @default(now())
 
   @@index([productionBatchId])
   @@index([itemId])
@@ -360,23 +354,23 @@ model Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   /// What they type to log in. Lowercased on write so "Karim" and "karim"
   /// can't become two accounts.
-  login        String   @unique
+  login        String    @unique
   fullName     String
   /// bcrypt hash. The plain password is never stored, logged or returned —
   /// see auth/auth.service.ts. Non-negotiable, per the build plan.
   passwordHash String
-  role         Role     @relation(fields: [roleId], references: [id])
+  role         Role      @relation(fields: [roleId], references: [id])
   roleId       String
   /// Deactivated rather than deleted: workers leave, but their audit trail
   /// and their movements must stay attributable. A deactivated user cannot
   /// log in and their existing tokens stop working on the next request.
-  active       Boolean  @default(true)
+  active       Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   auditEntries AuditEntry[]
 
@@ -391,24 +385,24 @@ model User {
 /// deletes a row here. The user relation is kept (rather than a bare id) so a
 /// deactivated employee's history still shows their name.
 model AuditEntry {
-  id         String   @id @default(cuid())
-  user       User?    @relation(fields: [userId], references: [id])
+  id        String   @id @default(cuid())
+  user      User?    @relation(fields: [userId], references: [id])
   /// Null only for actions taken before anyone was logged in (a failed login).
-  userId     String?
+  userId    String?
   /// Denormalised so the log stays readable even if a user is ever removed.
-  userLogin  String
+  userLogin String
   /// "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGIN_FAILED"
-  action     String
+  action    String
   /// What kind of thing was touched, e.g. "item", "production-batch".
-  entity     String
-  entityId   String?
+  entity    String
+  entityId  String?
   /// JSON: the changed fields only, as {field: {from, to}} for an update, or
   /// the created/deleted record for a create/delete. Passwords are stripped
   /// before anything reaches here (see audit.interceptor.ts).
-  changes    String?
-  method     String
-  path       String
-  createdAt  DateTime @default(now())
+  changes   String?
+  method    String
+  path      String
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([entity, entityId])
@@ -427,24 +421,28 @@ model AuditEntry {
 /// from ReceiptLine, the same rule as stock quantity and production variance:
 /// a stored "received so far" can drift from the receipts it claims to total.
 model PurchaseOrder {
-  id             String   @id @default(cuid())
+  id           String    @id @default(cuid())
   /// Human-readable, unique, generated per calendar year: "BC-2026-0007".
   /// "BC" = bon de commande.
-  code           String   @unique
-  supplier       Supplier @relation(fields: [supplierId], references: [id])
-  supplierId     String
-  date           DateTime
-  expectedDate   DateTime?
+  code         String    @unique
+  supplier     Supplier  @relation(fields: [supplierId], references: [id])
+  supplierId   String
+  date         DateTime
+  expectedDate DateTime?
   /// DRAFT | SUBMITTED | APPROVED | PARTIALLY_RECEIVED | RECEIVED | CANCELLED
   /// Plain string, same portability reason as Movement.direction.
-  status         String   @default("DRAFT")
+  status       String    @default("DRAFT")
   /// Order-level money, in DZD. Line amounts live on the lines.
-  shipping       Float    @default(0)
-  discount       Float    @default(0)
-  tax            Float    @default(0)
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  shipping     Float     @default(0)
+  discount     Float     @default(0)
+  /// The tax rate as a fraction (0.19 for 19 %) — what the buyer actually
+  /// types. The DZD amount is always computed from it (see
+  /// purchasing/purchasing-math.ts), never stored: a flat figure would drift
+  /// the moment a line, the shipping or the discount changed.
+  taxRate      Float     @default(0)
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   lines    PurchaseOrderLine[]
   receipts Receipt[]
@@ -564,8 +562,8 @@ model Order {
   /// Set when the order ships — the OUT movements are created then, not at
   /// order time, because an unshipped order hasn't left the building.
   shippedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   lines OrderLine[]
 
@@ -593,104 +591,94 @@ model OrderLine {
 }
 
 // ===========================================================================
-// FINANCE  —  Cost register → absorption → suggested price
+// HR  —  Employees, time worked, absences
 // ===========================================================================
 
-/// A kind of cost the factory carries, stored as data rather than an enum —
-/// the same reasoning as InventoryType: the accountant adds "gardiennage" or
-/// "assurance machine" without a migration.
-///
-/// Two independent axes, because "direct / indirect / fixe" is really two
-/// questions and collapsing them into one list is how cost registers become
-/// unusable:
-///   nature   — can this cost be traced to a product, or must it be shared out?
-///   behavior — does it move with volume, or is it there whatever we make?
-model CostCategory {
-  id          String  @id @default(cuid())
-  /// Stable machine key, e.g. "loyer". Referenced by seed data.
-  key         String  @unique
-  label       String
-  description String  @default("")
-  /// "DIRECT" | "INDIRECT" — plain string, same portability reason as
-  /// Movement.direction. Validated at the API boundary (see finance/dto).
-  nature      String
-  /// "FIXED" | "VARIABLE".
-  behavior    String
-  /// The raw-material category. Its amount is NEVER typed: it is summed from
-  /// what production actually consumed. At most one category carries this,
-  /// and the service refuses manual entries against it — a correction goes
-  /// through MaterialCostOverride, which keeps the computed figure visible
-  /// beside it.
-  isMaterials Boolean @default(false)
-  /// Seeded categories the accountant can rename but not delete, so the
-  /// register always keeps a home for the obvious costs.
-  isProtected Boolean @default(false)
-  sortOrder   Int     @default(0)
+/// A factory worker. Deactivated by archiving rather than deleted — someone
+/// who leaves still has time entries, absences and (once payroll exists)
+/// pay history that must stay attributable, the same reasoning as
+/// Supplier.archived and User.active.
+model Employee {
+  id                    String    @id @default(cuid())
+  fullName              String
+  phone                 String?
+  address               String?
+  position              String
+  hireDate              DateTime
+  birthDate             DateTime?
+  /// Numéro d'identification nationale — the Algerian national ID number,
+  /// used across administrative filings. Optional: a factory may not have
+  /// collected it for every worker yet.
+  nin                   String?
+  /// CNAS affiliation number (Caisse Nationale des Assurances Sociales) —
+  /// the social-security registration behind sick leave, family allowance
+  /// and retirement declarations.
+  cnasNumber            String?
+  /// "CDI" | "CDD" — plain string, same portability reason as
+  /// Movement.direction. A CDD is a fixed-term contract and carries an end
+  /// date; a CDI does not.
+  contractType          String    @default("CDI")
+  /// Only meaningful when contractType is "CDD".
+  contractEndDate       DateTime?
+  /// "CELIBATAIRE" | "MARIE" | "DIVORCE" | "VEUF" — situation familiale.
+  /// Feeds the CNAS family allowance (allocations familiales), which is
+  /// paid per dependent child, not the IRG (the 2022 reform removed the
+  /// family deduction from the income-tax computation itself).
+  maritalStatus         String?
+  dependentChildren     Int       @default(0)
+  /// Gross monthly base salary, in DZD — bonuses and overtime are not
+  /// modelled yet. CNAS and IRG are always computed from it on read (see
+  /// hr/payroll-math.ts); nothing derived is stored, same rule as stock
+  /// quantity and PO totals.
+  salary                Float
+  /// Relevé d'identité bancaire — where the salary is paid. Free text: the
+  /// exact bank/agency/account breakdown differs by bank and nothing here
+  /// computes on it.
+  bankRib               String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  notes                 String?
+  archived              Boolean   @default(false)
+  archivedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  timeEntries TimeEntry[]
+  absences    Absence[]
+
+  @@index([archived])
+}
+
+/// A day's worked hours. Kept as a ledger, not a monthly total, so a future
+/// fingerprint clock can write into this same table (source: "device")
+/// without reshaping anything — see build plan Phase 8.
+model TimeEntry {
+  id          String   @id @default(cuid())
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  date        DateTime
+  hoursWorked Float
+  /// "manual" | "device".
+  source      String   @default("manual")
   createdAt   DateTime @default(now())
 
-  entries CostEntry[]
-}
-
-/// One cost the accountant recorded, on a date.
-///
-/// Dated rather than stamped with a month: a monthly view is then just the
-/// default range, and a quarter or a year costs nothing extra.
-model CostEntry {
-  id            String       @id @default(cuid())
-  category      CostCategory @relation(fields: [categoryId], references: [id])
-  categoryId    String
-  label         String
-  /// In DZD. Always positive — a correction is an entry with its own label,
-  /// not a negative number hiding inside a total.
-  amount        Float
-  date          DateTime
-  /// The finished product this cost belongs to, when it belongs to exactly
-  /// one (a mould cut for a single model, a sub-contracted operation). Null
-  /// means it goes into the pool that gets shared across everything produced
-  /// — which is also what happens to a DIRECT cost nobody attributed, since
-  /// an unattributed direct cost is, in practice, an overhead.
-  productItem   Item?        @relation(fields: [productItemId], references: [id])
-  productItemId String?
-  notes         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  @@index([categoryId])
+  @@index([employeeId])
   @@index([date])
-  @@index([productItemId])
 }
 
-/// The accountant's correction to a month's computed raw-material cost.
-///
-/// Deliberately a row of its own instead of an editable amount: the computed
-/// figure — what production really consumed — stays visible next to what was
-/// substituted, together with the reason. Overwriting the derived number in
-/// place would be the same mistake as storing a stock quantity.
-///
-/// Keyed on a calendar month because that is the accounting unit; a quarter
-/// view sums three monthly figures, each with its own correction.
-model MaterialCostOverride {
-  id        String   @id @default(cuid())
-  /// "YYYY-MM". A string, not a DateTime: this names a month, and a date
-  /// would invite timezone arithmetic on something that has no time.
-  month     String   @unique
-  amount    Float
-  /// Why the computed figure was not used. Required — a correction without a
-  /// reason is indistinguishable from a typo six months later.
-  reason    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
+/// One period an employee did not work. "INJUSTIFIEE" is deliberately not
+/// called a disciplinary record — this table states what happened, not a
+/// judgement about it.
+model Absence {
+  id         String   @id @default(cuid())
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String
+  /// "CONGE" | "MALADIE" | "INJUSTIFIEE".
+  type       String
+  startDate  DateTime
+  endDate    DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
 
-/// Factory-wide pricing defaults. One row (id "default"), upserted.
-model FinanceSetting {
-  id             String @id @default("default")
-  /// Target markup on cost, as a fraction: 0.25 means "sell at cost + 25%".
-  /// Markup, not commercial margin — the two differ and the UI names both.
-  defaultMargin  Float  @default(0.25)
-  /// How the pooled costs are shared across products: "UNITS" | "MATERIAL_COST".
-  /// See finance/finance-math.ts — the choice is an accounting judgement, so
-  /// it is a visible setting rather than a constant buried in the code.
-  allocationBasis String @default("UNITS")
-  updatedAt      DateTime @updatedAt
+  @@index([employeeId])
 }

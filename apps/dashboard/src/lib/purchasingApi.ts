@@ -54,6 +54,9 @@ export interface PoTotals {
   subtotal: number;
   shipping: number;
   discount: number;
+  /** The rate that produced `tax`, e.g. 0.19 for 19 %. */
+  taxRate: number;
+  /** Always computed by the backend from `taxRate` — never typed directly. */
   tax: number;
   total: number;
 }
@@ -68,7 +71,7 @@ export interface ApiPurchaseOrder {
   status: PoStatus;
   shipping: number;
   discount: number;
-  tax: number;
+  taxRate: number;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -138,7 +141,7 @@ export function createPurchaseOrder(input: {
   status?: string;
   shipping?: number;
   discount?: number;
-  tax?: number;
+  taxRate?: number;
   notes?: string;
   lines: PoLineInput[];
 }): Promise<ApiPurchaseOrder> {
@@ -147,7 +150,7 @@ export function createPurchaseOrder(input: {
 
 export function updatePurchaseOrder(
   id: string,
-  input: { supplierId?: string; date?: string; expectedDate?: string; shipping?: number; discount?: number; tax?: number; notes?: string; lines?: PoLineInput[] },
+  input: { supplierId?: string; date?: string; expectedDate?: string; shipping?: number; discount?: number; taxRate?: number; notes?: string; lines?: PoLineInput[] },
 ): Promise<ApiPurchaseOrder> {
   return api.patch<ApiPurchaseOrder>(`/purchasing/orders/${id}`, input);
 }

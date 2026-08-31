@@ -37,6 +37,7 @@ export function PurchasingPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -58,6 +59,7 @@ export function PurchasingPage() {
   const set = (patch: Partial<PoFilters>) => setFilters((prev) => ({ ...prev, ...patch }));
   const hasFilters = Object.values(filters).some(Boolean);
   const openOrder = orders.find((o) => o.id === openId) ?? null;
+  const editingOrder = orders.find((o) => o.id === editingId) ?? null;
 
   // Materials only — you don't buy your own finished goods.
   const purchasableItems = items.filter((i) => i.inventoryType.key !== "finished-goods");
@@ -190,20 +192,33 @@ export function PurchasingPage() {
         </div>
       )}
 
-      {creating ? (
+      {creating || editingOrder ? (
         <PurchaseOrderModal
           suppliers={suppliers}
           items={purchasableItems}
-          onClose={() => setCreating(false)}
+          order={editingOrder ?? undefined}
+          onClose={() => {
+            setCreating(false);
+            setEditingId(null);
+          }}
           onSaved={() => {
             setCreating(false);
+            setEditingId(null);
             load();
           }}
         />
       ) : null}
 
       {openOrder ? (
-        <PurchaseOrderDetailModal order={openOrder} onClose={() => setOpenId(null)} onChanged={load} />
+        <PurchaseOrderDetailModal
+          order={openOrder}
+          onClose={() => setOpenId(null)}
+          onChanged={load}
+          onEdit={() => {
+            setEditingId(openOrder.id);
+            setOpenId(null);
+          }}
+        />
       ) : null}
     </div>
   );

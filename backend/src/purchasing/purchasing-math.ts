@@ -59,19 +59,34 @@ export interface PoTotals {
   subtotal: number;
   shipping: number;
   discount: number;
+  /** The rate the buyer typed, e.g. 0.19 for 19 %. Kept alongside the amount it produced. */
+  taxRate: number;
+  /** Always computed, never typed — see `taxRate` below. */
   tax: number;
   total: number;
 }
 
+/**
+ * Tax is entered as a rate, not an amount — the same reasoning as everything
+ * else this codebase refuses to store pre-computed: a flat DZD figure drifts
+ * the moment a line changes, while a rate stays correct on its own.
+ *
+ * The taxable base is the order's pre-tax total — subtotal plus shipping,
+ * minus the discount — because shipping is normally billed on the same
+ * invoice and taxed with it, and a discount reduces what is actually owed
+ * before tax applies to it.
+ */
 export function poTotals(
   lines: LineLike[],
-  extras: { shipping?: number; discount?: number; tax?: number } = {},
+  extras: { shipping?: number; discount?: number; taxRate?: number } = {},
 ): PoTotals {
   const subtotal = round(lines.reduce((sum, l) => sum + l.quantity * l.unitCost, 0));
   const shipping = extras.shipping ?? 0;
   const discount = extras.discount ?? 0;
-  const tax = extras.tax ?? 0;
-  return { subtotal, shipping, discount, tax, total: round(subtotal + shipping + tax - discount) };
+  const taxRate = extras.taxRate ?? 0;
+  const taxableBase = subtotal + shipping - discount;
+  const tax = round(taxableBase * taxRate);
+  return { subtotal, shipping, discount, taxRate, tax, total: round(taxableBase + tax) };
 }
 
 /**

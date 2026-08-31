@@ -24,6 +24,8 @@ interface DetailProps {
   order: ApiPurchaseOrder;
   onClose: () => void;
   onChanged: () => void;
+  /** Opens the edit form. Only offered while the order is still a brouillon. */
+  onEdit?: () => void;
 }
 
 /** What each status can move to by hand. Received/partial are never settable. */
@@ -40,7 +42,7 @@ const NEXT_STATUSES: Partial<Record<PoStatus, PoStatus[]>> = {
  * §14's purchase-order detail: what was ordered, what has arrived, and the
  * receiving form. Receiving is the only action here that touches stock.
  */
-export function PurchaseOrderDetailModal({ order, onClose, onChanged }: DetailProps) {
+export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: DetailProps) {
   const { can } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -116,6 +118,9 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged }: DetailPr
         <>
           <Button onClick={onClose}>Fermer</Button>
           <Button onClick={() => window.print()}>Imprimer</Button>
+          {order.status === "DRAFT" && can("purchasing:write") && onEdit ? (
+            <Button onClick={onEdit}>Modifier</Button>
+          ) : null}
           {order.status === "DRAFT" && can("purchasing:write") ? (
             <Button
               variant="danger"
@@ -160,7 +165,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged }: DetailPr
                   <th className="num">Commandé</th>
                   <th className="num">Reçu</th>
                   <th className="num">Reste</th>
-                  <th className="num">Coût unitaire</th>
+                  <th className="num">Prix unitaire</th>
                   <th className="num">Total ligne</th>
                 </tr>
               </thead>

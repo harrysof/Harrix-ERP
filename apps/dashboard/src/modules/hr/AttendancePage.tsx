@@ -1,90 +1,94 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Banner } from "../../components/ui/Banner";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
+import { ApiError } from "../../lib/api";
 import { formatNumber } from "../../lib/format";
-import { newId } from "../../lib/id";
 import { todayIso } from "../../lib/date";
-import { ABSENCE_TYPES, EXPECTED_HOURS_PER_DAY, type Absence, type AbsenceType, type Employee, type TimeEntry } from "./types";
+import {
+  ABSENCE_TYPES,
+  ABSENCE_TYPE_LABELS,
+  createAbsence,
+  createTimeEntry,
+  EXPECTED_HOURS_PER_DAY,
+  fetchEmployees,
+  fetchMonthlySummary,
+  type AbsenceType,
+  type ApiEmployee,
+  type MonthlySummary,
+} from "../../lib/hrApi";
 
 function currentMonth(): string {
   return todayIso().slice(0, 7);
 }
 
-function daysInMonth(month: string): number {
-  const [year, m] = month.split("-").map(Number);
-  return new Date(year, m, 0).getDate();
-}
-
-/** Days of `type` for this employee that overlap `month` (a simple day-count, not excluding weekends). */
-function absenceDaysInMonth(absences: Absence[], employeeId: string, type: AbsenceType, month: string): number {
-  const monthStart = new Date(`${month}-01T00:00:00`);
-  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-  let total = 0;
-  for (const a of absences) {
-    if (a.employeeId !== employeeId || a.type !== type) continue;
-    const start = new Date(a.startDate + "T00:00:00");
-    const end = new Date(a.endDate + "T00:00:00");
-    const overlapStart = start < monthStart ? monthStart : start;
-    const overlapEnd = end > monthEnd ? monthEnd : end;
-    if (overlapStart <= overlapEnd) {
-      total += Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 86_400_000) + 1;
-    }
-  }
-  return total;
-}
-
-interface AttendancePageProps {
-  employees: Employee[];
-  timeEntries: TimeEntry[];
-  addTimeEntry: (entry: TimeEntry) => void;
-  absences: Absence[];
-  addAbsence: (absence: Absence) => void;
-}
-
-export function AttendancePage({ employees, timeEntries, addTimeEntry, absences, addAbsence }: AttendancePageProps) {
+export function AttendancePage() {
+  const [employees, setEmployees] = useState<ApiEmployee[]>([]);
   const [month, setMonth] = useState(currentMonth());
+  const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [entryEmployeeId, setEntryEmployeeId] = useState("");
   const [entryDate, setEntryDate] = useState(todayIso());
   const [entryHours, setEntryHours] = useState("8");
+  const [savingEntry, setSavingEntry] = useState(false);
 
   const [absEmployeeId, setAbsEmployeeId] = useState("");
   const [absType, setAbsType] = useState<AbsenceType>(ABSENCE_TYPES[0]);
   const [absStart, setAbsStart] = useState(todayIso());
   const [absEnd, setAbsEnd] = useState(todayIso());
   const [absReason, setAbsReason] = useState("");
+  const [savingAbsence, setSavingAbsence] = useState(false);
 
-  const summary = useMemo(() => {
-    const expectedHours = daysInMonth(month) * EXPECTED_HOURS_PER_DAY;
-    return employees.map((emp) => {
-      const workedHours = timeEntries
-        .filter((t) => t.employeeId === emp.id && t.date.startsWith(month))
-        .reduce((sum, t) => sum + t.hoursWorked, 0);
-      return {
-        employee: emp,
-        workedHours,
-        expectedHours,
-        conge: absenceDaysInMonth(absences, emp.id, "Congé", month),
-        maladie: absenceDaysInMonth(absences, emp.id, "Maladie", month),
-        injustifiee: absenceDaysInMonth(absences, emp.id, "Absence injustifiée", month),
-      };
-    });
-  }, [employees, timeEntries, absences, month]);
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    return Promise.all([fetchEmployees({ includeArchived: false }), fetchMonthlySummary(month)])
+      .then(([nextEmployees, nextSummary]) => {
+        setEmployees(nextEmployees);
+        setSummary(nextSummary);
+      })
+      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger la présence."))
+      .finally(() => setLoading(false));
+  }, [month]);
 
-  function submitTimeEntry() {
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function submitTimeEntry() {
     if (!entryEmployeeId) return;
-    addTimeEntry({ id: newId("time"), employeeId: entryEmployeeId, date: entryDate, hoursWorked: Number(entryHours) || 0, source: "manual", createdAt: new Date().toISOString() });
-    setEntryHours("8");
+    setSavingEntry(true);
+    try {
+      await createTimeEntry({ employeeId: entryEmployeeId, date: entryDate, hoursWorked: Number(entryHours) || 0 });
+      setEntryHours("8");
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+    } finally {
+      setSavingEntry(false);
+    }
   }
 
-  function submitAbsence() {
+  async function submitAbsence() {
     if (!absEmployeeId) return;
-    addAbsence({ id: newId("abs"), employeeId: absEmployeeId, type: absType, startDate: absStart, endDate: absEnd, reason: absReason.trim(), createdAt: new Date().toISOString() });
-    setAbsReason("");
+    setSavingAbsence(true);
+    try {
+      await createAbsence({ employeeId: absEmployeeId, type: absType, startDate: absStart, endDate: absEnd, reason: absReason.trim() || undefined });
+      setAbsReason("");
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+    } finally {
+      setSavingAbsence(false);
+    }
   }
 
   return (
     <div className="page-stack">
+      {error ? <Banner tone="danger">{error}</Banner> : null}
+
       <Field label="Mois">
         <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ maxWidth: 200 }} />
       </Field>
@@ -110,8 +114,8 @@ export function AttendancePage({ employees, timeEntries, addTimeEntry, absences,
           </Field>
         </div>
         <div>
-          <Button variant="primary" onClick={submitTimeEntry} disabled={!entryEmployeeId}>
-            Ajouter l'entrée
+          <Button variant="primary" onClick={submitTimeEntry} disabled={!entryEmployeeId || savingEntry}>
+            {savingEntry ? "Enregistrement…" : "Ajouter l'entrée"}
           </Button>
         </div>
       </section>
@@ -133,7 +137,7 @@ export function AttendancePage({ employees, timeEntries, addTimeEntry, absences,
             <select className="input" value={absType} onChange={(e) => setAbsType(e.target.value as AbsenceType)}>
               {ABSENCE_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {ABSENCE_TYPE_LABELS[t]}
                 </option>
               ))}
             </select>
@@ -151,8 +155,8 @@ export function AttendancePage({ employees, timeEntries, addTimeEntry, absences,
           </Field>
         </div>
         <div>
-          <Button variant="primary" onClick={submitAbsence} disabled={!absEmployeeId}>
-            Enregistrer l'absence
+          <Button variant="primary" onClick={submitAbsence} disabled={!absEmployeeId || savingAbsence}>
+            {savingAbsence ? "Enregistrement…" : "Enregistrer l'absence"}
           </Button>
         </div>
       </section>
@@ -162,32 +166,38 @@ export function AttendancePage({ employees, timeEntries, addTimeEntry, absences,
         <p className="field-hint" style={{ marginBottom: 12 }}>
           Heures prévues = {EXPECTED_HOURS_PER_DAY} h × jours du mois, une approximation simple (voir PROJECT_CONTEXT.md).
         </p>
-        <div className="table-scroll">
-          <table className="stock-table">
-            <thead>
-              <tr>
-                <th>Employé</th>
-                <th>Heures prévues</th>
-                <th>Heures travaillées</th>
-                <th>Congé (j)</th>
-                <th>Maladie (j)</th>
-                <th>Absence injustifiée (j)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summary.map((row) => (
-                <tr key={row.employee.id}>
-                  <td>{row.employee.fullName}</td>
-                  <td className="tabular">{formatNumber(row.expectedHours)}</td>
-                  <td className="tabular">{formatNumber(row.workedHours)}</td>
-                  <td className="tabular">{row.conge}</td>
-                  <td className="tabular">{row.maladie}</td>
-                  <td className="tabular">{row.injustifiee}</td>
+        {loading || !summary ? (
+          <p className="loading-text">Chargement…</p>
+        ) : summary.rows.length === 0 ? (
+          <p className="muted">Aucun employé actif.</p>
+        ) : (
+          <div className="table-scroll">
+            <table className="stock-table">
+              <thead>
+                <tr>
+                  <th>Employé</th>
+                  <th className="num">Heures prévues</th>
+                  <th className="num">Heures travaillées</th>
+                  <th className="num">Congé (j)</th>
+                  <th className="num">Maladie (j)</th>
+                  <th className="num">Absence injustifiée (j)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {summary.rows.map((row) => (
+                  <tr key={row.employeeId}>
+                    <td>{row.fullName}</td>
+                    <td className="tabular num">{formatNumber(row.expectedHours)}</td>
+                    <td className="tabular num">{formatNumber(row.workedHours)}</td>
+                    <td className="tabular num">{row.absences.CONGE}</td>
+                    <td className="tabular num">{row.absences.MALADIE}</td>
+                    <td className="tabular num">{row.absences.INJUSTIFIEE}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

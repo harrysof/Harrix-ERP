@@ -28,7 +28,8 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
   const [expectedDate, setExpectedDate] = useState(order?.expectedDate?.slice(0, 10) ?? "");
   const [shipping, setShipping] = useState(String(order?.shipping ?? ""));
   const [discount, setDiscount] = useState(String(order?.discount ?? ""));
-  const [tax, setTax] = useState(String(order?.tax ?? ""));
+  // Held as a percentage (e.g. "19") — the fraction the API wants is derived below.
+  const [taxPercent, setTaxPercent] = useState(order ? String(order.taxRate * 100) : "");
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [lines, setLines] = useState<PoLineDraft[]>(
     order
@@ -39,7 +40,8 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const extras = { shipping: Number(shipping) || 0, discount: Number(discount) || 0, tax: Number(tax) || 0 };
+  const taxRate = (Number(taxPercent) || 0) / 100;
+  const extras = { shipping: Number(shipping) || 0, discount: Number(discount) || 0, taxRate };
   const activeLines = lines.filter((l) => l.itemId && l.quantity > 0);
   const totals = draftTotals(activeLines, extras);
 
@@ -142,7 +144,7 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
                   onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
                 />
               </Field>
-              <Field label="Coût unitaire (DZD)">
+              <Field label="Prix unitaire (DZD)">
                 <input
                   className="input"
                   type="number"
@@ -169,8 +171,16 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
           <Field label="Remise (DZD)">
             <input className="input" type="number" min={0} step="any" value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </Field>
-          <Field label="Taxe (DZD)">
-            <input className="input" type="number" min={0} step="any" value={tax} onChange={(e) => setTax(e.target.value)} />
+          <Field label="Taxe (%)" hint="Le taux seulement — le montant en DZD est calculé automatiquement">
+            <input
+              className="input"
+              type="number"
+              min={0}
+              step="any"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+              placeholder="Ex. 19"
+            />
           </Field>
         </div>
 
@@ -193,15 +203,27 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
 export function TotalsPanel({
   totals,
 }: {
-  totals: { subtotal: number; shipping: number; discount: number; tax: number; total: number; lineDiscounts?: number };
+  totals: {
+    subtotal: number;
+    shipping: number;
+    discount: number;
+    taxRate?: number;
+    tax: number;
+    total: number;
+    lineDiscounts?: number;
+  };
 }) {
+  const taxLabel =
+    totals.taxRate != null && totals.taxRate > 0
+      ? `Taxe (${(totals.taxRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)`
+      : "Taxe";
   return (
     <div className="totals-panel">
       <TotalRow label="Sous-total" value={totals.subtotal} />
       {totals.lineDiscounts ? <TotalRow label="dont remises par ligne" value={-totals.lineDiscounts} muted /> : null}
       <TotalRow label="Transport" value={totals.shipping} />
       <TotalRow label="Remise" value={-totals.discount} />
-      <TotalRow label="Taxe" value={totals.tax} />
+      <TotalRow label={taxLabel} value={totals.tax} />
       <TotalRow label="Total" value={totals.total} strong />
     </div>
   );

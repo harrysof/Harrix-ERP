@@ -34,9 +34,17 @@ describe('outstandingForLine', () => {
 
 describe('poTotals', () => {
   it('computes subtotal and total from the lines', () => {
-    const totals = poTotals([line('a', 10, 250), line('b', 4, 1000)], { shipping: 500, discount: 200, tax: 100 });
+    const totals = poTotals([line('a', 10, 250), line('b', 4, 1000)], { shipping: 500, discount: 200, taxRate: 0.19 });
     expect(totals.subtotal).toBe(6500);
-    expect(totals.total).toBe(6500 + 500 + 100 - 200);
+    // Taxable base is 6500 + 500 - 200 = 6800; tax is 19 % of that = 1292.
+    expect(totals.tax).toBe(1292);
+    expect(totals.total).toBe(6800 + 1292);
+  });
+
+  it('computes no tax when no rate is given', () => {
+    const totals = poTotals([line('a', 1, 100)], {});
+    expect(totals.tax).toBe(0);
+    expect(totals.total).toBe(100);
   });
 
   it('handles an empty PO without NaN', () => {

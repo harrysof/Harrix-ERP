@@ -34,12 +34,6 @@ export const PERMISSIONS = {
   HR_READ: 'hr:read',
   HR_WRITE: 'hr:write',
 
-  FINANCE_READ: 'finance:read',
-  FINANCE_WRITE: 'finance:write',
-  /// Changing the margin and the allocation basis decides what every price is
-  /// computed from — a heavier act than recording this month's electricity bill.
-  FINANCE_MANAGE: 'finance:manage',
-
   USERS_MANAGE: 'users:manage',
   AUDIT_READ: 'audit:read',
 } as const;
@@ -92,14 +86,6 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: Array<{ key:
     permissions: [
       { key: PERMISSIONS.HR_READ, label: 'Consulter les employés et les salaires' },
       { key: PERMISSIONS.HR_WRITE, label: 'Modifier les employés, heures et absences' },
-    ],
-  },
-  {
-    label: 'Finance',
-    permissions: [
-      { key: PERMISSIONS.FINANCE_READ, label: 'Consulter les coûts et les prix de revient' },
-      { key: PERMISSIONS.FINANCE_WRITE, label: 'Saisir les charges et corriger le coût des matières' },
-      { key: PERMISSIONS.FINANCE_MANAGE, label: 'Gérer les catégories de coûts, la marge et la répartition' },
     ],
   },
   {
