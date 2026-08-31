@@ -4,7 +4,7 @@ import { CreateItemDto } from './dto/create-item.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
 import { ReceiveStockDto } from './dto/receive-stock.dto.js';
 import { LogUsageDto } from './dto/log-usage.dto.js';
-import { getBatchesWithRemaining, getExpiryStatus, getFifoBatch, getItemQuantity, getLatestSupplier, getQualityCounts, getRecommendedBatch, getStockStatus, getUnaccounted, isLowStock, QUALITY_CLASSES, type BatchLike, type MovementDetail } from './stock-math.js';
+import { getAverageUnitCost, getBatchesWithRemaining, getBatchUnitCost, getCostSources, getExpiryStatus, getFifoBatch, getItemQuantity, getItemValuation, getLatestSupplier, getQualityCounts, getRecommendedBatch, getStockStatus, getUnaccounted, isLowStock, QUALITY_CLASSES, roundMoney, type BatchLike, type MovementDetail } from './stock-math.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 
@@ -59,7 +59,12 @@ export class StockService {
 
   /** The read shape every stock endpoint returns for an item. */
   private buildItemView(
-    item: { id: string; reorderThreshold: number; inventoryType: { hasBatches: boolean; hasQuality: boolean } },
+    item: {
+      id: string;
+      reorderThreshold: number;
+      unitCost: number | null;
+      inventoryType: { hasBatches: boolean; hasQuality: boolean };
+    },
     movements: MovementDetail[],
     batches: BatchLike[],
     today: Date,
@@ -72,6 +77,10 @@ export class StockService {
       .filter((m) => m.itemId === item.id && m.direction === 'OUT')
       .reduce((sum, m) => sum + m.quantity, 0);
     const batchList = getBatchesWithRemaining(batches, movements, item.id, today);
+    // What the stock on hand is worth, and where that value came from. Both
+    // are computed, never stored — see stock-math.ts, "COSTING & VALUATION".
+    const valuation = getItemValuation(movements, item.id, quantity, item.unitCost);
+    const costSources = getCostSources(movements, item.id, item.unitCost);
     const view: Record<string, unknown> = {
       ...item,
       quantity,
@@ -82,6 +91,10 @@ export class StockService {
       stockStatus: getStockStatus(quantity, item.reorderThreshold),
       fifoBatch: item.inventoryType.hasBatches ? getFifoBatch(batchList) : null,
       recommendedBatch: item.inventoryType.hasBatches ? getRecommendedBatch(batchList) : null,
+      ...valuation,
+      costSources,
+      /** What everything ever received actually cost — the money side of `purchased`. */
+      purchasedValue: roundMoney(costSources.reduce((sum, source) => sum + source.value, 0)),
     };
     if (item.inventoryType.hasQuality) {
       const counts = getQualityCounts(movements, item.id);
@@ -95,13 +108,23 @@ export class StockService {
     return view;
   }
 
+  /**
+   * The item's lots, in consumption-priority order, each carrying what it
+   * cost. Production reads this to price a material line from the very lot it
+   * is about to draw from, rather than from the item's overall average.
+   */
   async listBatches(itemId: string) {
-    await this.getItem(itemId);
+    const item = await this.prisma.item.findUnique({ where: { id: itemId }, select: { unitCost: true } });
+    if (!item) throw new NotFoundException(`Article introuvable : ${itemId}`);
     const [batches, movements] = await Promise.all([
       this.prisma.batch.findMany({ where: { itemId } }),
       this.prisma.movement.findMany({ where: { itemId } }),
     ]);
-    return getBatchesWithRemaining(batches, movements, itemId, new Date());
+    const fallback = item.unitCost ?? getAverageUnitCost(movements, itemId, item.unitCost);
+    return getBatchesWithRemaining(batches, movements, itemId, new Date()).map((batch) => ({
+      ...batch,
+      unitCost: getBatchUnitCost(movements, batch.id, fallback),
+    }));
   }
 
   async listMovements(itemId: string) {
@@ -231,6 +254,11 @@ export class StockService {
           date: new Date(dto.date),
           supplierId: dto.supplierId ?? null,
           quality,
+          // The delivery's own price when it was given, the article's standard
+          // cost otherwise. Never zero by default: an unpriced entry must
+          // stay visibly unpriced, not silently free.
+          unitCost: dto.unitCost ?? item.unitCost ?? null,
+          sourceType: 'MANUAL',
         },
         include: { batch: true, supplier: true },
       });
@@ -261,6 +289,13 @@ export class StockService {
 
     const quality = validateQuality(dto.quality, item.inventoryType.hasQuality);
 
+    // Value the outgoing units at what they cost — a breakage or an expiry is
+    // a loss in DZD, not only in units, and the fiche should be able to say
+    // how much. Lot-tracked stock is valued at its own lot's cost.
+    const unitCost = dto.batchId
+      ? (getBatchUnitCost(movements, dto.batchId, item.unitCost) ?? getAverageUnitCost(movements, itemId, item.unitCost))
+      : getAverageUnitCost(movements, itemId, item.unitCost);
+
     return this.prisma.movement.create({
       data: {
         itemId,
@@ -269,6 +304,8 @@ export class StockService {
         quantity: dto.quantity,
         date: new Date(dto.date),
         reason: dto.reason,
+        unitCost,
+        sourceType: 'MANUAL',
         quality,
         machine: dto.machine ?? null,
         maintenanceRef: dto.maintenanceRef ?? null,
@@ -304,11 +341,20 @@ export class StockService {
       return status === 'expired' || status === 'warning';
     });
 
+    const stockValue = roundMoney(
+      items.reduce((sum, item) => {
+        const quantity = getItemQuantity(movements, item.id);
+        return sum + (getItemValuation(movements, item.id, quantity, item.unitCost).stockValue ?? 0);
+      }, 0),
+    );
+
     return {
       totalItems: items.length,
       lowStockCount: lowStockItems.length,
       lowStockItems,
       watchBatchCount: watchBatches.length,
+      /** Weighted-average value of everything on the shelves, in DZD. */
+      stockValue,
     };
   }
 }

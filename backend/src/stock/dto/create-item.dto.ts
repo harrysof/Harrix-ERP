@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 
 export class CreateItemDto {
   @IsString()
@@ -13,6 +13,13 @@ export class CreateItemDto {
   @IsNotEmpty()
   reference!: string;
 
+  /**
+   * A unit has to name something: "kg", "litre", "paire". A value of only
+   * digits is refused because it produces quantities that read "0 100" and a
+   * cost labelled "DZD / 100" — the frontend offers a list, this is the rule
+   * behind it.
+   */
+  @Matches(/\p{L}/u, { message: "L'unité doit être une unité de mesure (kg, litre, pièce…), pas un nombre." })
   @IsString()
   @IsNotEmpty()
   unit!: string;
@@ -65,4 +72,10 @@ export class CreateItemDto {
   @IsNumber()
   @Min(0)
   price?: number;
+
+  /** Standard purchase cost per unit, in DZD — see Item.unitCost. */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number;
 }

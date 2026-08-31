@@ -3,6 +3,8 @@ import { Modal } from "../../components/ui/Modal";
 import { Field } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { todayIso } from "../../lib/date";
+import { formatCurrency } from "../../lib/format";
+import { Banner } from "../../components/ui/Banner";
 import type { Supplier } from "../../lib/suppliersApi";
 import type { ApiItem } from "../../lib/stockApi";
 import type { SupplierOrderInput } from "../../lib/supplierOrdersApi";
@@ -18,13 +20,15 @@ interface LineDraft {
   id: number;
   itemId: string;
   quantity: string;
+  /** Agreed price per unit. Pre-filled from the article, editable per order. */
+  unitCost: string;
 }
 
 export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: SupplierOrderFormModalProps) {
   const [supplierId, setSupplierId] = useState("");
   const [orderDate, setOrderDate] = useState(todayIso());
   const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<LineDraft[]>([{ id: 1, itemId: "", quantity: "" }]);
+  const [lines, setLines] = useState<LineDraft[]>([{ id: 1, itemId: "", quantity: "", unitCost: "" }]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,8 +37,29 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
   }
 
   function addLine() {
-    setLines((current) => [...current, { id: Date.now(), itemId: "", quantity: "" }]);
+    setLines((current) => [...current, { id: Date.now(), itemId: "", quantity: "", unitCost: "" }]);
   }
+
+  /**
+   * Picking the article proposes its cost. The price is captured HERE, on the
+   * order, rather than at delivery: it is what was agreed with the supplier,
+   * and it is what the reception will carry into the stock's value.
+   */
+  function onItemChange(line: LineDraft, itemId: string) {
+    const item = items.find((i) => i.id === itemId);
+    const proposed = item?.unitCost ?? item?.averageUnitCost ?? null;
+    updateLine(line.id, {
+      itemId,
+      unitCost: line.unitCost === "" && proposed != null ? String(proposed) : line.unitCost,
+    });
+  }
+
+  const orderTotal = lines.reduce((sum, l) => {
+    const quantity = Number(l.quantity);
+    const unitCost = Number(l.unitCost);
+    if (!l.itemId || !Number.isFinite(quantity) || !Number.isFinite(unitCost)) return sum;
+    return sum + quantity * unitCost;
+  }, 0);
 
   function removeLine(id: number) {
     setLines((current) => (current.length > 1 ? current.filter((l) => l.id !== id) : current));
@@ -51,7 +76,14 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
     }
     const parsed = lines
       .filter((l) => l.itemId && Number(l.quantity) > 0)
-      .map((l) => ({ itemId: l.itemId, quantityOrdered: Number(l.quantity) }));
+      .map((l) => {
+        const unitCost = Number(l.unitCost);
+        return {
+          itemId: l.itemId,
+          quantityOrdered: Number(l.quantity),
+          ...(l.unitCost !== "" && Number.isFinite(unitCost) && unitCost >= 0 ? { unitCost } : {}),
+        };
+      });
     if (parsed.length === 0) {
       setError("Ajoutez au moins une ligne avec une quantité supérieure à zéro.");
       return;
@@ -106,11 +138,7 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
           <p className="order-lines-title">Lignes de commande</p>
           {lines.map((line) => (
             <div key={line.id} className="order-line-editor">
-              <select
-                className="input"
-                value={line.itemId}
-                onChange={(e) => updateLine(line.id, { itemId: e.target.value })}
-              >
+              <select className="input" value={line.itemId} onChange={(e) => onItemChange(line, e.target.value)}>
                 <option value="">— Choisir un article —</option>
                 {items.map((i) => (
                   <option key={i.id} value={i.id}>
@@ -127,6 +155,16 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
                 value={line.quantity}
                 onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
               />
+              <input
+                className="input order-line-qty"
+                type="number"
+                min={0}
+                step="any"
+                placeholder="Prix / u."
+                title="Prix unitaire convenu (DZD). Laissez vide pour utiliser le coût standard de l'article."
+                value={line.unitCost}
+                onChange={(e) => updateLine(line.id, { unitCost: e.target.value })}
+              />
               <Button variant="ghost" onClick={() => removeLine(line.id)}>
                 Suppr.
               </Button>
@@ -135,7 +173,13 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
           <Button variant="secondary" onClick={addLine}>
             + Ajouter une ligne
           </Button>
+          {orderTotal > 0 ? <p className="order-lines-total">Total commande : {formatCurrency(orderTotal)}</p> : null}
         </div>
+
+        <Banner tone="info">
+          Le prix unitaire saisi ici suit la marchandise : à la réception, il entre dans la valeur du stock et met à jour le coût moyen de
+          l'article. Laissé vide, c'est le coût standard de l'article qui s'applique.
+        </Banner>
 
         {error ? <p className="form-error">{error}</p> : null}
       </div>

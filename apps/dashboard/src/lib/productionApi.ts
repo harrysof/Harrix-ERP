@@ -26,6 +26,12 @@ export interface ApiConsumption {
   itemId: string;
   stockBatchId: string | null;
   quantity: number;
+  /**
+   * What one unit of this material cost when it was drawn, in DZD — a
+   * snapshot taken at consumption time, so the batch's cost stays what it
+   * actually was. Null when the material had no known price.
+   */
+  unitCost: number | null;
   movementId: string | null;
   item: { id: string; name: string; unit: string };
   stockBatch: { id: string; batchNumber: string } | null;
@@ -67,6 +73,12 @@ export interface ApiProductionBatch {
   unknown: number | null;
   needsInvestigation: boolean;
   rates: ApiRates;
+  /** What this batch consumed, in DZD. MATERIALS ONLY — no labour, energy or overhead. */
+  materialCost: number;
+  /** Material cost per sellable unit (1er + 2ème). Null until output is declared. */
+  unitMaterialCost: number | null;
+  /** Consumption lines with no known price — the cost above is short by their value. */
+  uncostedConsumptionCount: number;
 }
 
 export interface LossTotals {

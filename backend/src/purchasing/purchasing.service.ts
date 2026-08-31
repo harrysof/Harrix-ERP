@@ -326,6 +326,12 @@ export class PurchasingService {
             quantity: line.quantity,
             date: new Date(dto.date),
             supplierId: po.supplierId,
+            // The price the order was actually placed at, carried onto the
+            // ledger. This is what makes a delivery move the item's average
+            // cost: the money arrives with the goods, not separately.
+            unitCost: poLine.unitCost,
+            sourceType: 'PURCHASE',
+            sourceRef: po.code,
           },
         });
 

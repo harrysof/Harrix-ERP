@@ -118,7 +118,7 @@ async function main() {
   // Produits chimiques — colle néoprène: two batches, the first nearly used
   // up and already expired, to demonstrate every FEFO/expiry state at once.
   const colle = await prisma.item.create({
-    data: { inventoryTypeId: chemicalsType.id, name: 'Colle néoprène', reference: 'CH-001', unit: 'kg', reorderThreshold: 20, photoUrl: svgPhoto('CH-001') },
+    data: { inventoryTypeId: chemicalsType.id, name: 'Colle néoprène', reference: 'CH-001', unit: 'kg', reorderThreshold: 20, unitCost: 1250, photoUrl: svgPhoto('CH-001') },
   });
   const colleBatch1 = await prisma.batch.create({
     data: { itemId: colle.id, batchNumber: 'L-2401', receivedDate: daysFromNow(-60), expiryDate: daysFromNow(-5) },
@@ -135,7 +135,7 @@ async function main() {
   });
 
   const solvant = await prisma.item.create({
-    data: { inventoryTypeId: chemicalsType.id, name: 'Solvant de nettoyage', reference: 'CH-002', unit: 'litre', reorderThreshold: 15, photoUrl: svgPhoto('CH-002') },
+    data: { inventoryTypeId: chemicalsType.id, name: 'Solvant de nettoyage', reference: 'CH-002', unit: 'litre', reorderThreshold: 15, unitCost: 420, photoUrl: svgPhoto('CH-002') },
   });
   const solvantBatch = await prisma.batch.create({
     data: { itemId: solvant.id, batchNumber: 'L-2405', receivedDate: daysFromNow(-40), expiryDate: daysFromNow(200) },
@@ -148,7 +148,7 @@ async function main() {
   });
 
   const vernis = await prisma.item.create({
-    data: { inventoryTypeId: chemicalsType.id, name: 'Vernis de finition', reference: 'CH-003', unit: 'litre', reorderThreshold: 10, photoUrl: svgPhoto('CH-003') },
+    data: { inventoryTypeId: chemicalsType.id, name: 'Vernis de finition', reference: 'CH-003', unit: 'litre', reorderThreshold: 10, unitCost: 980, photoUrl: svgPhoto('CH-003') },
   });
   const vernisBatch = await prisma.batch.create({
     data: { itemId: vernis.id, batchNumber: 'L-2408', receivedDate: daysFromNow(-25), expiryDate: daysFromNow(15) },
@@ -161,17 +161,27 @@ async function main() {
   });
 
   // Tige des chaussures — no batches, variants: colour + size
-  const tigeSizes: Array<[name: string, reference: string, size: string, threshold: number, received: number, used: number]> = [
-    ['Tige pointure 40', 'TG-040', '40', 200, 600, 250],
-    ['Tige pointure 41', 'TG-041', '41', 200, 500, 350],
-    ['Tige pointure 42', 'TG-042', '42', 200, 150, 0],
+  const tigeSizes: Array<
+    [name: string, reference: string, size: string, threshold: number, received: number, used: number, unitCost: number]
+  > = [
+    ['Tige pointure 40', 'TG-040', '40', 200, 600, 250, 850],
+    ['Tige pointure 41', 'TG-041', '41', 200, 500, 350, 850],
+    ['Tige pointure 42', 'TG-042', '42', 200, 150, 0, 880],
   ];
-  for (const [name, reference, size, threshold, received, used] of tigeSizes) {
+  for (const [name, reference, size, threshold, received, used, unitCost] of tigeSizes) {
     const item = await prisma.item.create({
-      data: { inventoryTypeId: tigeType.id, name, reference, unit: 'pièce', reorderThreshold: threshold, color: 'Noir', size, photoUrl: svgPhoto(reference, 'Tige des chaussures') },
+      data: { inventoryTypeId: tigeType.id, name, reference, unit: 'pièce', reorderThreshold: threshold, color: 'Noir', size, unitCost, photoUrl: svgPhoto(reference, 'Tige des chaussures') },
     });
     await prisma.movement.create({
-      data: { itemId: item.id, direction: 'IN', quantity: received, date: daysFromNow(-30), supplierId: fournituresBatna.id },
+      data: {
+        itemId: item.id,
+        direction: 'IN',
+        quantity: received,
+        date: daysFromNow(-30),
+        supplierId: fournituresBatna.id,
+        unitCost,
+        sourceType: 'MANUAL',
+      },
     });
     if (used > 0) {
       await prisma.movement.create({
@@ -194,6 +204,7 @@ async function main() {
     manufacturer: string;
     location: string;
     criticality: string;
+    unitCost: number;
     maintenanceRef: string;
     maintenanceEmployee: string;
   }> = [
@@ -209,6 +220,7 @@ async function main() {
       manufacturer: 'Gates',
       location: 'Atelier — armoire B2',
       criticality: 'Haute',
+      unitCost: 3200,
       maintenanceRef: 'MT-2026-014',
       maintenanceEmployee: 'Karim Bensaïd',
     },
@@ -224,6 +236,7 @@ async function main() {
       manufacturer: 'Organ',
       location: 'Atelier — tiroir C1',
       criticality: 'Moyenne',
+      unitCost: 45,
       maintenanceRef: 'MT-2026-011',
       maintenanceEmployee: 'Sofiane Merbah',
     },
@@ -239,6 +252,7 @@ async function main() {
       manufacturer: 'SKF',
       location: 'Réserve — étagère A4',
       criticality: 'Haute',
+      unitCost: 1750,
       maintenanceRef: '',
       maintenanceEmployee: '',
     },
@@ -257,11 +271,20 @@ async function main() {
         manufacturer: part.manufacturer,
         location: part.location,
         criticality: part.criticality,
+        unitCost: part.unitCost,
         photoUrl: svgPhoto(part.reference, 'Pièce détachée'),
       },
     });
     await prisma.movement.create({
-      data: { itemId: item.id, direction: 'IN', quantity: part.received, date: daysFromNow(-70), supplierId: mecaPieces.id },
+      data: {
+        itemId: item.id,
+        direction: 'IN',
+        quantity: part.received,
+        date: daysFromNow(-70),
+        supplierId: mecaPieces.id,
+        unitCost: part.unitCost,
+        sourceType: 'MANUAL',
+      },
     });
     if (part.used > 0) {
       await prisma.movement.create({

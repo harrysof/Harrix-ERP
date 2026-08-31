@@ -936,13 +936,32 @@ textarea.input {
 
 /* ---------- production ---------- */
 
+/* A material row grew a cost and a line total, and a lot picker that only
+   some materials show — so it wraps rather than holding a fixed column count
+   that would be wrong for half the cases. */
 .material-line {
-  display: grid;
-  grid-template-columns: 2fr 1.4fr 1fr auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: end;
   padding: 12px 0;
   border-top: 1px solid var(--border);
+}
+
+.material-line > .field {
+  flex: 1 1 130px;
+  min-width: 110px;
+}
+
+.material-line > .field:first-child {
+  flex: 2 1 200px;
+}
+
+/* Costs come from the stock, not from this form: readable, obviously inert. */
+.material-line .input[readonly] {
+  background: var(--surface-sunk);
+  color: var(--ink-soft);
+  cursor: default;
 }
 
 .material-line:first-child {
@@ -1161,11 +1180,6 @@ textarea.input {
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-  font-size: 20px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -1244,8 +1258,6 @@ textarea.input {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1797,8 +1809,7 @@ audit-changes {
   .form-row {
     grid-template-columns: 1fr;
   }
-  .order-line,
-  .material-line {
+  .order-line {
     grid-template-columns: 1fr 1fr;
   }
   .totals-panel {
@@ -1814,4 +1825,108 @@ audit-changes {
   .variance-operator {
     padding-top: 0;
   }
+}
+
+
+/* ---------- stock valuation & inventory management ---------- */
+
+/* Adding an inventory is a different act from switching between them, so the
+   button sits in the strip but never looks like one of the tabs. */
+.tab-strip-add {
+  color: var(--accent);
+  border: 1px dashed var(--border-strong);
+}
+
+.tab-strip-add:hover {
+  color: var(--accent-strong);
+  background: var(--surface);
+}
+
+.inventory-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inventory-heading .inventory-description {
+  margin: 0;
+  flex: 1 1 320px;
+}
+
+.inventory-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 20px;
+}
+
+/* A stock value, with a quiet flag when part of the history has no price. */
+.value-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.value-cell .field-hint {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Where a movement came from — shown under its detail, never louder than it. */
+.history-origin {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* ---------- supplier order line editor ---------- */
+
+.order-lines-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.order-lines-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+}
+
+.order-line-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.order-line-editor > select {
+  flex: 2 1 200px;
+  min-width: 0;
+}
+
+.order-line-qty {
+  flex: 1 1 90px;
+  min-width: 80px;
+}
+
+.order-lines-total {
+  margin: 0;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* A unit is picked from a list; the text box only appears for "Autre…". */
+.unit-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }

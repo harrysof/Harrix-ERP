@@ -8,7 +8,8 @@ import { createBatch, type CreateBatchInput } from "../../lib/productionApi";
 import { todayIso } from "../../lib/date";
 import { MaterialLineEditor } from "./MaterialLineEditor";
 import { VarianceBreakdown } from "./VarianceBreakdown";
-import { SHIFTS, emptyMaterialLine, type MaterialLine } from "./types";
+import { SHIFTS, emptyMaterialLine, materialLinesCost, unpricedLines, type MaterialLine } from "./types";
+import { formatCurrency } from "../../lib/format";
 
 interface NewBatchModalProps {
   materialItems: ApiItem[];
@@ -54,6 +55,15 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
   const wasteValue = Number(waste) || 0;
   const unknown = expected - first - second - wasteValue;
   const product = finishedGoodsItems.find((i) => i.id === productItemId);
+
+  // What this batch costs in raw materials, and what that works out to per
+  // finished unit. The same arithmetic the backend performs when it writes
+  // the batch — shown here so the cost is visible before it is committed,
+  // not discovered afterwards.
+  const materialCost = materialLinesCost(materials);
+  const sellable = first + second;
+  const unitMaterialCost = declareNow && sellable > 0 ? materialCost / sellable : null;
+  const missingCosts = unpricedLines(materials);
 
   async function handleSubmit() {
     setError(null);
@@ -188,6 +198,29 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
           <Button variant="ghost" onClick={() => setMaterials((prev) => [...prev, emptyMaterialLine()])} style={{ marginTop: 8 }}>
             + Ajouter une matière
           </Button>
+
+          {materialCost > 0 || missingCosts.length > 0 ? (
+            <div className="detail-stats" style={{ marginTop: 12 }}>
+              <div className="stat-card">
+                <span className="stat-card-label">Coût matières du lot</span>
+                <span className="stat-card-value">{formatCurrency(materialCost)}</span>
+                <span className="stat-card-hint">
+                  {missingCosts.length > 0
+                    ? `${missingCosts.length} matière(s) sans coût connu — non comptée(s)`
+                    : "Somme des matières consommées, au coût du stock"}
+                </span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-card-label">Coût matières / unité</span>
+                <span className="stat-card-value">{unitMaterialCost !== null ? formatCurrency(unitMaterialCost) : "—"}</span>
+                <span className="stat-card-hint">
+                  {unitMaterialCost !== null
+                    ? "Réparti sur les unités vendables (1er + 2ème choix)"
+                    : "Disponible une fois la sortie déclarée"}
+                </span>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <label className="checkbox-row">
@@ -244,8 +277,16 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
 
         <Banner tone="info">
           Les matières sont déduites du stock et les produits finis (1er + 2ème choix) y sont ajoutés en une seule opération côté serveur. Le
-          rebut est enregistré mais n'entre jamais dans le stock vendable.
+          rebut est enregistré mais n'entre jamais dans le stock vendable. Le coût des matières consommées suit le produit fini : il devient
+          son coût matières estimé dans l'onglet Stock.
         </Banner>
+
+        {materialCost > 0 ? (
+          <Banner tone="warn">
+            Ce coût ne comprend que les <strong>matières premières</strong>. Main-d'œuvre, énergie, amortissement des machines et frais
+            généraux n'y sont pas — le coût de revient réel du lot est plus élevé.
+          </Banner>
+        ) : null}
 
         {error ? <p className="form-error">{error}</p> : null}
       </div>

@@ -1,4 +1,4 @@
-import { IsISO8601, IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
+import { IsISO8601, IsNumber, IsOptional, IsPositive, IsString, Min } from 'class-validator';
 
 export class ReceiveStockDto {
   @IsNumber()
@@ -26,4 +26,15 @@ export class ReceiveStockDto {
   @IsOptional()
   @IsString()
   quality?: string;
+
+  /**
+   * What one unit of THIS delivery cost, in DZD. Omitted, the service falls
+   * back to the item's standard cost — a reception nobody priced still values
+   * the stock, it just does so from the catalogue rather than from a
+   * document.
+   */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number;
 }

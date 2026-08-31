@@ -10,6 +10,14 @@ export interface MaterialLine {
   quantity: number;
   stockBatchId: string | null;
   batchNumber: string | null;
+  /**
+   * What one unit of this material costs, read from the stock it will be
+   * drawn from — the lot's own cost when the material is lot-tracked, the
+   * article's weighted average otherwise. Display only: the backend prices
+   * every line again from the same stock when it writes the batch, so the
+   * number the factory saw and the number recorded come from one source.
+   */
+  unitCost: number | null;
 }
 
 export const emptyMaterialLine = (): MaterialLine => ({
@@ -19,7 +27,18 @@ export const emptyMaterialLine = (): MaterialLine => ({
   quantity: 0,
   stockBatchId: null,
   batchNumber: null,
+  unitCost: null,
 });
+
+/** What a set of material lines costs — the raw-material cost of a batch. */
+export function materialLinesCost(lines: MaterialLine[]): number {
+  return lines.reduce((sum, line) => sum + (line.unitCost ?? 0) * line.quantity, 0);
+}
+
+/** Lines drawn from stock nobody has ever priced — the total above is short by their value. */
+export function unpricedLines(lines: MaterialLine[]): MaterialLine[] {
+  return lines.filter((line) => line.itemId && line.quantity > 0 && line.unitCost === null);
+}
 
 /**
  * How each status is coloured. "Investigation requise" is the only tone that

@@ -14,6 +14,8 @@ export interface ApiSupplierOrder {
     id: string;
     itemId: string;
     quantityOrdered: number;
+    /** Agreed price per unit, in DZD. Null when the order was placed without one. */
+    unitCost: number | null;
     batchNumber: string | null;
     expiryDate: string | null;
     item: {
@@ -30,7 +32,7 @@ export interface SupplierOrderInput {
   supplierId: string;
   orderDate: string;
   notes?: string;
-  lines: Array<{ itemId: string; quantityOrdered: number }>;
+  lines: Array<{ itemId: string; quantityOrdered: number; unitCost?: number }>;
 }
 
 export interface ReceiveOrderInput {

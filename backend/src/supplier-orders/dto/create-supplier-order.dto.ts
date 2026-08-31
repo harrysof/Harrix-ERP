@@ -19,6 +19,16 @@ export class CreateSupplierOrderLineDto {
   @IsNumber()
   @Min(0.01)
   quantityOrdered!: number;
+
+  /**
+   * Agreed price per unit, in DZD. Optional — an order is sometimes placed
+   * before the price is settled, and the reception then falls back to the
+   * article's standard cost.
+   */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitCost?: number;
 }
 
 export class CreateSupplierOrderDto {

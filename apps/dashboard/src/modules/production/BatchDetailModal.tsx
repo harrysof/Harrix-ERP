@@ -5,7 +5,7 @@ import { Field } from "../../components/ui/Field";
 import { Pill } from "../../components/ui/Pill";
 import { Banner } from "../../components/ui/Banner";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { formatDate, formatQuantity } from "../../lib/format";
+import { formatCurrency, formatDate, formatQuantity } from "../../lib/format";
 import type { ApiItem } from "../../lib/stockApi";
 import { addConsumption, declareOutput, updateBatch, STATUS_LABELS, type ApiProductionBatch } from "../../lib/productionApi";
 import { MaterialLineEditor } from "./MaterialLineEditor";
@@ -84,6 +84,8 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                     <th>Matière</th>
                     <th>Lot</th>
                     <th>Quantité</th>
+                    <th>Coût unitaire</th>
+                    <th>Coût</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -92,9 +94,21 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                       <td>{c.item.name}</td>
                       <td>{c.stockBatch ? c.stockBatch.batchNumber : <span className="muted">—</span>}</td>
                       <td className="tabular">{formatQuantity(c.quantity, c.item.unit)}</td>
+                      <td className="tabular">
+                        {c.unitCost != null ? formatCurrency(c.unitCost) : <span className="muted">—</span>}
+                      </td>
+                      <td className="tabular">
+                        {c.unitCost != null ? formatCurrency(c.unitCost * c.quantity) : <span className="muted">—</span>}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={4}>Coût matières du lot</td>
+                    <td className="tabular">{formatCurrency(batch.materialCost)}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
@@ -158,6 +172,32 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                 waste={batch.waste}
                 unit={batch.product.unit}
               />
+              <div className="detail-stats" style={{ marginBottom: 12 }}>
+                <div className="stat-card">
+                  <span className="stat-card-label">Coût matières du lot</span>
+                  <span className="stat-card-value">{formatCurrency(batch.materialCost)}</span>
+                  <span className="stat-card-hint">
+                    {batch.uncostedConsumptionCount > 0
+                      ? `${batch.uncostedConsumptionCount} matière(s) sans coût connu — non comptée(s)`
+                      : "Matières premières consommées, au coût du stock"}
+                  </span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-card-label">Coût matières / unité</span>
+                  <span className="stat-card-value">
+                    {batch.unitMaterialCost !== null ? formatCurrency(batch.unitMaterialCost) : "—"}
+                  </span>
+                  <span className="stat-card-hint">
+                    Réparti sur les unités vendables — le rebut n'en absorbe aucune part
+                  </span>
+                </div>
+              </div>
+
+              <Banner tone="warn">
+                Coût matières uniquement : main-d'œuvre, énergie, amortissement des machines et frais généraux ne sont pas comptés. C'est
+                aussi ce montant qui devient le coût matières estimé du produit fini dans l'onglet Stock.
+              </Banner>
+
               <div className="rate-row">
                 <RateItem label="Rendement (1er choix)" value={formatRate(batch.rates.yieldRate)} />
                 <RateItem label="Taux 2ème choix" value={formatRate(batch.rates.secondChoiceRate)} />

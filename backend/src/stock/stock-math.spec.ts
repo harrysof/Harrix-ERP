@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getAverageUnitCost,
   getBatchesWithRemaining,
+  getBatchUnitCost,
+  getCostSources,
   getExpiryStatus,
   getFifoBatch,
   getItemQuantity,
+  getItemValuation,
   getLatestSupplier,
   getQualityCounts,
   getRecommendedBatch,
@@ -11,6 +15,7 @@ import {
   getUnaccounted,
   isLowStock,
   type BatchLike,
+  type CostedMovement,
   type MovementDetail,
   type MovementLike,
 } from './stock-math.js';
@@ -241,5 +246,145 @@ describe('getRecommendedBatch', () => {
     ];
     const list = getBatchesWithRemaining(expiringBatches, movements, 'item-1', today);
     expect(getRecommendedBatch(list)?.id).toBe('b-expired');
+  });
+});
+
+
+// ===========================================================================
+// COSTING & VALUATION
+// ===========================================================================
+
+function cost(
+  partial: Partial<CostedMovement> & Pick<CostedMovement, 'itemId' | 'direction' | 'quantity'>,
+): CostedMovement {
+  return { batchId: null, ...partial };
+}
+
+describe('getAverageUnitCost', () => {
+  it('weights each entry by its quantity, not by how many entries there were', () => {
+    // 100 kg at 200 DZD and 900 kg at 100 DZD is 110 DZD a kg — not 150.
+    const movements = [
+      cost({ itemId: 'ch', direction: 'IN', quantity: 100, unitCost: 200 }),
+      cost({ itemId: 'ch', direction: 'IN', quantity: 900, unitCost: 100 }),
+    ];
+    expect(getAverageUnitCost(movements, 'ch')).toBe(110);
+  });
+
+  it('ignores what left the shelf — consumption spends value, it does not reprice it', () => {
+    const movements = [
+      cost({ itemId: 'ch', direction: 'IN', quantity: 100, unitCost: 50 }),
+      cost({ itemId: 'ch', direction: 'OUT', quantity: 90, unitCost: 50 }),
+    ];
+    expect(getAverageUnitCost(movements, 'ch')).toBe(50);
+  });
+
+  it("falls back to the article's standard cost for entries nobody priced", () => {
+    const movements = [cost({ itemId: 'ch', direction: 'IN', quantity: 10 })];
+    expect(getAverageUnitCost(movements, 'ch', 75)).toBe(75);
+  });
+
+  it('reports an unknown cost as unknown rather than as zero', () => {
+    const movements = [cost({ itemId: 'ch', direction: 'IN', quantity: 10 })];
+    expect(getAverageUnitCost(movements, 'ch')).toBeNull();
+  });
+
+  it("reports the article's standard cost when nothing has come in yet", () => {
+    // A newly created article: a cost was typed, no delivery has arrived. The
+    // standard cost is what the factory knows, so it is what gets reported.
+    expect(getAverageUnitCost([], 'ch', 500)).toBe(500);
+  });
+
+  it('still reports nothing when there is neither a movement nor a standard cost', () => {
+    expect(getAverageUnitCost([], 'ch')).toBeNull();
+  });
+
+  it('leaves other items alone', () => {
+    const movements = [
+      cost({ itemId: 'ch', direction: 'IN', quantity: 10, unitCost: 100 }),
+      cost({ itemId: 'tige', direction: 'IN', quantity: 10, unitCost: 900 }),
+    ];
+    expect(getAverageUnitCost(movements, 'ch')).toBe(100);
+  });
+});
+
+describe('getBatchUnitCost', () => {
+  it('prices a lot from its own deliveries, not from the item average', () => {
+    const movements = [
+      cost({ itemId: 'ch', batchId: 'b-1', direction: 'IN', quantity: 100, unitCost: 80 }),
+      cost({ itemId: 'ch', batchId: 'b-2', direction: 'IN', quantity: 100, unitCost: 120 }),
+    ];
+    expect(getBatchUnitCost(movements, 'b-1')).toBe(80);
+    expect(getBatchUnitCost(movements, 'b-2')).toBe(120);
+    expect(getAverageUnitCost(movements, 'ch')).toBe(100);
+  });
+});
+
+describe('getItemValuation', () => {
+  it('values the stock on hand at the weighted average', () => {
+    const movements = [
+      cost({ itemId: 'ch', direction: 'IN', quantity: 100, unitCost: 200 }),
+      cost({ itemId: 'ch', direction: 'IN', quantity: 900, unitCost: 100 }),
+      cost({ itemId: 'ch', direction: 'OUT', quantity: 500 }),
+    ];
+    const quantity = getItemQuantity(movements, 'ch');
+    const valuation = getItemValuation(movements, 'ch', quantity, null);
+    expect(quantity).toBe(500);
+    expect(valuation.averageUnitCost).toBe(110);
+    expect(valuation.stockValue).toBe(55_000);
+    expect(valuation.uncostedQuantity).toBe(0);
+  });
+
+  it('says how much of the history it could not price', () => {
+    const movements = [
+      cost({ itemId: 'ch', direction: 'IN', quantity: 100, unitCost: 50 }),
+      cost({ itemId: 'ch', direction: 'IN', quantity: 40 }), // arrived before costs were tracked
+    ];
+    const valuation = getItemValuation(movements, 'ch', 140, null);
+    expect(valuation.averageUnitCost).toBe(50);
+    expect(valuation.valuedQuantity).toBe(100);
+    expect(valuation.uncostedQuantity).toBe(40);
+  });
+
+  it('has no value to report when nothing was ever priced', () => {
+    const valuation = getItemValuation([cost({ itemId: 'ch', direction: 'IN', quantity: 10 })], 'ch', 10, null);
+    expect(valuation.averageUnitCost).toBeNull();
+    expect(valuation.stockValue).toBeNull();
+  });
+
+  it("falls back to the article's standard cost before any delivery arrives", () => {
+    const valuation = getItemValuation([], 'ch', 0, 500);
+    expect(valuation.averageUnitCost).toBe(500);
+    expect(valuation.stockValue).toBe(0);
+    expect(valuation.valuedQuantity).toBe(0);
+  });
+});
+
+describe('getCostSources', () => {
+  const movements = [
+    cost({ itemId: 'ch', direction: 'IN', quantity: 100, unitCost: 100, sourceType: 'PURCHASE', sourceRef: 'BC-2026-0001' }),
+    cost({ itemId: 'ch', direction: 'IN', quantity: 50, unitCost: 120, sourceType: 'PURCHASE', sourceRef: 'BC-2026-0002' }),
+    cost({ itemId: 'ch', direction: 'IN', quantity: 20, unitCost: 90, sourceType: 'MANUAL' }),
+    cost({ itemId: 'ch', direction: 'OUT', quantity: 60, unitCost: 100, sourceType: 'PRODUCTION', sourceRef: 'LOT-2026-0004' }),
+  ];
+
+  it('splits the value by where the stock came from, biggest first', () => {
+    const sources = getCostSources(movements, 'ch');
+    expect(sources.map((s) => s.source)).toEqual(['PURCHASE', 'MANUAL']);
+    expect(sources[0].quantity).toBe(150);
+    expect(sources[0].value).toBe(16_000);
+    expect(sources[0].averageUnitCost).toBe(106.67);
+    expect(sources[0].references).toEqual(['BC-2026-0001', 'BC-2026-0002']);
+    expect(sources[1].value).toBe(1_800);
+  });
+
+  it('counts entries with no source as direct receptions', () => {
+    const sources = getCostSources([cost({ itemId: 'ch', direction: 'IN', quantity: 5, unitCost: 10 })], 'ch');
+    expect(sources[0].source).toBe('MANUAL');
+    expect(sources[0].label).toBe('Réception directe');
+  });
+
+  it('never counts a consumption as a source of value', () => {
+    const sources = getCostSources(movements, 'ch');
+    expect(sources.some((s) => s.source === 'PRODUCTION')).toBe(false);
   });
 });

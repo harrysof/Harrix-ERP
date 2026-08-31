@@ -120,24 +120,24 @@ Override the API location with `VITE_API_URL` (see `.env.example`).
 Seven tables, no more:
 
 ### `InventoryType`
-The four inventories, as **data**, not a hardcoded enum — a future factory with 3 or 6 inventories needs new rows, not a schema change. Fields: `key` (stable machine id like `"chemicals"`), `label`, `singular`, `description`, `hasBatches`, `hasExpiry`, `isProductionInput`, `hasColor`, `hasSize`, `hasDescription`, `hasMachineInfo`, `hasGender`, `hasPrice`, `hasQuality`, `defaultUnit`, `sortOrder`.
+The inventories, as **data**, not a hardcoded enum — a future factory with 3 or 6 inventories needs new rows, not a schema change. Since the costing work these rows are also **editable from the Stock tab** (`+ Inventaire` in the tab strip → `POST /settings/inventory-types`), so a fifth inventory (emballages, consommables, outillage) no longer needs a seed edit. The machine `key` is frozen after creation — everything in the inventory hangs off it. Batch tracking cannot be switched off once lots exist, and an inventory holding articles cannot be deleted. Fields: `key` (stable machine id like `"chemicals"`), `label`, `singular`, `description`, `hasBatches`, `hasExpiry`, `isProductionInput`, `hasColor`, `hasSize`, `hasDescription`, `hasMachineInfo`, `hasGender`, `hasPrice`, `hasQuality`, `defaultUnit`, `sortOrder`.
 
 Current rows (from `prisma/seed.ts`): `chemicals` (hasBatches, hasExpiry, isProductionInput), `tige` (isProductionInput, **hasColor, hasSize** — the tige variant inventory), `spare-parts` (none of the production/batch flags, but **hasDescription + hasMachineInfo** — the maintenance inventory), `finished-goods` (**hasColor, hasSize, hasGender, hasPrice, hasQuality** — the sellable output inventory, with per-movement production-quality classes).
 
 ### `Item`
-One row per tracked article. `reference` is globally unique. Belongs to one `InventoryType`. Has `reorderThreshold` (for the low-stock flag), an optional `photoUrl` (a URL or inline `data:` image — no upload endpoint yet), optional **`color`** and **`size`** variant strings (only meaningful when the type declares `hasColor`/`hasSize`), an optional **`description`** (free text, only when `hasDescription`), optional maintenance attribute strings — **`machine`, `compatibility`, `manufacturer`, `location`, `criticality`** (only when `hasMachineInfo`; `criticality` is a free string seeded as "Haute"/"Moyenne"/"Basse"), an optional **`gender`** ("M"/"F", only when `hasGender`) and an optional **`price`** in DZD (only when `hasPrice`) — but **no quantity column and no supplier column** — quantity is `SUM(IN)−SUM(OUT)` (§4) and the displayed supplier is derived from the ledger (§4).
+One row per tracked article. `reference` is globally unique. `unit` is a unit of measure — the frontend offers a closed list (`src/lib/units.ts`, with an "Autre…" escape hatch) and both the DTO and that list refuse a value with no letter in it, because "100" as a unit renders quantities as "0 100" and a cost as "DZD / 100". Belongs to one `InventoryType`. Has `reorderThreshold` (for the low-stock flag), an optional `photoUrl` (a URL or inline `data:` image — no upload endpoint yet), optional **`color`** and **`size`** variant strings (only meaningful when the type declares `hasColor`/`hasSize`), an optional **`description`** (free text, only when `hasDescription`), optional maintenance attribute strings — **`machine`, `compatibility`, `manufacturer`, `location`, `criticality`** (only when `hasMachineInfo`; `criticality` is a free string seeded as "Haute"/"Moyenne"/"Basse"), an optional **`gender`** ("M"/"F", only when `hasGender`), an optional **`price`** in DZD (the *sale* price, only when `hasPrice`) and an optional **`unitCost`** in DZD (the *purchase* cost per unit — see §5.4) — but **no quantity column, no supplier column and no stock-value column** — quantity is `SUM(IN)−SUM(OUT)` (§4) and the displayed supplier is derived from the ledger (§4).
 
 ### `Batch`
 Only meaningful for items whose `InventoryType.hasBatches` is true (chemicals). Has `receivedDate` and `expiryDate`. A batch's remaining quantity, like an item's, is computed from its movements — never stored.
 
 ### `Movement`
-The ledger. Every stock change, ever, is a row here: `itemId`, optional `batchId`, `direction` ("IN"/"OUT"), `quantity`, `date`, optional `supplierId`, optional `reason` (only meaningful on OUT), the maintenance context column set — **`machine`, `maintenanceRef`, `employee`, `notes`** — filled in on spare-part usages (when the type declares `hasMachineInfo`), and **`quality`** (`"1er"`/`"2ème"`/`"rebut"`, or null) for finished-goods production classes. Movements left with a null quality are exactly what the reconciliation reports as `unaccounted` — see §4. This table is append-only in spirit — nothing in the app updates or deletes a movement.
+The ledger. Every stock change, ever, is a row here: `itemId`, optional `batchId`, `direction` ("IN"/"OUT"), `quantity`, `date`, optional `supplierId`, optional `reason` (only meaningful on OUT), the maintenance context column set — **`machine`, `maintenanceRef`, `employee`, `notes`** — filled in on spare-part usages (when the type declares `hasMachineInfo`), **`quality`** (`"1er"`/`"2ème"`/`"rebut"`, or null) for finished-goods production classes, and the costing pair **`unitCost`** (what one unit cost on *this* movement) + **`sourceType`**/**`sourceRef`** (`"MANUAL"`, `"SUPPLIER_ORDER"`, `"PURCHASE"`, `"PRODUCTION"`, `"SALE"`, and the document behind it, e.g. `"BC-2026-0007"`). See §5.4. Movements left with a null quality are exactly what the reconciliation reports as `unaccounted` — see §4. This table is append-only in spirit — nothing in the app updates or deletes a movement.
 
 ### `Supplier`
 Plain contact record with `archived` (soft-delete — archiving, not deleting, keeps historical movements' supplier links intact). Linked from movements and from `SupplierOrder`.
 
 ### `SupplierOrder` + `SupplierOrderLine`
-A purchase order placed with a supplier. `SupplierOrder` has `supplierId`, `orderDate`, plain-string `status` (`"open"`/`"received"`, validated at the DTO), `receivedDate` (set on receive), optional `notes`. `SupplierOrderLine` has `itemId`, `quantityOrdered`, and optional `batchNumber`/`expiryDate` filled in **at receive time** for batch-tracked items. See §4 for why an order is inert until received.
+A purchase order placed with a supplier. `SupplierOrder` has `supplierId`, `orderDate`, plain-string `status` (`"open"`/`"received"`, validated at the DTO), `receivedDate` (set on receive), optional `notes`. `SupplierOrderLine` has `itemId`, `quantityOrdered`, an optional `unitCost` (the agreed price, captured on the order and carried onto the IN movement at receive time), and optional `batchNumber`/`expiryDate` filled in **at receive time** for batch-tracked items. See §4 for why an order is inert until received.
 
 ### `Role`
 A job title, as **data**. `key` (stable, e.g. `"gerant"`), `label`, `description`, `permissions` (comma-separated string — SQLite has no array type; only `auth/permissions.ts` knows that format), `isProtected`, `sortOrder`.
@@ -179,7 +179,39 @@ Pure functions, unit tested in `stock-math.spec.ts`:
 - `MovementDetail` (movement + `date` + joined `supplier`) and `getLatestSupplier(movements, itemId)` → the supplier of the most recent IN movement for the item, or `null` if it was never received from anyone.
 - `getQualityCounts(movements, itemId)` → per-`quality` IN−OUT counts for an item (every class seen plus `"1er"`, `"2ème"`, `"rebut"`, and `unclassified`), and `getUnaccounted(counts)` → the `unclassified` bucket (see §4 — the "unknown units" number).
 
+Costing lives in the same file — see §5.4.
+
 If you need this logic anywhere else (a report, a new endpoint), import from this file. Don't re-derive it.
+
+---
+
+### 5.4 Costing and valuation (`backend/src/stock/stock-math.ts`, "COSTING & VALUATION")
+
+**The rule is the one quantity already follows: nothing is stored.** An item's unit cost is always recomputed from the IN movements that actually paid for it. `Item.unitCost` is only the *fallback* used for movements carrying no cost of their own (rows written before costs were tracked, or a reception nobody priced).
+
+**Method: weighted average.** Every unit in stock is valued at the average of what the units bought were paid for, not at the newest price. FIFO cost layers would be more precise, but they only pay off when purchase prices swing hard and they cost the thing this system exists for — being able to explain a number to the person who typed it in.
+
+Pure functions, 12 tests in `stock-math.spec.ts`:
+- `getAverageUnitCost(movements, itemId, fallback)` — Σ(qty × cost) ÷ Σ(qty), over IN movements only. Falls back to `Item.unitCost` when no entry has arrived yet (a newly created article shows the cost that was just typed, not "—"). **Null**, never 0, only when there is neither a priced entry nor a standard cost: an unknown cost is reported as unknown.
+- `getBatchUnitCost(movements, batchId, fallback)` — the same, for one lot. Production prices a material from the very lot it draws on.
+- `getItemValuation(movements, itemId, quantity, fallback)` → `averageUnitCost`, `stockValue` (= quantity × average), `valuedQuantity`, `uncostedQuantity`. The last one is what lets every screen say "this average only covers part of the history" instead of quietly under-reporting.
+- `getCostSources(movements, itemId, fallback)` → one bucket per `sourceType`: quantity, value, average unit cost, and the documents behind it. This is the item fiche's "Valeur & provenance" table — a valuation nobody can trace to a document is a number, not an answer.
+- `MOVEMENT_SOURCES` / `MOVEMENT_SOURCE_LABELS` — the provenance vocabulary, mirrored in the frontend's `ItemDetailModal`.
+
+**Where costs enter the ledger** (all of them write `Movement.unitCost` + `sourceType`/`sourceRef`):
+
+| Path | Cost used | Source |
+| --- | --- | --- |
+| `POST /stock/items/:id/receive` | the delivery's price, else `Item.unitCost` | `MANUAL` |
+| `POST /stock/items/:id/usage` | current average (or the lot's) — so a breakage is a loss in DZD too | `MANUAL` |
+| `POST /purchasing/purchase-orders/:id/receive` | the PO line's `unitCost` | `PURCHASE` + PO code |
+| `POST /supplier-orders/:id/receive` | the order line's `unitCost`, else `Item.unitCost` | `SUPPLIER_ORDER` |
+| production consumption | the lot's cost, else the item average | `PRODUCTION` + batch code |
+| production output credit | batch material cost ÷ sellable units | `PRODUCTION` + batch code |
+
+**The chain, end to end.** A cost typed on the article (or paid on a purchase order) lands on the IN movement → the item's average moves → production draws the material at that average and *snapshots* it on `ProductionConsumption.unitCost` (a snapshot on purpose: re-pricing a lot's materials months later because stock got cheaper would rewrite what the batch actually cost) → the batch's `materialCost` is Σ(qty × cost) → the finished units are credited at `materialCost ÷ (firstChoice + secondChoice)` → that becomes the finished good's average cost in Stock. Waste absorbs **no** share, so a batch that wastes half its run shows a doubled cost per unit rather than a flattering average.
+
+**This is a materials cost only.** No labour, no energy, no machine time, no overhead. Every screen that shows a finished-good cost says so in a warning — the Stock tab's finished-goods banner, the item fiche's "Valeur & provenance" section, the new-batch form and the batch fiche. Do not quietly repurpose the figure as a coût de revient.
 
 ---
 
@@ -207,6 +239,8 @@ Pure functions, 13 tests in `sales-math.spec.ts`:
 ---
 
 ## 6. Backend API reference
+
+> Costing note: every stock read (`/stock/items`, `/stock/items/:id`) now also returns `averageUnitCost`, `stockValue`, `valuedQuantity`, `uncostedQuantity`, `purchasedValue` and `costSources[]`; `/stock/items/:id/batches` returns a per-lot `unitCost`; `/stock/summary` returns `stockValue`; `/production/batches*` return `materialCost`, `unitMaterialCost` and `uncostedConsumptionCount`. All computed, never stored — §5.4. `/settings/inventory-types` gained `POST`, `PATCH /:id` and `DELETE /:id`, all behind `stock:manage`.
 
 All routes are prefixed `/api`. All bodies are JSON, validated with `class-validator` (`whitelist: true, forbidNonWhitelisted: true` — unknown fields are rejected, not silently dropped).
 

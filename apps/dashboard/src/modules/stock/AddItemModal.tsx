@@ -4,6 +4,11 @@ import { Field } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import type { InventoryTypeConfig } from "../../lib/types";
 import type { ApiItem } from "../../lib/stockApi";
+import { formatCurrency, formatQuantity } from "../../lib/format";
+import { UnitSelect } from "../../components/ui/UnitSelect";
+import { isValidUnit } from "../../lib/units";
+import { todayIso } from "../../lib/date";
+import { Banner } from "../../components/ui/Banner";
 
 interface AddItemModalProps {
   inventoryType: InventoryTypeConfig;
@@ -25,6 +30,14 @@ interface AddItemModalProps {
     criticality?: string | null;
     gender?: string | null;
     price?: number | null;
+    unitCost?: number | null;
+    /**
+     * Stock already on the shelf when the article is created. Optional, and
+     * offered only on creation: it is not a column on the article, it is a
+     * first reception the caller posts right after — quantity only ever comes
+     * from the ledger (PROJECT_CONTEXT.md §4).
+     */
+    initialStock?: { quantity: number; date: string; batchNumber?: string; expiryDate?: string } | null;
   }) => Promise<void> | void;
 }
 
@@ -44,12 +57,23 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
   const [criticality, setCriticality] = useState(item?.criticality ?? "");
   const [gender, setGender] = useState(item?.gender ?? "");
   const [price, setPrice] = useState(item?.price != null ? String(item.price) : "");
+  const [unitCost, setUnitCost] = useState(item?.unitCost != null ? String(item.unitCost) : "");
+  // Opening stock, on creation only. Editing an article must never move stock:
+  // that is what a réception or a sortie is for, and each leaves a ledger row.
+  const [initialQuantity, setInitialQuantity] = useState("");
+  const [initialDate, setInitialDate] = useState(todayIso());
+  const [initialBatch, setInitialBatch] = useState("");
+  const [initialExpiry, setInitialExpiry] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
     if (!name.trim() || !reference.trim()) {
       setError("Le nom et la référence sont obligatoires.");
+      return;
+    }
+    if (!isValidUnit(unit)) {
+      setError("Choisissez une unité de mesure (kg, litre, pièce…). Un nombre n'est pas une unité.");
       return;
     }
     const thresholdValue = Number(threshold);
@@ -62,13 +86,34 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
       setError("Le prix doit être un nombre positif (DZD).");
       return;
     }
+    const unitCostValue = unitCost === "" ? null : Number(unitCost);
+    if (unitCostValue !== null && (!Number.isFinite(unitCostValue) || unitCostValue < 0)) {
+      setError("Le coût unitaire doit être un nombre positif (DZD).");
+      return;
+    }
+    const quantityValue = initialQuantity === "" ? 0 : Number(initialQuantity);
+    if (initialQuantity !== "" && (!Number.isFinite(quantityValue) || quantityValue < 0)) {
+      setError("La quantité initiale doit être un nombre positif.");
+      return;
+    }
+    if (quantityValue > 0) {
+      if (inventoryType.hasBatches && !initialBatch.trim()) {
+        setError("Indiquez le numéro de lot de ce stock initial — cet inventaire est suivi par lot.");
+        return;
+      }
+      if (inventoryType.hasExpiry && !initialExpiry) {
+        setError("Indiquez la date de péremption de ce stock initial.");
+        return;
+      }
+    }
+
     setError(null);
     setSubmitting(true);
     try {
       await onSubmit({
         name: name.trim(),
         reference: reference.trim(),
-        unit: unit.trim() || inventoryType.defaultUnit,
+        unit: unit.trim(),
         reorderThreshold: thresholdValue,
         photoUrl: photoUrl.trim() || null,
         color: color.trim() || null,
@@ -81,12 +126,37 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
         criticality: criticality || null,
         gender: gender || null,
         price: priceValue,
+        unitCost: unitCostValue,
+        initialStock:
+          quantityValue > 0
+            ? {
+                quantity: quantityValue,
+                date: initialDate,
+                ...(inventoryType.hasBatches ? { batchNumber: initialBatch.trim() } : {}),
+                ...(inventoryType.hasExpiry ? { expiryDate: initialExpiry } : {}),
+              }
+            : null,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue.");
       setSubmitting(false);
     }
   }
+
+  // What the article is worth at the cost just typed, at today's quantity —
+  // the point of entering a cost, shown before the form is even saved.
+  const unitCostNumber = Number(unitCost);
+  const initialQuantityNumber = Number(initialQuantity);
+  // What the opening stock is worth at the cost typed above — the two fields
+  // only mean something together.
+  const initialValue =
+    initialQuantity !== "" && Number.isFinite(initialQuantityNumber) && initialQuantityNumber > 0 && Number.isFinite(unitCostNumber) && unitCost !== ""
+      ? initialQuantityNumber * unitCostNumber
+      : null;
+  const unitCostPreview =
+    unitCost !== "" && Number.isFinite(unitCostNumber) && unitCostNumber >= 0 && item && item.quantity > 0
+      ? `${formatQuantity(item.quantity, item.unit)} en stock — ${formatCurrency(item.quantity * unitCostNumber)}`
+      : null;
 
   return (
     <Modal
@@ -111,13 +181,28 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
           <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Ex. CH-004" />
         </Field>
         <div className="form-row">
-          <Field label="Unité">
-            <input className="input" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <Field label="Unité" hint="Ce en quoi l'article se compte — la quantité et le coût s'expriment par unité">
+            <UnitSelect value={unit} onChange={setUnit} />
           </Field>
           <Field label="Seuil de réapprovisionnement" hint="Alerte quand le stock descend à ce niveau ou en dessous">
             <input className="input" type="number" min={0} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
           </Field>
         </div>
+        <Field
+          label={`Coût unitaire (DZD / ${unit.trim() || inventoryType.defaultUnit})`}
+          hint="Ce que coûte une unité à l'achat. Sert de valeur par défaut aux réceptions et à valoriser le stock : la valeur affichée est la moyenne de ce qui a réellement été payé."
+        >
+          <input
+            className="input"
+            type="number"
+            min={0}
+            step="any"
+            value={unitCost}
+            onChange={(e) => setUnitCost(e.target.value)}
+            placeholder="Ex. 1200"
+          />
+          {unitCostPreview ? <span className="field-hint">{unitCostPreview}</span> : null}
+        </Field>
         {(inventoryType.hasColor || inventoryType.hasSize) && (
           <div className="form-row">
             {inventoryType.hasColor && (
@@ -144,7 +229,7 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
               </Field>
             )}
             {inventoryType.hasPrice && (
-              <Field label="Prix (DZD)" hint="Prix de vente unitaire">
+              <Field label="Prix de vente (DZD)" hint="Ce à quoi l'article est vendu — distinct du coût unitaire ci-dessus">
                 <input className="input" type="number" min={0} step="any" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex. 4500" />
               </Field>
             )}
@@ -188,6 +273,56 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
             </div>
           </>
         )}
+        {!item ? (
+          <>
+            <p className="detail-type" style={{ margin: 0 }}>
+              Stock déjà en place
+            </p>
+            <div className="form-row">
+              <Field
+                label={`Quantité initiale (${unit.trim() || inventoryType.defaultUnit})`}
+                hint="Ce que vous avez déjà en magasin aujourd'hui. Laissez vide si l'article n'est pas encore approvisionné."
+              >
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={initialQuantity}
+                  onChange={(e) => setInitialQuantity(e.target.value)}
+                  placeholder="Ex. 100"
+                />
+              </Field>
+              <Field label="Date" hint="Date à laquelle ce stock est constaté">
+                <input className="input" type="date" value={initialDate} onChange={(e) => setInitialDate(e.target.value)} />
+              </Field>
+            </div>
+
+            {Number(initialQuantity) > 0 && (inventoryType.hasBatches || inventoryType.hasExpiry) ? (
+              <div className="form-row">
+                {inventoryType.hasBatches ? (
+                  <Field label="Numéro de lot">
+                    <input className="input" value={initialBatch} onChange={(e) => setInitialBatch(e.target.value)} placeholder="Ex. L-2501" />
+                  </Field>
+                ) : null}
+                {inventoryType.hasExpiry ? (
+                  <Field label="Date de péremption">
+                    <input className="input" type="date" value={initialExpiry} onChange={(e) => setInitialExpiry(e.target.value)} />
+                  </Field>
+                ) : null}
+              </div>
+            ) : null}
+
+            {initialValue !== null ? (
+              <Banner tone="info">
+                Ce stock initial est enregistré comme une <strong>réception</strong> : {formatQuantity(Number(initialQuantity), unit.trim() || inventoryType.defaultUnit)}{" "}
+                valorisés à {formatCurrency(initialValue)}. Pour une livraison avec fournisseur, utilisez le bouton « Réception » de la
+                ligne — la quantité d'un article vient toujours de ses mouvements, jamais d'une case qu'on réécrit.
+              </Banner>
+            ) : null}
+          </>
+        ) : null}
+
         <Field
           label="Photo (URL)"
           hint="Adresse d'une image (https…) ou image intégrée (données data:image/…). Facultatif."

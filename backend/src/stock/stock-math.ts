@@ -23,10 +23,17 @@ export interface MovementLike {
 export const QUALITY_CLASSES = ['1er', '2ème', 'rebut'] as const;
 export type QualityClass = (typeof QUALITY_CLASSES)[number];
 
-/** A movement row as loaded from the DB — everything MovementLike has, plus date and the joined supplier. */
+/**
+ * A movement row as loaded from the DB — everything MovementLike has, plus
+ * date, the joined supplier, and the cost/provenance fields the valuation
+ * reads (see "COSTING & VALUATION" at the bottom of this file).
+ */
 export interface MovementDetail extends MovementLike {
   date: Date;
   supplier?: { id: string; name: string } | null;
+  unitCost?: number | null;
+  sourceType?: string | null;
+  sourceRef?: string | null;
 }
 
 export interface BatchLike {
@@ -201,4 +208,209 @@ export function getFifoBatch(batchesWithRemaining: BatchWithRemaining[]): BatchW
 export function getRecommendedBatch(batchesWithRemaining: BatchWithRemaining[]): BatchWithRemaining | null {
   const usable = batchesWithRemaining.find((b) => b.remaining > 0 && b.status !== 'expired');
   return usable ?? getFifoBatch(batchesWithRemaining);
+}
+
+// ===========================================================================
+// COSTING & VALUATION
+// ===========================================================================
+//
+// What the stock is worth, and where that value came from.
+//
+// The rule is the same one quantity follows: nothing is stored. An item's
+// unit cost is always recomputed from the IN movements that actually paid for
+// it — a reception typed by hand, a purchase receipt, a supplier delivery, a
+// production batch crediting its output. `Item.unitCost` is only the fallback
+// for movements that carry no cost of their own (rows written before costs
+// were tracked, or a reception nobody priced).
+//
+// The method is the weighted average: every unit in stock is valued at the
+// average of what the units bought were paid for, not at the newest price.
+// FIFO layers would be more precise, but they only pay off when purchase
+// prices swing hard, and they cost the one thing this system is for — being
+// able to explain a number to the person who typed it in.
+
+/** Where an IN movement came from. Plain strings — see Movement.sourceType. */
+export const MOVEMENT_SOURCES = ['MANUAL', 'SUPPLIER_ORDER', 'PURCHASE', 'PRODUCTION', 'SALE'] as const;
+export type MovementSource = (typeof MOVEMENT_SOURCES)[number];
+
+/** French labels for the provenance shown next to each entry in the item fiche. */
+export const MOVEMENT_SOURCE_LABELS: Record<MovementSource, string> = {
+  MANUAL: 'Réception directe',
+  SUPPLIER_ORDER: 'Commande fournisseur',
+  PURCHASE: 'Achat (bon de commande)',
+  PRODUCTION: 'Production',
+  SALE: 'Vente',
+};
+
+/** A movement with the money on it. Everything MovementLike has, plus cost and provenance. */
+export interface CostedMovement extends MovementLike {
+  unitCost?: number | null;
+  sourceType?: string | null;
+  sourceRef?: string | null;
+}
+
+export interface ValuationLike {
+  /** Weighted average cost of one unit, in DZD. Null when nothing is priced. */
+  averageUnitCost: number | null;
+  /** quantity × averageUnitCost. Null when there is no average to apply. */
+  stockValue: number | null;
+  /** How much of what came in carries a known cost — the average's basis. */
+  valuedQuantity: number;
+  /** How much came in with no price at all. A non-zero figure means the
+   *  average describes only part of the history, and the UI says so. */
+  uncostedQuantity: number;
+}
+
+/** One provenance bucket: what arrived from a given source, and what it cost. */
+export interface CostSource {
+  source: string;
+  label: string;
+  quantity: number;
+  /** Σ(quantity × unit cost) over that source's entries, in DZD. */
+  value: number;
+  /** value ÷ quantity — the average price this source charged. */
+  averageUnitCost: number | null;
+  /** The documents behind it, e.g. ["BC-2026-0007"]. Capped for display. */
+  references: string[];
+  /** Entries from this source that carried no price. */
+  uncostedQuantity: number;
+}
+
+/** The cost to attribute to one movement: its own, else the item's standard. */
+export function movementUnitCost(movement: CostedMovement, fallbackUnitCost?: number | null): number | null {
+  if (movement.unitCost != null) return movement.unitCost;
+  return fallbackUnitCost ?? null;
+}
+
+/**
+ * Weighted average cost of one unit of an item, over everything that ever
+ * came in. Returns null when the cost is genuinely unknown — no priced entry
+ * AND no standard cost on the article — rather than quietly valuing it at
+ * zero.
+ *
+ * An article that has a standard cost but no entries yet (just created, never
+ * received) reports that standard cost: it is what the factory knows one unit
+ * costs, and showing "—" next to a price somebody just typed reads as the
+ * system having lost it.
+ */
+export function getAverageUnitCost(
+  movements: CostedMovement[],
+  itemId: string,
+  fallbackUnitCost?: number | null,
+): number | null {
+  const { valuedQuantity, value } = accumulateCost(movements, (m) => m.itemId === itemId, fallbackUnitCost);
+  if (valuedQuantity <= 0) return fallbackUnitCost ?? null;
+  return roundMoney(value / valuedQuantity);
+}
+
+/** The same average, restricted to one stock lot (chemicals). */
+export function getBatchUnitCost(
+  movements: CostedMovement[],
+  batchId: string,
+  fallbackUnitCost?: number | null,
+): number | null {
+  const { valuedQuantity, value } = accumulateCost(movements, (m) => m.batchId === batchId, fallbackUnitCost);
+  if (valuedQuantity <= 0) return fallbackUnitCost ?? null;
+  return roundMoney(value / valuedQuantity);
+}
+
+/** What an item's stock on hand is worth, and how well that figure is backed. */
+export function getItemValuation(
+  movements: CostedMovement[],
+  itemId: string,
+  quantity: number,
+  fallbackUnitCost?: number | null,
+): ValuationLike {
+  const { valuedQuantity, value, uncostedQuantity } = accumulateCost(
+    movements,
+    (m) => m.itemId === itemId,
+    fallbackUnitCost,
+  );
+  const averageUnitCost = valuedQuantity > 0 ? roundMoney(value / valuedQuantity) : (fallbackUnitCost ?? null);
+  return {
+    averageUnitCost,
+    stockValue: averageUnitCost === null ? null : roundMoney(quantity * averageUnitCost),
+    valuedQuantity: roundMoney(valuedQuantity),
+    uncostedQuantity: roundMoney(uncostedQuantity),
+  };
+}
+
+/**
+ * Where an item's value came from, split by provenance: so much from purchase
+ * orders at so much a unit, so much from direct receptions, so much credited
+ * by production. This is what the item fiche shows under its total — a
+ * valuation nobody can trace back to a document is a number, not an answer.
+ */
+export function getCostSources(
+  movements: CostedMovement[],
+  itemId: string,
+  fallbackUnitCost?: number | null,
+  maxReferences = 6,
+): CostSource[] {
+  const buckets = new Map<string, CostSource>();
+
+  for (const m of movements) {
+    if (m.itemId !== itemId || m.direction !== 'IN') continue;
+    const source = m.sourceType ?? 'MANUAL';
+    let bucket = buckets.get(source);
+    if (!bucket) {
+      bucket = {
+        source,
+        label: MOVEMENT_SOURCE_LABELS[source as MovementSource] ?? source,
+        quantity: 0,
+        value: 0,
+        averageUnitCost: null,
+        references: [],
+        uncostedQuantity: 0,
+      };
+      buckets.set(source, bucket);
+    }
+
+    bucket.quantity += m.quantity;
+    const unitCost = movementUnitCost(m, fallbackUnitCost);
+    if (unitCost === null) bucket.uncostedQuantity += m.quantity;
+    else bucket.value += m.quantity * unitCost;
+    if (m.sourceRef && !bucket.references.includes(m.sourceRef) && bucket.references.length < maxReferences) {
+      bucket.references.push(m.sourceRef);
+    }
+  }
+
+  return [...buckets.values()]
+    .map((b) => {
+      const valued = b.quantity - b.uncostedQuantity;
+      return {
+        ...b,
+        quantity: roundMoney(b.quantity),
+        value: roundMoney(b.value),
+        uncostedQuantity: roundMoney(b.uncostedQuantity),
+        averageUnitCost: valued > 0 ? roundMoney(b.value / valued) : null,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+}
+
+function accumulateCost(
+  movements: CostedMovement[],
+  matches: (m: CostedMovement) => boolean,
+  fallbackUnitCost?: number | null,
+): { valuedQuantity: number; value: number; uncostedQuantity: number } {
+  let valuedQuantity = 0;
+  let value = 0;
+  let uncostedQuantity = 0;
+  for (const m of movements) {
+    if (!matches(m) || m.direction !== 'IN') continue;
+    const unitCost = movementUnitCost(m, fallbackUnitCost);
+    if (unitCost === null) {
+      uncostedQuantity += m.quantity;
+      continue;
+    }
+    valuedQuantity += m.quantity;
+    value += m.quantity * unitCost;
+  }
+  return { valuedQuantity, value, uncostedQuantity };
+}
+
+/** Money for a factory: two decimals, and no 0.1 + 0.2 artefacts. */
+export function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
 }

@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { getBatchesWithRemaining, getItemQuantity } from '../stock/stock-math.js';
+import { getAverageUnitCost, getBatchesWithRemaining, getBatchUnitCost, getItemQuantity, roundMoney } from '../stock/stock-math.js';
 import {
   getRates,
   getVariance,
@@ -171,10 +171,10 @@ export class ProductionService {
           },
         });
 
-        await applyConsumption(tx, batch.id, plans);
+        await applyConsumption(tx, batch.id, batch.code, plans);
 
         if (output && (output.creditStock ?? true)) {
-          const movementId = await creditOutput(tx, product.id, figures, new Date(dto.date));
+          const movementId = await creditOutput(tx, batch.id, batch.code, product.id, figures, new Date(dto.date));
           if (movementId) {
             await tx.productionBatch.update({ where: { id: batch.id }, data: { outputMovementId: movementId } });
           }
@@ -239,7 +239,7 @@ export class ProductionService {
     );
 
     await this.prisma.$transaction(async (tx) => {
-      await applyConsumption(tx, id, plans);
+      await applyConsumption(tx, id, batch.code, plans);
       if (batch.status === 'PLANNED') {
         await tx.productionBatch.update({ where: { id }, data: { status: 'IN_PROGRESS' } });
       }
@@ -273,7 +273,9 @@ export class ProductionService {
     assertOutputFits(figures);
 
     await this.prisma.$transaction(async (tx) => {
-      const movementId = (dto.creditStock ?? true) ? await creditOutput(tx, batch.productItemId, figures, batch.date) : null;
+      const movementId = (dto.creditStock ?? true)
+        ? await creditOutput(tx, batch.id, batch.code, batch.productItemId, figures, batch.date)
+        : null;
       await tx.productionBatch.update({
         where: { id },
         data: {
@@ -338,11 +340,21 @@ export class ProductionService {
         claim(item.id, line.quantity);
       }
 
+      // Price the line from the very stock it draws on: the lot's own cost
+      // for batch-tracked materials, the item's weighted average otherwise.
+      // Snapshotted onto the consumption row, so what this batch cost to make
+      // stays what it cost even after the next delivery moves the average.
+      const stockBatchId = item.inventoryType.hasBatches ? (line.stockBatchId ?? null) : null;
+      const unitCost = stockBatchId
+        ? (getBatchUnitCost(movements, stockBatchId, item.unitCost) ?? getAverageUnitCost(movements, item.id, item.unitCost))
+        : getAverageUnitCost(movements, item.id, item.unitCost);
+
       return {
         itemId: item.id,
-        stockBatchId: item.inventoryType.hasBatches ? (line.stockBatchId ?? null) : null,
+        stockBatchId,
         quantity: line.quantity,
         date: new Date(dates[i]),
+        unitCost,
       };
     });
   }
@@ -361,10 +373,10 @@ export class ProductionService {
 }
 
 type TxClient = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
-type ConsumptionPlan = { itemId: string; stockBatchId: string | null; quantity: number; date: Date };
+type ConsumptionPlan = { itemId: string; stockBatchId: string | null; quantity: number; date: Date; unitCost: number | null };
 
 /** Write the OUT movements and the consumption lines that point back at them. */
-async function applyConsumption(tx: TxClient, productionBatchId: string, plans: ConsumptionPlan[]) {
+async function applyConsumption(tx: TxClient, productionBatchId: string, code: string, plans: ConsumptionPlan[]) {
   for (const plan of plans) {
     const movement = await tx.movement.create({
       data: {
@@ -374,6 +386,9 @@ async function applyConsumption(tx: TxClient, productionBatchId: string, plans: 
         quantity: plan.quantity,
         date: plan.date,
         reason: 'Production',
+        unitCost: plan.unitCost,
+        sourceType: 'PRODUCTION',
+        sourceRef: code,
       },
     });
     await tx.productionConsumption.create({
@@ -382,28 +397,80 @@ async function applyConsumption(tx: TxClient, productionBatchId: string, plans: 
         itemId: plan.itemId,
         stockBatchId: plan.stockBatchId,
         quantity: plan.quantity,
+        unitCost: plan.unitCost,
         movementId: movement.id,
       },
     });
   }
 }
 
-/** Credit 1st + 2nd choice to stock. Waste is recorded but never sellable. */
-async function creditOutput(tx: TxClient, productItemId: string, figures: OutputFigures, date: Date) {
+/**
+ * Credit 1st + 2nd choice to stock. Waste is recorded but never sellable.
+ *
+ * The finished units arrive carrying a cost: everything this batch consumed,
+ * divided by the units that came out of it sellable. Waste is deliberately
+ * NOT given a share of it — the rejected units are a loss the good ones
+ * absorb, which is why a batch that wastes half its run shows a doubled cost
+ * per unit rather than a flattering average.
+ *
+ * This is a MATERIALS cost only. No labour, no energy, no machine time, no
+ * overhead — every screen that shows it says so.
+ */
+async function creditOutput(
+  tx: TxClient,
+  productionBatchId: string,
+  code: string,
+  productItemId: string,
+  figures: OutputFigures,
+  date: Date,
+) {
   const sellable = figures.firstChoice + figures.secondChoice;
   if (sellable <= 0) return null;
+
+  const consumptions = await tx.productionConsumption.findMany({ where: { productionBatchId } });
+  const materialCost = materialCostOf(consumptions);
   const movement = await tx.movement.create({
-    data: { itemId: productItemId, direction: 'IN', quantity: sellable, date },
+    data: {
+      itemId: productItemId,
+      direction: 'IN',
+      quantity: sellable,
+      date,
+      unitCost: materialCost > 0 ? roundMoney(materialCost / sellable) : null,
+      sourceType: 'PRODUCTION',
+      sourceRef: code,
+    },
   });
   return movement.id;
 }
 
-/** Attach the computed variance and rates. Never stored — see schema.prisma. */
-function decorate<T extends OutputFigures & { varianceNote: string | null }>(batch: T) {
+/** Sum of quantity x unit cost over consumption lines. Unpriced lines add nothing. */
+export function materialCostOf(consumptions: Array<{ quantity: number; unitCost: number | null }>): number {
+  return roundMoney(consumptions.reduce((sum, c) => sum + c.quantity * (c.unitCost ?? 0), 0));
+}
+
+/**
+ * Attach the computed variance, the rates and what the batch cost in
+ * materials. Never stored — see schema.prisma.
+ */
+function decorate<
+  T extends OutputFigures & {
+    varianceNote: string | null;
+    consumptions?: Array<{ quantity: number; unitCost: number | null }>;
+  },
+>(batch: T) {
+  const consumptions = batch.consumptions ?? [];
+  const materialCost = materialCostOf(consumptions);
+  const sellable = batch.firstChoice + batch.secondChoice;
   return {
     ...batch,
     ...getVariance(batch, Boolean(batch.varianceNote)),
     rates: getRates(batch),
+    /** What this batch consumed, in DZD. Materials only — never labour or overhead. */
+    materialCost,
+    /** Material cost per sellable unit produced. Null until output is declared. */
+    unitMaterialCost: batch.outputDeclared && sellable > 0 ? roundMoney(materialCost / sellable) : null,
+    /** Lines drawn from stock with no known price — the cost above is short by their value. */
+    uncostedConsumptionCount: consumptions.filter((c) => c.unitCost == null).length,
   };
 }
 

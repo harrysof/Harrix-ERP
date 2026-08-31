@@ -45,6 +45,7 @@ export class SupplierOrdersService {
           create: dto.lines.map((line) => ({
             itemId: line.itemId,
             quantityOrdered: line.quantityOrdered,
+            unitCost: line.unitCost ?? null,
           })),
         },
       },
@@ -104,6 +105,12 @@ export class SupplierOrdersService {
             quantity: line.quantityOrdered,
             date: now,
             supplierId: order.supplierId,
+            // The agreed price if the order carried one, the article's
+            // standard cost otherwise — so a delivery always brings its value
+            // into the stock, and the item fiche can say which it was.
+            unitCost: line.unitCost ?? line.item.unitCost ?? null,
+            sourceType: 'SUPPLIER_ORDER',
+            sourceRef: `Commande du ${order.orderDate.toISOString().slice(0, 10)}`,
           },
         });
       }

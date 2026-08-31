@@ -5,18 +5,38 @@ import { Button } from "../../components/ui/Button";
 import type { InventoryTypeConfig } from "../../lib/types";
 import type { Supplier } from "../../lib/suppliersApi";
 import { todayIso } from "../../lib/date";
+import { formatCurrency } from "../../lib/format";
 
 interface ReceiveStockModalProps {
   itemName: string;
   itemUnit: string;
+  /** The article's standard cost, proposed as the delivery's price. */
+  itemUnitCost: number | null;
   inventoryType: InventoryTypeConfig;
   suppliers: Supplier[];
   onClose: () => void;
-  onSubmit: (input: { quantity: number; date: string; supplierId: string | null; batchNumber?: string; expiryDate?: string | null; quality?: string | null }) => Promise<void> | void;
+  onSubmit: (input: {
+    quantity: number;
+    date: string;
+    supplierId: string | null;
+    batchNumber?: string;
+    expiryDate?: string | null;
+    quality?: string | null;
+    unitCost?: number | null;
+  }) => Promise<void> | void;
 }
 
-export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers, onClose, onSubmit }: ReceiveStockModalProps) {
+export function ReceiveStockModal({
+  itemName,
+  itemUnit,
+  itemUnitCost,
+  inventoryType,
+  suppliers,
+  onClose,
+  onSubmit,
+}: ReceiveStockModalProps) {
   const [quantity, setQuantity] = useState("");
+  const [unitCost, setUnitCost] = useState(itemUnitCost != null ? String(itemUnitCost) : "");
   const [date, setDate] = useState(todayIso());
   const [supplierId, setSupplierId] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
@@ -24,6 +44,14 @@ export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers
   const [quality, setQuality] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const unitCostValue = unitCost === "" ? null : Number(unitCost);
+  const quantityPreview = Number(quantity);
+  // What this delivery is worth, shown live: the reason the field is here.
+  const lineTotal =
+    unitCostValue !== null && Number.isFinite(unitCostValue) && Number.isFinite(quantityPreview) && quantityPreview > 0
+      ? unitCostValue * quantityPreview
+      : null;
 
   async function handleSubmit() {
     const quantityValue = Number(quantity);
@@ -43,6 +71,10 @@ export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers
       setError("La date de péremption est obligatoire pour ce type de produit.");
       return;
     }
+    if (unitCost !== "" && (!Number.isFinite(unitCostValue!) || unitCostValue! < 0)) {
+      setError("Le coût unitaire doit être un nombre positif (DZD).");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -53,6 +85,7 @@ export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers
         batchNumber: inventoryType.hasBatches ? batchNumber.trim() : undefined,
         expiryDate: inventoryType.hasExpiry ? expiryDate : undefined,
         quality: inventoryType.hasQuality ? quality || null : undefined,
+        unitCost: unitCostValue,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue.");
@@ -84,6 +117,26 @@ export function ReceiveStockModal({ itemName, itemUnit, inventoryType, suppliers
             <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
+
+        <Field
+          label={`Coût unitaire (DZD / ${itemUnit})`}
+          hint={
+            itemUnitCost != null
+              ? "Pré-rempli avec le coût standard de l'article. Corrigez-le si cette livraison a été payée à un autre prix — c'est ce montant qui entre dans la valeur du stock."
+              : "Ce que cette livraison coûte par unité. Laissez vide si le prix n'est pas connu — l'entrée restera visiblement non valorisée."
+          }
+        >
+          <input
+            className="input"
+            type="number"
+            min={0}
+            step="any"
+            value={unitCost}
+            onChange={(e) => setUnitCost(e.target.value)}
+            placeholder="Ex. 1200"
+          />
+          {lineTotal !== null ? <span className="field-hint">Valeur de la réception : {formatCurrency(lineTotal)}</span> : null}
+        </Field>
 
         <Field label="Fournisseur" hint={suppliers.length === 0 ? "Aucun fournisseur enregistré — ajoutez-en un dans l'onglet Fournisseurs" : undefined}>
           <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>

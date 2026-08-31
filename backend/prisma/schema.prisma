@@ -85,6 +85,12 @@ model Item {
   gender            String?
   /// Optional sale price in DZD (gated in the UI by InventoryType.hasPrice).
   price             Float?
+  /// Standard purchase cost per unit, in DZD. What a reception defaults to
+  /// when nothing more precise is known, and the fallback the valuation uses
+  /// for movements recorded before costs were tracked. The figure the
+  /// valuation actually reports is the weighted average of what was really
+  /// paid (see stock/stock-math.ts) — this column is only the starting point.
+  unitCost          Float?
   archived          Boolean @default(false)
   createdAt         DateTime @default(now())
 
@@ -152,6 +158,24 @@ model Movement {
   /// Movements left untagged are exactly what the reconciliation flags as
   /// unaccounted units — stock whose presence no production record explains.
   quality        String?
+  /// What one unit cost on THIS movement, in DZD. Set on IN movements (a
+  /// reception, a purchase receipt, a supplier delivery) and on the IN
+  /// movement that credits a production batch's output, where it carries the
+  /// raw-material cost per finished unit. Also set on production OUT
+  /// movements, so a consumption's cost is the cost the lot actually held.
+  ///
+  /// Stored per movement rather than only on the item because that is the
+  /// only way to answer "where did this value come from?" — the item's
+  /// average cost is derived from these rows, never the other way round.
+  unitCost   Float?
+  /// Where this movement came from: "MANUAL" | "SUPPLIER_ORDER" | "PURCHASE"
+  /// | "PRODUCTION" | "SALE". Plain string, same portability reason as
+  /// `direction`. Null on rows written before provenance was recorded.
+  sourceType String?
+  /// The human-readable document behind it, e.g. "BC-2026-0007" or
+  /// "LOT-2026-0012". Denormalised on purpose: the detail view must stay
+  /// readable without joining four tables.
+  sourceRef  String?
   createdAt  DateTime  @default(now())
 
   @@index([itemId])
@@ -206,6 +230,10 @@ model SupplierOrderLine {
   item            Item          @relation(fields: [itemId], references: [id])
   itemId          String
   quantityOrdered Float
+  /// Agreed price per unit, in DZD. Optional: an order can be placed before
+  /// the price is confirmed, in which case the reception falls back to the
+  /// item's standard cost.
+  unitCost        Float?
   /// Batch details captured when the order is received (chemicals only).
   batchNumber     String?
   expiryDate      DateTime?
@@ -286,6 +314,11 @@ model ProductionConsumption {
   stockBatch        Batch?   @relation(fields: [stockBatchId], references: [id])
   stockBatchId      String?
   quantity          Float
+  /// What one unit of this material cost when it was drawn, in DZD — a
+  /// SNAPSHOT, deliberately, exactly like Order.shipTo*: re-pricing a lot's
+  /// materials months later because stock got cheaper would rewrite what the
+  /// batch actually cost to make. Null when the material had no known cost.
+  unitCost          Float?
   /// The OUT movement this line created, so the ledger and the batch record
   /// can always be traced to each other. Plain id, not a relation: Movement is
   /// an append-only ledger and nothing should be able to cascade into it.

@@ -4,7 +4,7 @@ import { ApiError } from "../../lib/api";
 import { StatCard } from "../../components/ui/StatCard";
 import { Pill } from "../../components/ui/Pill";
 import { Banner } from "../../components/ui/Banner";
-import { formatQuantity } from "../../lib/format";
+import { formatCurrency, formatQuantity } from "../../lib/format";
 
 export function DashboardPage({ onGoToStock }: { onGoToStock: () => void }) {
   const [summary, setSummary] = useState<StockSummary | null>(null);
@@ -24,7 +24,13 @@ export function DashboardPage({ onGoToStock }: { onGoToStock: () => void }) {
       <section>
         <h2 className="section-title">Aujourd'hui</h2>
         <div className="stat-grid">
-          <StatCard label="Articles suivis" value={summary.totalItems} hint="Dans les 4 inventaires" />
+          <StatCard label="Articles suivis" value={summary.totalItems} hint="Tous inventaires confondus" />
+          <StatCard
+            label="Valeur du stock"
+            value={formatCurrency(summary.stockValue)}
+            hint="Coût moyen pondéré de ce qui est réellement entré en stock"
+            onClick={onGoToStock}
+          />
           <StatCard
             label="Alertes stock faible"
             value={summary.lowStockCount}
