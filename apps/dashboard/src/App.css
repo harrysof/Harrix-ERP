@@ -2164,3 +2164,36 @@ button.topbar-user:hover {
   font-size: 13px;
   color: var(--ink);
 }
+
+/* A table cell whose number hides a story (the raison behind an absence or
+   overtime entry) — underlined like a link, but tabular and right-aligned so
+   it still reads as a number in the column. */
+.cell-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+
+.cell-button:hover {
+  color: var(--accent-strong);
+}
+
+.cell-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cell-button-danger {
+  color: var(--danger);
+}
+
+.cell-button-danger:hover {
+  opacity: 0.85;
+  color: var(--danger);
+}

@@ -61,6 +61,8 @@ export interface ApiEmployee {
   maritalStatus: MaritalStatus | null;
   dependentChildren: number;
   salary: number;
+  /** Heures attendues par jour — éditable par employé, défaut 8. */
+  expectedHoursPerDay: number;
   bankRib: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
@@ -77,6 +79,7 @@ export interface ApiEmployee {
 export interface ApiEmployeeDetail extends ApiEmployee {
   timeEntries: ApiTimeEntry[];
   absences: ApiAbsence[];
+  overtimeEntries: ApiOvertimeEntry[];
 }
 
 export interface ApiTimeEntry {
@@ -100,11 +103,23 @@ export interface ApiAbsence {
   employee?: { id: string; fullName: string };
 }
 
+export interface ApiOvertimeEntry {
+  id: string;
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  hours: number;
+  reason: string | null;
+  createdAt: string;
+  employee?: { id: string; fullName: string };
+}
+
 export interface MonthlySummaryRow {
   employeeId: string;
   fullName: string;
   expectedHours: number;
   workedHours: number;
+  overtimeHours: number;
   absences: Record<AbsenceType, number>;
 }
 
@@ -145,6 +160,7 @@ export interface EmployeeInput {
   maritalStatus?: MaritalStatus;
   dependentChildren?: number;
   salary: number;
+  expectedHoursPerDay?: number;
   bankRib?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
@@ -199,6 +215,26 @@ export function createAbsence(input: {
 
 export function deleteAbsence(id: string): Promise<{ id: string; deleted: boolean }> {
   return api.del<{ id: string; deleted: boolean }>(`/hr/absences/${id}`);
+}
+
+// --- overtime entries --------------------------------------------------------
+
+export function fetchOvertimeEntries(filters: { employeeId?: string; from?: string; to?: string } = {}): Promise<ApiOvertimeEntry[]> {
+  return api.get<ApiOvertimeEntry[]>(`/hr/overtime-entries${query(filters)}`);
+}
+
+export function createOvertimeEntry(input: {
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  hours: number;
+  reason?: string;
+}): Promise<ApiOvertimeEntry> {
+  return api.post<ApiOvertimeEntry>("/hr/overtime-entries", input);
+}
+
+export function deleteOvertimeEntry(id: string): Promise<{ id: string; deleted: boolean }> {
+  return api.del<{ id: string; deleted: boolean }>(`/hr/overtime-entries/${id}`);
 }
 
 // --- summary -----------------------------------------------------------

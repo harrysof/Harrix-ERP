@@ -44,6 +44,7 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus | "">(employee?.maritalStatus ?? "");
   const [dependentChildren, setDependentChildren] = useState(String(employee?.dependentChildren ?? 0));
   const [salary, setSalary] = useState(String(employee?.salary ?? ""));
+  const [expectedHoursPerDay, setExpectedHoursPerDay] = useState(String(employee?.expectedHoursPerDay ?? 8));
   const [bankRib, setBankRib] = useState(employee?.bankRib ?? "");
   const [emergencyContactName, setEmergencyContactName] = useState(employee?.emergencyContactName ?? "");
   const [emergencyContactPhone, setEmergencyContactPhone] = useState(employee?.emergencyContactPhone ?? "");
@@ -59,6 +60,10 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
     const salaryValue = Number(salary);
     if (!Number.isFinite(salaryValue) || salaryValue < 0) {
       return setError("Le salaire doit être un nombre positif.");
+    }
+    const expectedHoursValue = Number(expectedHoursPerDay);
+    if (!Number.isFinite(expectedHoursValue) || expectedHoursValue < 1 || expectedHoursValue > 24) {
+      return setError("Les heures prévues par jour doivent être comprises entre 1 et 24.");
     }
     if (contractType === "CDD" && !contractEndDate) {
       return setError("Un CDD doit avoir une date de fin de contrat.");
@@ -82,6 +87,7 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
         maritalStatus: maritalStatus || undefined,
         dependentChildren: childrenValue,
         salary: salaryValue,
+        expectedHoursPerDay: expectedHoursValue,
         bankRib: bankRib.trim() || undefined,
         emergencyContactName: emergencyContactName.trim() || undefined,
         emergencyContactPhone: emergencyContactPhone.trim() || undefined,
@@ -196,6 +202,17 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
         <div className="form-row">
           <Field label="Salaire brut (DZD/mois)">
             <input className="input" type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} />
+          </Field>
+          <Field label="Heures prévues / jour" hint="Utilisé pour le résumé du mois">
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={24}
+              step={0.5}
+              value={expectedHoursPerDay}
+              onChange={(e) => setExpectedHoursPerDay(e.target.value)}
+            />
           </Field>
           <Field label="RIB" hint="Compte de versement du salaire, facultatif">
             <input className="input" value={bankRib} onChange={(e) => setBankRib(e.target.value)} />

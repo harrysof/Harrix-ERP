@@ -226,3 +226,31 @@ export function absenceDaysInRange(absences: AbsenceLike[], employeeId: string, 
 export function daysInMonthOf(year: number, monthIndex: number): number {
   return daysInMonth(year, monthIndex);
 }
+
+// ---------------------------------------------------------------------------
+// Overtime aggregation
+// ---------------------------------------------------------------------------
+
+export interface OvertimeEntryLike {
+  employeeId: string;
+  startDate: Date;
+  endDate: Date;
+  hours: number;
+}
+
+/**
+ * Sum of `hours` for one employee's overtime entries whose [startDate,
+ * endDate] touches [start, end) — the same overlap test as
+ * `absenceDaysInRange`, but summing the declared hours rather than counting
+ * days, since one entry already states its total (no per-day proration).
+ */
+export function overtimeHoursInRange(entries: OvertimeEntryLike[], employeeId: string, start: Date, end: Date): number {
+  let total = 0;
+  const rangeEndInclusive = new Date(end.getTime() - 1);
+  for (const e of entries) {
+    if (e.employeeId !== employeeId) continue;
+    if (e.endDate < start || e.startDate > rangeEndInclusive) continue;
+    total += e.hours;
+  }
+  return roundMoney(total);
+}

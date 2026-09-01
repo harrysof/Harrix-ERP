@@ -690,11 +690,15 @@ model Employee {
   /// family deduction from the income-tax computation itself).
   maritalStatus         String?
   dependentChildren     Int       @default(0)
-  /// Gross monthly base salary, in DZD — bonuses and overtime are not
-  /// modelled yet. CNAS and IRG are always computed from it on read (see
-  /// hr/payroll-math.ts); nothing derived is stored, same rule as stock
-  /// quantity and PO totals.
+  /// Gross monthly base salary, in DZD — bonuses are not modelled yet.
+  /// Overtime is tracked separately (OvertimeEntry). CNAS and IRG are always
+  /// computed from it on read (see hr/payroll-math.ts); nothing derived is
+  /// stored, same rule as stock quantity and PO totals.
   salary                Float
+  /// Expected worked hours per calendar day, used by the monthly summary's
+  /// "heures prévues" column in place of a single factory-wide constant.
+  /// Editable per employee (part-time, different shift lengths, …).
+  expectedHoursPerDay   Float     @default(8)
   /// Relevé d'identité bancaire — where the salary is paid. Free text: the
   /// exact bank/agency/account breakdown differs by bank and nothing here
   /// computes on it.
@@ -707,8 +711,9 @@ model Employee {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  timeEntries TimeEntry[]
-  absences    Absence[]
+  timeEntries    TimeEntry[]
+  absences       Absence[]
+  overtimeEntries OvertimeEntry[]
 
   @@index([archived])
 }
@@ -741,6 +746,23 @@ model Absence {
   type       String
   startDate  DateTime
   endDate    DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([employeeId])
+}
+
+/// Extra hours worked beyond the expected schedule, declared over a date
+/// range (not necessarily a single day) with an optional reason — the same
+/// shape as Absence, so the monthly summary can treat both as "click a cell,
+/// see why" ledgers.
+model OvertimeEntry {
+  id         String   @id @default(cuid())
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId String
+  startDate  DateTime
+  endDate    DateTime
+  hours      Float
   reason     String?
   createdAt  DateTime @default(now())
 

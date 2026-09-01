@@ -3,11 +3,13 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto.js';
 import { CreateTimeEntryDto } from './dto/time-entry.dto.js';
 import { CreateAbsenceDto } from './dto/absence.dto.js';
+import { CreateOvertimeEntryDto } from './dto/overtime-entry.dto.js';
 import {
   ABSENCE_TYPES,
   absenceDaysInRange,
   EXPECTED_HOURS_PER_DAY,
   hoursWorkedInRange,
+  overtimeHoursInRange,
   payEstimateOf,
   tenureOf,
 } from './payroll-math.js';
@@ -47,6 +49,7 @@ export class HrService {
       include: {
         timeEntries: { orderBy: { date: 'desc' }, take: 60 },
         absences: { orderBy: { startDate: 'desc' }, take: 60 },
+        overtimeEntries: { orderBy: { startDate: 'desc' }, take: 60 },
       },
     });
     if (!employee) throw new NotFoundException(`Employé introuvable : ${id}`);
@@ -71,6 +74,7 @@ export class HrService {
         maritalStatus: dto.maritalStatus ?? null,
         dependentChildren: dto.dependentChildren ?? 0,
         salary: dto.salary,
+        expectedHoursPerDay: dto.expectedHoursPerDay ?? EXPECTED_HOURS_PER_DAY,
         bankRib: dto.bankRib?.trim() || null,
         emergencyContactName: dto.emergencyContactName?.trim() || null,
         emergencyContactPhone: dto.emergencyContactPhone?.trim() || null,
@@ -105,6 +109,7 @@ export class HrService {
         ...(dto.maritalStatus !== undefined ? { maritalStatus: dto.maritalStatus } : {}),
         ...(dto.dependentChildren !== undefined ? { dependentChildren: dto.dependentChildren } : {}),
         ...(dto.salary !== undefined ? { salary: dto.salary } : {}),
+        ...(dto.expectedHoursPerDay !== undefined ? { expectedHoursPerDay: dto.expectedHoursPerDay } : {}),
         ...(dto.bankRib !== undefined ? { bankRib: dto.bankRib.trim() || null } : {}),
         ...(dto.emergencyContactName !== undefined ? { emergencyContactName: dto.emergencyContactName.trim() || null } : {}),
         ...(dto.emergencyContactPhone !== undefined
@@ -220,6 +225,45 @@ export class HrService {
     return { id, deleted: true };
   }
 
+  // ------------------------------------------------------------ overtime
+
+  async listOvertimeEntries(filters: { employeeId?: string; from?: string; to?: string } = {}) {
+    return this.prisma.overtimeEntry.findMany({
+      where: {
+        ...(filters.employeeId ? { employeeId: filters.employeeId } : {}),
+        ...(filters.from ? { endDate: { gte: new Date(filters.from) } } : {}),
+        ...(filters.to ? { startDate: { lt: new Date(filters.to) } } : {}),
+      },
+      orderBy: { startDate: 'desc' },
+      include: { employee: { select: { id: true, fullName: true } } },
+    });
+  }
+
+  async createOvertimeEntry(dto: CreateOvertimeEntryDto) {
+    await this.requireEmployee(dto.employeeId);
+    const start = new Date(dto.startDate);
+    const end = new Date(dto.endDate);
+    if (end < start) throw new BadRequestException('La date de fin ne peut pas précéder la date de début.');
+
+    return this.prisma.overtimeEntry.create({
+      data: {
+        employeeId: dto.employeeId,
+        startDate: start,
+        endDate: end,
+        hours: dto.hours,
+        reason: dto.reason?.trim() || null,
+      },
+      include: { employee: { select: { id: true, fullName: true } } },
+    });
+  }
+
+  async deleteOvertimeEntry(id: string) {
+    const entry = await this.prisma.overtimeEntry.findUnique({ where: { id } });
+    if (!entry) throw new NotFoundException(`Entrée introuvable : ${id}`);
+    await this.prisma.overtimeEntry.delete({ where: { id } });
+    return { id, deleted: true };
+  }
+
   // ---------------------------------------------------------------- summary
 
   /**
@@ -235,10 +279,11 @@ export class HrService {
     const daysInMonth = Math.round((end.getTime() - start.getTime()) / 86_400_000);
     const expectedHours = daysInMonth * EXPECTED_HOURS_PER_DAY;
 
-    const [employees, timeEntries, absences] = await Promise.all([
+    const [employees, timeEntries, absences, overtimeEntries] = await Promise.all([
       this.prisma.employee.findMany({ where: { archived: false }, orderBy: { fullName: 'asc' } }),
       this.prisma.timeEntry.findMany({ where: { date: { gte: start, lt: end } } }),
       this.prisma.absence.findMany({ where: { startDate: { lt: end }, endDate: { gte: start } } }),
+      this.prisma.overtimeEntry.findMany({ where: { startDate: { lt: end }, endDate: { gte: start } } }),
     ]);
 
     return {
@@ -247,8 +292,11 @@ export class HrService {
       rows: employees.map((e) => ({
         employeeId: e.id,
         fullName: e.fullName,
-        expectedHours,
+        // Per employee — "heures prévues" is editable on the employee card
+        // (défault = daysInMonth × EXPECTED_HOURS_PER_DAY), not a global constant.
+        expectedHours: daysInMonth * e.expectedHoursPerDay,
         workedHours: hoursWorkedInRange(timeEntries, e.id, start, end),
+        overtimeHours: overtimeHoursInRange(overtimeEntries, e.id, start, end),
         absences: Object.fromEntries(ABSENCE_TYPES.map((t) => [t, absenceDaysInRange(absences, e.id, t, start, end)])),
       })),
     };

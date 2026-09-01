@@ -63,6 +63,12 @@ export class CreateEmployeeDto {
   salary!: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(24)
+  expectedHoursPerDay?: number;
+
+  @IsOptional()
   @IsString()
   @MaxLength(60)
   bankRib?: string;
@@ -106,6 +112,7 @@ export class UpdateEmployeeDto {
 
   @IsOptional() @IsInt() @Min(0) @Max(20) dependentChildren?: number;
   @IsOptional() @IsNumber() @Min(0) salary?: number;
+  @IsOptional() @IsNumber() @Min(1) @Max(24) expectedHoursPerDay?: number;
   @IsOptional() @IsString() @MaxLength(60) bankRib?: string;
   @IsOptional() @IsString() @MaxLength(120) emergencyContactName?: string;
   @IsOptional() @IsString() @MaxLength(30) emergencyContactPhone?: string;

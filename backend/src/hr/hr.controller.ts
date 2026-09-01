@@ -3,6 +3,7 @@ import { HrService } from './hr.service.js';
 import { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto.js';
 import { CreateTimeEntryDto } from './dto/time-entry.dto.js';
 import { CreateAbsenceDto } from './dto/absence.dto.js';
+import { CreateOvertimeEntryDto } from './dto/overtime-entry.dto.js';
 import { RequirePermissions } from '../auth/require-permission.decorator.js';
 import { PERMISSIONS } from '../auth/permissions.js';
 
@@ -86,6 +87,26 @@ export class HrController {
   @Delete('absences/:id')
   deleteAbsence(@Param('id') id: string) {
     return this.hr.deleteAbsence(id);
+  }
+
+  // --- overtime entries ------------------------------------------------------
+
+  @RequirePermissions(PERMISSIONS.HR_READ)
+  @Get('overtime-entries')
+  listOvertimeEntries(@Query('employeeId') employeeId?: string, @Query('from') from?: string, @Query('to') to?: string) {
+    return this.hr.listOvertimeEntries({ employeeId, from, to });
+  }
+
+  @RequirePermissions(PERMISSIONS.HR_WRITE)
+  @Post('overtime-entries')
+  createOvertimeEntry(@Body() dto: CreateOvertimeEntryDto) {
+    return this.hr.createOvertimeEntry(dto);
+  }
+
+  @RequirePermissions(PERMISSIONS.HR_WRITE)
+  @Delete('overtime-entries/:id')
+  deleteOvertimeEntry(@Param('id') id: string) {
+    return this.hr.deleteOvertimeEntry(id);
   }
 
   // --- monthly summary -----------------------------------------------------

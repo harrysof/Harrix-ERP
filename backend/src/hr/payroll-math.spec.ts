@@ -4,6 +4,7 @@ import {
   cnasEmployeeContribution,
   hoursWorkedInRange,
   irgEstimate,
+  overtimeHoursInRange,
   payEstimateOf,
   tenureOf,
 } from './payroll-math.js';
@@ -121,5 +122,28 @@ describe('absenceDaysInRange', () => {
 
   it('is zero for a type with no matching absence', () => {
     expect(absenceDaysInRange(absences, 'e1', 'INJUSTIFIEE', monthStart, monthEnd)).toBe(0);
+  });
+});
+
+describe('overtimeHoursInRange', () => {
+  const monthStart = new Date('2026-08-01');
+  const monthEnd = new Date('2026-09-01');
+  const entries = [
+    { employeeId: 'e1', startDate: new Date('2026-08-10'), endDate: new Date('2026-08-12'), hours: 6 },
+    { employeeId: 'e1', startDate: new Date('2026-07-28'), endDate: new Date('2026-08-02'), hours: 4 },
+    { employeeId: 'e1', startDate: new Date('2026-09-01'), endDate: new Date('2026-09-03'), hours: 5 },
+    { employeeId: 'e2', startDate: new Date('2026-08-10'), endDate: new Date('2026-08-10'), hours: 3 },
+  ];
+
+  it('sums entries whose range overlaps the month', () => {
+    expect(overtimeHoursInRange(entries, 'e1', monthStart, monthEnd)).toBe(10);
+  });
+
+  it('excludes entries entirely outside the range', () => {
+    expect(overtimeHoursInRange(entries, 'e1', new Date('2026-06-01'), new Date('2026-07-01'))).toBe(0);
+  });
+
+  it('is scoped to one employee', () => {
+    expect(overtimeHoursInRange(entries, 'e2', monthStart, monthEnd)).toBe(3);
   });
 });

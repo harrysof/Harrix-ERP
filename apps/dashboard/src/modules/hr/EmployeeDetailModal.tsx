@@ -86,6 +86,13 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
   const contractSoonEnding =
     employee.contractType === "CDD" && employee.contractEndDate && new Date(employee.contractEndDate) < new Date(Date.now() + 30 * 86_400_000);
 
+  const leaveAbsences = employee.absences.filter((a) => a.type === "CONGE");
+  const otherAbsences = employee.absences.filter((a) => a.type !== "CONGE");
+  const leaveDaysTotal = leaveAbsences.reduce((sum, a) => {
+    const days = Math.round((new Date(a.endDate).getTime() - new Date(a.startDate).getTime()) / 86_400_000) + 1;
+    return sum + Math.max(days, 0);
+  }, 0);
+
   return (
     <Modal
       title={employee.fullName}
@@ -114,6 +121,7 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
           <Meta label="Contrat" value={CONTRACT_TYPE_LABELS[employee.contractType]} />
           <Meta label="Embauché le" value={formatDate(employee.hireDate)} />
           <Meta label="Ancienneté" value={tenureLabel(employee.tenure)} />
+          <Meta label="Heures prévues / jour" value={`${employee.expectedHoursPerDay} h`} />
         </div>
 
         {employee.contractType === "CDD" && employee.contractEndDate ? (
@@ -196,8 +204,71 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
         </section>
 
         <section>
+          <h4 className="section-title">Heures supplémentaires récentes</h4>
+          {employee.overtimeEntries.length === 0 ? (
+            <p className="muted">Aucune heure supplémentaire enregistrée.</p>
+          ) : (
+            <div className="table-scroll">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>Du</th>
+                    <th>Au</th>
+                    <th className="num">Heures</th>
+                    <th>Raison</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employee.overtimeEntries.map((o) => (
+                    <tr key={o.id}>
+                      <td className="tabular">{formatDate(o.startDate)}</td>
+                      <td className="tabular">{formatDate(o.endDate)}</td>
+                      <td className="tabular num">{o.hours}</td>
+                      <td>{o.reason ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h4 className="section-title">Congés</h4>
+          {leaveAbsences.length === 0 ? (
+            <p className="muted">Aucun congé enregistré.</p>
+          ) : (
+            <>
+              <p className="field-hint" style={{ marginTop: -4 }}>
+                {leaveDaysTotal} jour{leaveDaysTotal > 1 ? "s" : ""} de congé au total sur les entrées ci-dessous.
+              </p>
+              <div className="table-scroll">
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>Du</th>
+                      <th>Au</th>
+                      <th>Raison</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaveAbsences.map((a) => (
+                      <tr key={a.id}>
+                        <td className="tabular">{formatDate(a.startDate)}</td>
+                        <td className="tabular">{formatDate(a.endDate)}</td>
+                        <td>{a.reason ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </section>
+
+        <section>
           <h4 className="section-title">Absences récentes</h4>
-          {employee.absences.length === 0 ? (
+          {otherAbsences.length === 0 ? (
             <p className="muted">Aucune absence enregistrée.</p>
           ) : (
             <div className="table-scroll">
@@ -211,12 +282,10 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
                   </tr>
                 </thead>
                 <tbody>
-                  {employee.absences.map((a) => (
+                  {otherAbsences.map((a) => (
                     <tr key={a.id}>
                       <td>
-                        <Pill tone={a.type === "INJUSTIFIEE" ? "danger" : a.type === "MALADIE" ? "warn" : "neutral"}>
-                          {ABSENCE_TYPE_LABELS[a.type]}
-                        </Pill>
+                        <Pill tone={a.type === "INJUSTIFIEE" ? "danger" : "warn"}>{ABSENCE_TYPE_LABELS[a.type]}</Pill>
                       </td>
                       <td className="tabular">{formatDate(a.startDate)}</td>
                       <td className="tabular">{formatDate(a.endDate)}</td>
