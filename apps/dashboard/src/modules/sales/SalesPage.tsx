@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { ClipboardList, Truck, Wallet, CircleAlert, Eye, Pencil, Archive, ArchiveRestore } from "lucide-react";
 import { Banner } from "../../components/ui/Banner";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Pill } from "../../components/ui/Pill";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { StatCard } from "../../components/ui/StatCard";
+import { Avatar } from "../../components/ui/Avatar";
 import { ApiError } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { fetchItems, type ApiItem } from "../../lib/stockApi";
@@ -12,6 +14,7 @@ import {
   fetchCustomers,
   fetchOrders,
   fetchOrdersSummary,
+  setCustomerArchived,
   PAYMENT_LABELS,
   PAYMENT_STATUSES,
   PAYMENT_TONES,
@@ -79,16 +82,22 @@ export function SalesPage() {
   const visibleCustomers = showArchived ? customers : activeCustomers;
   const openOrder = modal.kind === "orderDetail" ? orders.find((o) => o.id === modal.id) ?? null : null;
 
+  async function toggleCustomerArchive(customer: ApiCustomer) {
+    await setCustomerArchived(customer.id, !customer.archived);
+    await load();
+  }
+
   return (
     <div className="page-stack">
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       {summary ? (
         <div className="stat-grid">
-          <StatCard label="Commandes" value={summary.orderCount} hint={`${summary.pendingShipment} en attente`} />
-          <StatCard label="Expédiées" value={summary.shipped} tone="ok" />
-          <StatCard label="Chiffre d'affaires" value={formatCurrency(summary.revenue)} hint="Hors commandes annulées" />
+          <StatCard icon={ClipboardList} label="Commandes" value={summary.orderCount} hint={`${summary.pendingShipment} en attente`} />
+          <StatCard icon={Truck} label="Expédiées" value={summary.shipped} tone="ok" />
+          <StatCard icon={Wallet} label="Chiffre d'affaires" value={formatCurrency(summary.revenue)} hint="Commandes payées uniquement" />
           <StatCard
+            icon={CircleAlert}
             label="Impayé"
             value={formatCurrency(summary.outstanding)}
             hint="Commandes non réglées"
@@ -178,56 +187,86 @@ export function SalesPage() {
               description={hasFilters ? "Élargissez la recherche ou réinitialisez les filtres." : undefined}
             />
           ) : (
-            <div className="table-scroll">
-              <table className="stock-table">
-                <thead>
-                  <tr>
-                    <th>N° commande</th>
-                    <th>Date</th>
-                    <th>Client</th>
-                    <th>Email</th>
-                    <th>Expédition</th>
-                    <th>Paiement</th>
-                    <th className="num">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className={
-                        order.shipmentStatus === "CANCELLED"
-                          ? "row-muted"
-                          : order.stockWarnings.length > 0
-                            ? "row-attention"
-                            : undefined
-                      }
-                    >
-                      <td>
-                        <button type="button" className="link-button" onClick={() => setModal({ kind: "orderDetail", id: order.id })}>
-                          {order.code}
-                        </button>
-                        {order.stockWarnings.length > 0 ? (
-                          <span className="muted" title="Stock insuffisant pour expédier maintenant">
-                            {" "}
-                            ⚠
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="tabular">{formatDate(order.date)}</td>
-                      <td>{order.customer.fullName}</td>
-                      <td>{order.customer.email ?? <span className="muted">—</span>}</td>
-                      <td>
-                        <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>{SHIPMENT_LABELS[order.shipmentStatus]}</Pill>
-                      </td>
-                      <td>
-                        <Pill tone={PAYMENT_TONES[order.paymentStatus]}>{PAYMENT_LABELS[order.paymentStatus]}</Pill>
-                      </td>
-                      <td className="tabular num">{formatCurrency(order.totals.total)}</td>
+            <div className="list-card">
+              <div className="table-scroll">
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>N° commande</th>
+                      <th>Date</th>
+                      <th>Client</th>
+                      <th>Email</th>
+                      <th>Expédition</th>
+                      <th>Paiement</th>
+                      <th className="num">Total</th>
+                      <th aria-label="Actions" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className={
+                          order.shipmentStatus === "CANCELLED"
+                            ? "row-muted"
+                            : order.stockWarnings.length > 0
+                              ? "row-attention"
+                              : undefined
+                        }
+                      >
+                        <td>
+                          <button type="button" className="link-button" onClick={() => setModal({ kind: "orderDetail", id: order.id })}>
+                            {order.code}
+                          </button>
+                          {order.stockWarnings.length > 0 ? (
+                            <span className="muted" title="Stock insuffisant pour expédier maintenant">
+                              {" "}
+                              ⚠
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="tabular">{formatDate(order.date)}</td>
+                        <td>
+                          <div className="identity-cell">
+                            <Avatar name={order.customer.fullName} />
+                            <span className="identity-cell-name">{order.customer.fullName}</span>
+                          </div>
+                        </td>
+                        <td>{order.customer.email ?? <span className="muted">—</span>}</td>
+                        <td>
+                          <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>{SHIPMENT_LABELS[order.shipmentStatus]}</Pill>
+                        </td>
+                        <td>
+                          <Pill tone={PAYMENT_TONES[order.paymentStatus]}>{PAYMENT_LABELS[order.paymentStatus]}</Pill>
+                        </td>
+                        <td className="tabular num">{formatCurrency(order.totals.total)}</td>
+                        <td>
+                          <div className="row-actions">
+                            <button
+                              type="button"
+                              className="icon-button"
+                              title="Voir"
+                              onClick={() => setModal({ kind: "orderDetail", id: order.id })}
+                            >
+                              <Eye size={16} strokeWidth={2} />
+                            </button>
+                            {writable && order.canEdit ? (
+                              <button
+                                type="button"
+                                className="icon-button"
+                                title="Modifier"
+                                onClick={() => setModal({ kind: "editOrder", order })}
+                              >
+                                <Pencil size={16} strokeWidth={2} />
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
@@ -245,47 +284,95 @@ export function SalesPage() {
           ) : visibleCustomers.length === 0 ? (
             <EmptyState title="Aucun client" description="Ajoutez vos clients pour pouvoir créer des commandes." />
           ) : (
-            <div className="table-scroll">
-              <table className="stock-table">
-                <thead>
-                  <tr>
-                    <th>Nom complet</th>
-                    <th>Email</th>
-                    <th>Téléphone</th>
-                    <th className="num">Commandes</th>
-                    <th className="num">Total acheté</th>
-                    <th className="num">Solde dû</th>
-                    <th>Statut</th>
-                    <th>Créé le</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleCustomers.map((customer) => (
-                    <tr key={customer.id} className={customer.archived ? "row-muted" : undefined}>
-                      <td>
-                        <button type="button" className="link-button" onClick={() => setModal({ kind: "customerDetail", customer })}>
-                          {customer.fullName}
-                        </button>
-                      </td>
-                      <td>{customer.email ?? <span className="muted">—</span>}</td>
-                      <td className="tabular">{customer.phone ?? <span className="muted">—</span>}</td>
-                      <td className="tabular num">{customer.orderCount}</td>
-                      <td className="tabular num">{formatCurrency(customer.totalPurchased)}</td>
-                      <td className="tabular num">
-                        {customer.outstandingBalance > 0 ? (
-                          <strong>{formatCurrency(customer.outstandingBalance)}</strong>
-                        ) : (
-                          formatCurrency(0)
-                        )}
-                      </td>
-                      <td>
-                        <Pill tone={customer.archived ? "neutral" : "ok"}>{customer.archived ? "Archivé" : "Actif"}</Pill>
-                      </td>
-                      <td className="tabular">{formatDate(customer.createdAt)}</td>
+            <div className="list-card">
+              <div className="table-scroll">
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>Nom complet</th>
+                      <th>Email</th>
+                      <th>Téléphone</th>
+                      <th className="num">Commandes</th>
+                      <th className="num">Total acheté</th>
+                      <th className="num">Solde dû</th>
+                      <th>Statut</th>
+                      <th>Créé le</th>
+                      <th aria-label="Actions" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {visibleCustomers.map((customer) => (
+                      <tr key={customer.id} className={customer.archived ? "row-muted" : undefined}>
+                        <td>
+                          <div className="identity-cell">
+                            <Avatar name={customer.fullName} />
+                            {can("orders:read") ? (
+                              <button
+                                type="button"
+                                className="link-button"
+                                onClick={() => setModal({ kind: "customerDetail", customer })}
+                              >
+                                {customer.fullName}
+                              </button>
+                            ) : (
+                              <span className="identity-cell-name">{customer.fullName}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>{customer.email ?? <span className="muted">—</span>}</td>
+                        <td className="tabular">{customer.phone ?? <span className="muted">—</span>}</td>
+                        <td className="tabular num">{customer.orderCount}</td>
+                        <td className="tabular num">{formatCurrency(customer.totalPurchased)}</td>
+                        <td className="tabular num">
+                          {customer.outstandingBalance > 0 ? (
+                            <strong>{formatCurrency(customer.outstandingBalance)}</strong>
+                          ) : (
+                            formatCurrency(0)
+                          )}
+                        </td>
+                        <td>
+                          <Pill tone={customer.archived ? "neutral" : "ok"}>{customer.archived ? "Archivé" : "Actif"}</Pill>
+                        </td>
+                        <td className="tabular">{formatDate(customer.createdAt)}</td>
+                        <td>
+                          <div className="row-actions">
+                            {can("orders:read") ? (
+                              <button
+                                type="button"
+                                className="icon-button"
+                                title="Fiche"
+                                onClick={() => setModal({ kind: "customerDetail", customer })}
+                              >
+                                <Eye size={16} strokeWidth={2} />
+                              </button>
+                            ) : null}
+                            {writable ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  title="Modifier"
+                                  onClick={() => setModal({ kind: "editCustomer", customer })}
+                                >
+                                  <Pencil size={16} strokeWidth={2} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="icon-button"
+                                  title={customer.archived ? "Désarchiver" : "Archiver"}
+                                  onClick={() => toggleCustomerArchive(customer)}
+                                >
+                                  {customer.archived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
+                                </button>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>

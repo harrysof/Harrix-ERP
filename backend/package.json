@@ -25,7 +25,8 @@
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
-    "seed:auth": "tsx prisma/seed-auth.ts"
+    "seed:auth": "tsx prisma/seed-auth.ts",
+    "reset:data": "tsx prisma/reset-data.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

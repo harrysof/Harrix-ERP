@@ -6,6 +6,7 @@ import { Banner } from "../../components/ui/Banner";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ApiError } from "../../lib/api";
 import { fetchAudit, fetchAuditFilterOptions, type AuditEntry, type AuditFilters } from "../../lib/authApi";
+import { entityLabel, renderAuditChanges } from "./auditChanges";
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE: "Création",
@@ -91,7 +92,7 @@ export function AuditPage() {
             <option value="">Tout</option>
             {options.entities.map((e) => (
               <option key={e} value={e}>
-                {e}
+                {entityLabel(e)}
               </option>
             ))}
           </select>
@@ -130,7 +131,7 @@ export function AuditPage() {
                   <td>
                     <Pill tone={ACTION_TONES[entry.action] ?? "neutral"}>{ACTION_LABELS[entry.action] ?? entry.action}</Pill>
                   </td>
-                  <td>{entry.entity}</td>
+                  <td>{entityLabel(entry.entity)}</td>
                   <td>
                     {entry.changes ? (
                       <button type="button" className="link-button" onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}>
@@ -139,7 +140,7 @@ export function AuditPage() {
                     ) : (
                       <span className="muted">—</span>
                     )}
-                    {expanded === entry.id && entry.changes ? <pre className="audit-changes">{prettify(entry.changes)}</pre> : null}
+                    {expanded === entry.id && entry.changes ? renderAuditChanges(entry.changes, entry.entity) : null}
                   </td>
                 </tr>
               ))}
@@ -149,13 +150,4 @@ export function AuditPage() {
       )}
     </div>
   );
-}
-
-/** The log stores compact JSON; a human reading it wants it indented. */
-function prettify(changes: string): string {
-  try {
-    return JSON.stringify(JSON.parse(changes), null, 2);
-  } catch {
-    return changes;
-  }
 }

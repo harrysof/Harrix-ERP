@@ -36,6 +36,8 @@ export const PERMISSIONS = {
 
   USERS_MANAGE: 'users:manage',
   AUDIT_READ: 'audit:read',
+
+  FINANCE_READ: 'finance:read',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -94,6 +96,10 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: Array<{ key:
       { key: PERMISSIONS.USERS_MANAGE, label: 'Créer et désactiver des utilisateurs' },
       { key: PERMISSIONS.AUDIT_READ, label: "Consulter le journal d'activité" },
     ],
+  },
+  {
+    label: 'Finance',
+    permissions: [{ key: PERMISSIONS.FINANCE_READ, label: 'Utiliser le calculateur de marge' }],
   },
 ];
 

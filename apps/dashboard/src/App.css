@@ -46,8 +46,7 @@
 .sidebar-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   text-align: left;
   background: none;
   border: none;
@@ -57,6 +56,11 @@
   font-weight: 500;
   color: var(--ink-soft);
   cursor: pointer;
+}
+
+.sidebar-link-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 .sidebar-link:hover:not(:disabled) {
@@ -186,26 +190,51 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   text-align: left;
   box-shadow: var(--shadow-sm);
 }
 
+.stat-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.stat-card-warn .stat-card-icon {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.stat-card-danger .stat-card-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.stat-card-ok .stat-card-icon {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
 .stat-card-label {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--ink-soft);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  font-weight: 500;
 }
 
 .stat-card-value {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
-  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -228,12 +257,13 @@
 
 .stat-card-clickable {
   cursor: pointer;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
 }
 
 .stat-card-clickable:hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .stat-card-clickable:focus-visible {
@@ -524,6 +554,48 @@ textarea.input {
 
 /* ---------- tables ---------- */
 
+/* The card a table (and whatever sits right above it — a filter bar, a
+   toolbar) is grouped inside, so the two read as one unit instead of a
+   loose stack of elements. */
+.list-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.list-card .table-scroll {
+  border-radius: 0;
+}
+
+.list-card .stock-table,
+.list-card .history-table {
+  border: none;
+  border-radius: 0;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.icon-button:hover {
+  background: var(--surface-sunk);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
 .table-scroll {
   overflow-x: auto;
   border-radius: var(--radius);
@@ -573,6 +645,75 @@ textarea.input {
 .row-actions {
   display: flex;
   gap: 6px;
+}
+
+/* ---------- avatar ---------- */
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.avatar-blue {
+  background: #e3e9ff;
+  color: #3d57d6;
+}
+
+.avatar-amber {
+  background: #fdf1dc;
+  color: #b8790a;
+}
+
+.avatar-green {
+  background: #e3f8ee;
+  color: #0f9463;
+}
+
+.avatar-pink {
+  background: #fde3ec;
+  color: #c23a70;
+}
+
+.avatar-purple {
+  background: #ece3ff;
+  color: #6a3dd6;
+}
+
+.avatar-teal {
+  background: #dcf5f3;
+  color: #0e8f86;
+}
+
+/* A name paired with a subtitle (city, email…), avatar to the left — the
+   table-cell treatment for anything that is fundamentally "a person". */
+.identity-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.identity-cell-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.identity-cell-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.identity-cell-sub {
+  font-size: 12px;
+  color: var(--ink-faint);
 }
 
 .fifo-cell {
@@ -918,6 +1059,22 @@ textarea.input {
 .field-hint {
   font-size: 11.5px;
   color: var(--ink-faint);
+}
+
+/* An amount input paired with a unit selector, e.g. discount as DZD vs %. */
+.field-inline-group {
+  display: flex;
+  gap: 6px;
+}
+
+.field-inline-group .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.field-inline-group select.input {
+  flex: 0 0 auto;
+  width: 84px;
 }
 
 .field-error {
@@ -1589,10 +1746,68 @@ button.topbar-user:hover {
 
 /* ---------- audit log ---------- */
 
-audit-changes {
+.audit-details {
   margin: 8px 0 0;
   padding: 10px 12px;
-  max-width: 460px;
+  max-width: 480px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--surface-sunk);
+  border-radius: var(--radius-sm);
+}
+
+.audit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.audit-field {
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.audit-field-label {
+  flex: 0 0 auto;
+  min-width: 120px;
+  color: var(--ink-faint);
+}
+
+.audit-field-value {
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.audit-ref {
+  font-size: 11px;
+}
+
+.audit-sublist {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.audit-sublist li {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.audit-result {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.audit-fallback {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  max-width: 480px;
   max-height: 260px;
   overflow: auto;
   background: var(--surface-sunk);

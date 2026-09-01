@@ -1,56 +1,57 @@
 :root {
-  --bg: #eef0f2;
+  --bg: #f4f6fa;
   --surface: #ffffff;
-  --surface-sunk: #e3e7ea;
-  --ink: #1b2430;
-  --ink-soft: #57636f;
-  --ink-faint: #8b96a0;
-  --border: #d3d9de;
-  --border-strong: #b7bfc6;
+  --surface-sunk: #eef1f7;
+  --ink: #101828;
+  --ink-soft: #616e82;
+  --ink-faint: #97a2b5;
+  --border: #e4e8f0;
+  --border-strong: #cbd2e0;
 
-  --accent: #b5541f;
-  --accent-strong: #8f4118;
-  --accent-soft: #f3e1d3;
+  --accent: #4f6ef7;
+  --accent-strong: #3d57d6;
+  --accent-soft: #ecefff;
 
-  --ok: #1e8a6e;
-  --ok-soft: #dcf0e9;
-  --warn: #a66a00;
-  --warn-soft: #f5e6c8;
-  --danger: #b3261e;
-  --danger-soft: #f6dedc;
+  --ok: #12a36c;
+  --ok-soft: #e3f8ee;
+  --warn: #c4820a;
+  --warn-soft: #fdf1dc;
+  --danger: #d4342c;
+  --danger-soft: #fbe6e5;
 
-  --shadow-sm: 0 1px 2px rgba(27, 36, 48, 0.06);
-  --shadow-md: 0 4px 16px -6px rgba(27, 36, 48, 0.22);
-  --radius: 8px;
-  --radius-sm: 5px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 8px 20px -6px rgba(16, 24, 40, 0.14);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
 
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12161b;
-    --surface: #1a2028;
-    --surface-sunk: #212831;
-    --ink: #e7eaed;
-    --ink-soft: #a7b0b8;
-    --ink-faint: #6e7982;
-    --border: #2b333c;
-    --border-strong: #3a4550;
+    --bg: #10141c;
+    --surface: #171c26;
+    --surface-sunk: #1f2530;
+    --ink: #e9ecf3;
+    --ink-soft: #a3aec2;
+    --ink-faint: #6b7690;
+    --border: #2a3140;
+    --border-strong: #3b4457;
 
-    --accent: #e08a4d;
-    --accent-strong: #f0a870;
-    --accent-soft: #3a2a1e;
+    --accent: #7089ff;
+    --accent-strong: #92a5ff;
+    --accent-soft: #232a48;
 
-    --ok: #4fbf9c;
-    --ok-soft: #163229;
-    --warn: #d9a441;
-    --warn-soft: #3a2d12;
-    --danger: #e5645c;
+    --ok: #3ddc9b;
+    --ok-soft: #142e26;
+    --warn: #eeb84f;
+    --warn-soft: #362a12;
+    --danger: #f0847c;
     --danger-soft: #3a1e1c;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 20px -6px rgba(0, 0, 0, 0.55);
+    --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -67,7 +68,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14.5px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;

@@ -24,7 +24,8 @@ export type Permission =
   | "hr:read"
   | "hr:write"
   | "users:manage"
-  | "audit:read";
+  | "audit:read"
+  | "finance:read";
 
 export interface AuthUser {
   id: string;

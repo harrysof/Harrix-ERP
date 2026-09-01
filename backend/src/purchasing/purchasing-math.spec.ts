@@ -50,6 +50,22 @@ describe('poTotals', () => {
   it('handles an empty PO without NaN', () => {
     expect(poTotals([], {})).toMatchObject({ subtotal: 0, total: 0 });
   });
+
+  it('defaults to FIXED and treats discount as a DZD amount', () => {
+    const totals = poTotals([line('a', 1, 1000)], { discount: 100 });
+    expect(totals.discountType).toBe('FIXED');
+    expect(totals.discount).toBe(100);
+    expect(totals.discountRate).toBe(0);
+    expect(totals.total).toBe(900);
+  });
+
+  it('computes a PERCENT discount from the subtotal, before shipping', () => {
+    const totals = poTotals([line('a', 1, 1000)], { shipping: 200, discount: 0.1, discountType: 'PERCENT' });
+    expect(totals.discountType).toBe('PERCENT');
+    expect(totals.discountRate).toBe(0.1);
+    expect(totals.discount).toBe(100);
+    expect(totals.total).toBe(1100);
+  });
 });
 
 describe('statusAfterReceipt', () => {

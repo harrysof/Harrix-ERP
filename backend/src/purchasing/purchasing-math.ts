@@ -25,6 +25,10 @@ export const PO_STATUSES = [
 
 export type PoStatus = (typeof PO_STATUSES)[number];
 
+/** FIXED: `discount` is a DZD amount. PERCENT: it's a fraction, like taxRate. */
+export const DISCOUNT_TYPES = ['FIXED', 'PERCENT'] as const;
+export type DiscountType = (typeof DISCOUNT_TYPES)[number];
+
 /** Statuses whose quantities no longer count as an outstanding commitment. */
 export const CLOSED_PO_STATUSES: PoStatus[] = ['RECEIVED', 'CANCELLED'];
 
@@ -58,7 +62,12 @@ export function outstandingForLine(line: LineLike, receiptLines: ReceiptLineLike
 export interface PoTotals {
   subtotal: number;
   shipping: number;
+  /** Always computed, in DZD — see `discountType`/`discountRate` below. */
   discount: number;
+  /** FIXED or PERCENT, mirrored from the PO. */
+  discountType: DiscountType;
+  /** The fraction the buyer typed when discountType is PERCENT, e.g. 0.10 for 10 %. Zero for FIXED. */
+  discountRate: number;
   /** The rate the buyer typed, e.g. 0.19 for 19 %. Kept alongside the amount it produced. */
   taxRate: number;
   /** Always computed, never typed — see `taxRate` below. */
@@ -69,7 +78,10 @@ export interface PoTotals {
 /**
  * Tax is entered as a rate, not an amount — the same reasoning as everything
  * else this codebase refuses to store pre-computed: a flat DZD figure drifts
- * the moment a line changes, while a rate stays correct on its own.
+ * the moment a line changes, while a rate stays correct on its own. The
+ * order-level discount has the same choice: FIXED is a DZD amount taken as
+ * is, PERCENT is a fraction applied to the subtotal (before shipping —
+ * shipping isn't goods, so a commercial discount doesn't eat into it).
  *
  * The taxable base is the order's pre-tax total — subtotal plus shipping,
  * minus the discount — because shipping is normally billed on the same
@@ -78,15 +90,17 @@ export interface PoTotals {
  */
 export function poTotals(
   lines: LineLike[],
-  extras: { shipping?: number; discount?: number; taxRate?: number } = {},
+  extras: { shipping?: number; discount?: number; discountType?: string; taxRate?: number } = {},
 ): PoTotals {
   const subtotal = round(lines.reduce((sum, l) => sum + l.quantity * l.unitCost, 0));
   const shipping = extras.shipping ?? 0;
-  const discount = extras.discount ?? 0;
+  const discountType: DiscountType = extras.discountType === 'PERCENT' ? 'PERCENT' : 'FIXED';
+  const discountRate = discountType === 'PERCENT' ? (extras.discount ?? 0) : 0;
+  const discount = discountType === 'PERCENT' ? round(subtotal * discountRate) : (extras.discount ?? 0);
   const taxRate = extras.taxRate ?? 0;
   const taxableBase = subtotal + shipping - discount;
   const tax = round(taxableBase * taxRate);
-  return { subtotal, shipping, discount, taxRate, tax, total: round(taxableBase + tax) };
+  return { subtotal, shipping, discount, discountType, discountRate, taxRate, tax, total: round(taxableBase + tax) };
 }
 
 /**

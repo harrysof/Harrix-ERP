@@ -1,4 +1,4 @@
-import type { PoLineInput } from "../../lib/purchasingApi";
+import type { DiscountType, PoLineInput } from "../../lib/purchasingApi";
 
 /** One editable line in the purchase-order form. */
 export interface PoLineDraft {
@@ -22,16 +22,25 @@ export function toLineInput(line: PoLineDraft): PoLineInput {
  *
  * Tax is a rate (0.19 for 19 %), not an amount: the user only ever types the
  * percentage, and the DZD figure is derived here exactly as it is on the
- * server (see purchasing-math.ts's poTotals).
+ * server (see purchasing-math.ts's poTotals). The order-level discount is
+ * either a DZD amount (FIXED) or a fraction applied to the subtotal
+ * (PERCENT), same choice as everywhere else.
  */
-export function draftTotals(lines: PoLineDraft[], extras: { shipping: number; discount: number; taxRate: number }) {
+export function draftTotals(
+  lines: PoLineDraft[],
+  extras: { shipping: number; discount: number; discountType: DiscountType; taxRate: number },
+) {
   const subtotal = round(lines.reduce((sum, l) => sum + l.quantity * l.unitCost, 0));
-  const taxableBase = subtotal + extras.shipping - extras.discount;
+  const discountRate = extras.discountType === "PERCENT" ? extras.discount : 0;
+  const discount = extras.discountType === "PERCENT" ? round(subtotal * discountRate) : extras.discount;
+  const taxableBase = subtotal + extras.shipping - discount;
   const tax = round(taxableBase * extras.taxRate);
   return {
     subtotal,
     shipping: extras.shipping,
-    discount: extras.discount,
+    discount,
+    discountType: extras.discountType,
+    discountRate,
     taxRate: extras.taxRate,
     tax,
     total: round(taxableBase + tax),

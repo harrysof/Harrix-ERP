@@ -10,10 +10,11 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
-import { PAYMENT_STATUSES, SHIPMENT_STATUSES } from '../sales-math.js';
+import { DISCOUNT_TYPES, PAYMENT_STATUSES, SHIPMENT_STATUSES } from '../sales-math.js';
 
 export class OrderLineDto {
   @IsString()
@@ -29,10 +30,19 @@ export class OrderLineDto {
   unitPrice!: number;
 
   /** Per-line discount in DZD. */
+  /**
+   * A DZD amount when discountType is FIXED (the default), or a fraction
+   * (0.10 for 10 %) when it's PERCENT — validated against discountType in
+   * the service, since class-validator can't compare two fields inline here.
+   */
   @IsOptional()
   @IsNumber()
   @Min(0)
   discount?: number;
+
+  @IsOptional()
+  @IsIn(DISCOUNT_TYPES)
+  discountType?: string;
 }
 
 /**
@@ -66,15 +76,30 @@ export class CreateOrderDto {
   @Min(0)
   shipping?: number;
 
+  /**
+   * A DZD amount when discountType is FIXED (the default), or a fraction
+   * (0.10 for 10 %) when it's PERCENT — validated against discountType in
+   * the service, since class-validator can't compare two fields inline here.
+   */
   @IsOptional()
   @IsNumber()
   @Min(0)
   discount?: number;
 
   @IsOptional()
+  @IsIn(DISCOUNT_TYPES)
+  discountType?: string;
+
+  /**
+   * A fraction, not a DZD amount — 0.19 for 19 %. The system computes the
+   * actual tax from this and the order's other figures (see
+   * sales/sales-math.ts's orderTotals), never stored as a flat figure.
+   */
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  tax?: number;
+  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  taxRate?: number;
 
   @IsOptional()
   @IsString()
@@ -116,15 +141,25 @@ export class UpdateOrderDto {
   @Min(0)
   shipping?: number;
 
+  /**
+   * A DZD amount when discountType is FIXED (the default), or a fraction
+   * (0.10 for 10 %) when it's PERCENT — validated against discountType in
+   * the service, since class-validator can't compare two fields inline here.
+   */
   @IsOptional()
   @IsNumber()
   @Min(0)
   discount?: number;
 
   @IsOptional()
+  @IsIn(DISCOUNT_TYPES)
+  discountType?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  tax?: number;
+  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  taxRate?: number;
 
   @IsOptional()
   @IsString()
@@ -169,4 +204,35 @@ export class ShipOrderDto {
   @IsOptional()
   @IsBoolean()
   markPaid?: boolean;
+}
+
+/** One line of a return: how much of one shipped order line came back. */
+export class ReturnOrderLineDto {
+  @IsString()
+  @IsNotEmpty()
+  orderLineId!: string;
+
+  @IsNumber()
+  @IsPositive()
+  quantity!: number;
+}
+
+export class ReturnOrderDto {
+  @IsISO8601()
+  date!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ReturnOrderLineDto)
+  lines!: ReturnOrderLineDto[];
+
+  /** Why the goods came back, e.g. "ne convient pas au client". */
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

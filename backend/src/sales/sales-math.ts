@@ -9,9 +9,12 @@
 
 export const SHIPMENT_STATUSES = ['PENDING', 'SHIPPED', 'CANCELLED'] as const;
 export const PAYMENT_STATUSES = ['PENDING', 'PAID', 'CANCELLED'] as const;
+/** FIXED: `discount` is a DZD amount. PERCENT: it's a fraction, like taxRate. */
+export const DISCOUNT_TYPES = ['FIXED', 'PERCENT'] as const;
 
 export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+export type DiscountType = (typeof DISCOUNT_TYPES)[number];
 
 export interface OrderLineLike {
   quantity: number;
@@ -24,7 +27,15 @@ export interface OrderTotals {
   subtotal: number;
   lineDiscounts: number;
   shipping: number;
+  /** Always computed, in DZD — see `discountType`/`discountRate` below. */
   discount: number;
+  /** FIXED or PERCENT, mirrored from the order. */
+  discountType: DiscountType;
+  /** The fraction the seller typed when discountType is PERCENT, e.g. 0.10 for 10 %. Zero for FIXED. */
+  discountRate: number;
+  /** The rate the seller typed, e.g. 0.19 for 19 %. Kept alongside the amount it produced. */
+  taxRate: number;
+  /** Always computed, never typed — see `taxRate` above. */
   tax: number;
   total: number;
 }
@@ -36,31 +47,47 @@ export function lineTotal(line: OrderLineLike): number {
 
 /**
  * §16's calculation, in one place:
- *   subtotal (after line discounts) + shipping + tax − order discount
+ *   subtotal (after line discounts) + shipping − order discount, then tax
+ *
+ * Tax is entered as a rate, not a DZD amount — same reasoning as
+ * PurchaseOrder.taxRate: a flat figure drifts the moment a line, the shipping
+ * or the discount changes, while a rate stays correct on its own. The
+ * taxable base is pre-tax revenue: subtotal plus shipping, minus the
+ * discount.
+ *
+ * The order-level discount itself has the same two-shape choice as everywhere
+ * else in this file: FIXED is a DZD amount taken as-is, PERCENT is a fraction
+ * applied to the subtotal (before shipping — shipping isn't goods, so a
+ * commercial discount doesn't eat into it).
  *
  * Clamped at zero: a discount larger than the order does not produce a
  * negative invoice the factory would have to explain.
  */
 export function orderTotals(
   lines: OrderLineLike[],
-  extras: { shipping?: number; discount?: number; tax?: number } = {},
+  extras: { shipping?: number; discount?: number; discountType?: string; taxRate?: number } = {},
 ): OrderTotals {
-  const gross = lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
   const lineDiscounts = round(lines.reduce((sum, l) => sum + (l.discount ?? 0), 0));
   const subtotal = round(lines.reduce((sum, l) => sum + lineTotal(l), 0));
 
   const shipping = extras.shipping ?? 0;
-  const discount = extras.discount ?? 0;
-  const tax = extras.tax ?? 0;
+  const discountType: DiscountType = extras.discountType === 'PERCENT' ? 'PERCENT' : 'FIXED';
+  const discountRate = discountType === 'PERCENT' ? (extras.discount ?? 0) : 0;
+  const discount = discountType === 'PERCENT' ? round(subtotal * discountRate) : (extras.discount ?? 0);
+  const taxRate = extras.taxRate ?? 0;
+  const taxableBase = subtotal + shipping - discount;
+  const tax = round(taxableBase * taxRate);
 
   return {
     subtotal,
     lineDiscounts,
     shipping,
     discount,
+    discountType,
+    discountRate,
+    taxRate,
     tax,
-    total: round(Math.max(0, subtotal + shipping + tax - discount)),
-    ...(gross === 0 ? {} : {}),
+    total: round(Math.max(0, taxableBase + tax)),
   };
 }
 
@@ -82,6 +109,26 @@ export function canCancel(order: { shipmentStatus: string }): boolean {
   return order.shipmentStatus !== 'CANCELLED' && order.shipmentStatus !== 'SHIPPED';
 }
 
+/** Only a shipped order has stock on the outside to give back. */
+export function canReturn(order: { shipmentStatus: string }): boolean {
+  return order.shipmentStatus === 'SHIPPED';
+}
+
+export interface ReturnLineLike {
+  orderLineId: string;
+  quantity: number;
+}
+
+/** How much of one order line has already come back, across every return. */
+export function returnedForLine(lineId: string, returnLines: ReturnLineLike[]): number {
+  return round(returnLines.filter((r) => r.orderLineId === lineId).reduce((sum, r) => sum + r.quantity, 0));
+}
+
+/** Still returnable on one shipped line. Never negative — an over-return is not owed twice. */
+export function returnableForLine(line: { id: string; quantity: number }, returnLines: ReturnLineLike[]): number {
+  return round(Math.max(0, line.quantity - returnedForLine(line.id, returnLines)));
+}
+
 export interface CustomerSummary {
   orderCount: number;
   totalPurchased: number;
@@ -97,7 +144,15 @@ export interface CustomerSummary {
  *   is whole-order, not partial — an order is owed in full or not at all.
  */
 export function summarizeCustomer(
-  orders: Array<{ shipmentStatus: string; paymentStatus: string; lines: OrderLineLike[]; shipping: number; discount: number; tax: number }>,
+  orders: Array<{
+    shipmentStatus: string;
+    paymentStatus: string;
+    lines: OrderLineLike[];
+    shipping: number;
+    discount: number;
+    discountType: string;
+    taxRate: number;
+  }>,
 ): CustomerSummary {
   const live = orders.filter((o) => o.shipmentStatus !== 'CANCELLED' && o.paymentStatus !== 'CANCELLED');
   const totalOf = (o: (typeof live)[number]) => orderTotals(o.lines, o).total;

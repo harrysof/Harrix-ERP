@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import {
   deleteOrder,
+  returnOrder,
   setOrderStatus,
   shipOrder,
   PAYMENT_LABELS,
@@ -17,6 +18,7 @@ import {
   SHIPMENT_LABELS,
   SHIPMENT_TONES,
   type ApiOrder,
+  type ReturnOrderLineInput,
 } from "../../lib/salesApi";
 import { useAuth } from "../../state/AuthContext";
 import { OrderTotalsPanel } from "./OrderTotalsPanel";
@@ -44,6 +46,11 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
   const [shipDate, setShipDate] = useState(todayIso());
   const [markPaid, setMarkPaid] = useState(false);
 
+  const [returning, setReturning] = useState(false);
+  const [returnDate, setReturnDate] = useState(todayIso());
+  const [returnReason, setReturnReason] = useState("");
+  const [returnDraft, setReturnDraft] = useState<Record<string, string>>({});
+
   const writable = can("orders:write");
 
   async function run(action: () => Promise<unknown>) {
@@ -58,6 +65,26 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
       return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitReturn() {
+    const lines: ReturnOrderLineInput[] = order.lines
+      .filter((l) => Number(returnDraft[l.id]) > 0)
+      .map((l) => ({ orderLineId: l.id, quantity: Number(returnDraft[l.id]) }));
+
+    if (lines.length === 0) {
+      setError("Indiquez la quantité retournée pour au moins une ligne.");
+      return;
+    }
+
+    const ok = await run(() =>
+      returnOrder(order.id, { date: returnDate, lines, ...(returnReason.trim() ? { reason: returnReason.trim() } : {}) }),
+    );
+    if (ok) {
+      setReturning(false);
+      setReturnDraft({});
+      setReturnReason("");
     }
   }
 
@@ -222,7 +249,14 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
             ) : null}
 
             <div className="form-row" style={{ marginTop: 12 }}>
-              <Field label="Statut de paiement">
+              <Field
+                label="Statut de paiement"
+                hint={
+                  order.shipmentStatus === "SHIPPED"
+                    ? "Ne touche pas au stock. Pour reprendre des articles déjà expédiés, utilisez « Enregistrer un retour » ci-dessous."
+                    : undefined
+                }
+              >
                 <select
                   className="input"
                   value={order.paymentStatus}
@@ -237,6 +271,95 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
                 </select>
               </Field>
             </div>
+          </section>
+        ) : null}
+
+        {order.shipmentStatus === "SHIPPED" || order.returns.length > 0 ? (
+          <section>
+            <h4 className="section-title">Retours</h4>
+
+            {order.returns.length === 0 ? (
+              <p className="muted">Aucun retour enregistré.</p>
+            ) : (
+              <div className="table-scroll">
+                <table className="stock-table">
+                  <thead>
+                    <tr>
+                      <th>N°</th>
+                      <th>Date</th>
+                      <th>Motif</th>
+                      <th className="num">Quantité</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.returns.map((ret) => (
+                      <tr key={ret.id}>
+                        <td>{ret.code}</td>
+                        <td className="tabular">{formatDate(ret.date)}</td>
+                        <td>{ret.reason ?? <span className="muted">—</span>}</td>
+                        <td className="tabular num">{ret.lines.reduce((s, l) => s + l.quantity, 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {writable && order.canReturn ? (
+              returning ? (
+                <div className="form-stack" style={{ marginTop: 14 }}>
+                  <div className="form-row">
+                    <Field label="Date du retour">
+                      <input className="input" type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+                    </Field>
+                    <Field label="Motif" hint="Facultatif — ex. « ne convient pas au client »">
+                      <input className="input" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} />
+                    </Field>
+                  </div>
+
+                  {order.lines
+                    .filter((l) => l.returnable > 0)
+                    .map((line) => (
+                      <div key={line.id} className="receive-line">
+                        <div className="receive-line-head">
+                          <strong>{line.item.name}</strong>
+                          <span className="muted">
+                            {line.returnable} {line.item.unit} retournable(s)
+                          </span>
+                        </div>
+                        <Field label={`Quantité retournée (${line.item.unit})`}>
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            max={line.returnable}
+                            step="any"
+                            value={returnDraft[line.id] ?? ""}
+                            onChange={(e) => setReturnDraft((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                          />
+                        </Field>
+                      </div>
+                    ))}
+
+                  <Banner tone="info">Enregistrer ce retour remettra les quantités indiquées dans le stock de produits finis.</Banner>
+
+                  <div className="row-actions">
+                    <Button variant="primary" onClick={submitReturn} disabled={busy}>
+                      {busy ? "Enregistrement…" : "Enregistrer le retour"}
+                    </Button>
+                    <Button onClick={() => setReturning(false)}>Annuler</Button>
+                  </div>
+                </div>
+              ) : order.lines.some((l) => l.returnable > 0) ? (
+                <Button variant="primary" style={{ marginTop: 10 }} onClick={() => setReturning(true)}>
+                  + Enregistrer un retour
+                </Button>
+              ) : (
+                <p className="muted" style={{ marginTop: 10 }}>
+                  Tout a déjà été retourné.
+                </p>
+              )
+            ) : null}
           </section>
         ) : null}
 

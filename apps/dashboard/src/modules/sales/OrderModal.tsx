@@ -14,6 +14,7 @@ import {
   PAYMENT_STATUSES,
   type ApiCustomer,
   type ApiOrder,
+  type DiscountType,
 } from "../../lib/salesApi";
 import { OrderTotalsPanel } from "./OrderTotalsPanel";
 
@@ -48,8 +49,13 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
   const [date, setDate] = useState(order ? order.date.slice(0, 10) : todayIso());
   const [paymentStatus, setPaymentStatus] = useState<string>(order?.paymentStatus ?? "PENDING");
   const [shipping, setShipping] = useState(String(order?.shipping ?? ""));
-  const [discount, setDiscount] = useState(String(order?.discount ?? ""));
-  const [tax, setTax] = useState(String(order?.tax ?? ""));
+  const [discountType, setDiscountType] = useState<DiscountType>(order?.discountType ?? "FIXED");
+  // In FIXED mode this is a DZD amount; in PERCENT mode it's a percentage (e.g. "10") — the fraction the API wants is derived below.
+  const [discount, setDiscount] = useState(
+    order ? String(order.discountType === "PERCENT" ? order.discount * 100 : order.discount) : "",
+  );
+  // Held as a percentage (e.g. "19") — the fraction the API wants is derived below.
+  const [taxPercent, setTaxPercent] = useState(order ? String(order.taxRate * 100) : "");
   const [notes, setNotes] = useState(order?.notes ?? "");
   const [lines, setLines] = useState<OrderLineDraft[]>(
     order
@@ -67,18 +73,32 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const extras = { shipping: Number(shipping) || 0, discount: Number(discount) || 0, tax: Number(tax) || 0 };
+  const taxRate = (Number(taxPercent) || 0) / 100;
+  // discount is typed as DZD in FIXED mode, or a whole percentage (e.g. "10") in
+  // PERCENT mode — converted to the fraction the API wants, exactly like taxRate above.
+  const discountInput = Number(discount) || 0;
+  const discountValue = discountType === "PERCENT" ? discountInput / 100 : discountInput;
+  const extras = { shipping: Number(shipping) || 0, discount: discountValue, discountType, taxRate };
   const activeLines = lines.filter((l) => l.itemId && l.quantity > 0);
 
   // Mirrors the server's arithmetic so the user sees the total while typing.
   // The saved figures always come back from the API.
   const subtotal = round(activeLines.reduce((sum, l) => sum + Math.max(0, l.quantity * l.unitPrice - l.discount), 0));
   const lineDiscounts = round(activeLines.reduce((sum, l) => sum + l.discount, 0));
+  const discountRate = discountType === "PERCENT" ? discountValue : 0;
+  const orderDiscount = discountType === "PERCENT" ? round(subtotal * discountRate) : discountValue;
+  const taxableBase = subtotal + extras.shipping - orderDiscount;
+  const tax = round(taxableBase * taxRate);
   const totals = {
     subtotal,
     lineDiscounts,
-    ...extras,
-    total: round(Math.max(0, subtotal + extras.shipping + extras.tax - extras.discount)),
+    shipping: extras.shipping,
+    discount: orderDiscount,
+    discountType,
+    discountRate,
+    taxRate,
+    tax,
+    total: round(Math.max(0, taxableBase + tax)),
   };
 
   function updateLine(index: number, patch: Partial<OrderLineDraft>) {
@@ -226,11 +246,36 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
           <Field label="Livraison (DZD)">
             <input className="input" type="number" min={0} step="any" value={shipping} onChange={(e) => setShipping(e.target.value)} />
           </Field>
-          <Field label="Remise globale (DZD)">
-            <input className="input" type="number" min={0} step="any" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+          <Field
+            label="Remise globale"
+            hint={discountType === "PERCENT" ? "Le taux seulement — le montant en DZD est calculé automatiquement" : undefined}
+          >
+            <div className="field-inline-group">
+              <input
+                className="input"
+                type="number"
+                min={0}
+                step="any"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder={discountType === "PERCENT" ? "Ex. 10" : ""}
+              />
+              <select className="input" value={discountType} onChange={(e) => setDiscountType(e.target.value as DiscountType)}>
+                <option value="FIXED">DZD</option>
+                <option value="PERCENT">%</option>
+              </select>
+            </div>
           </Field>
-          <Field label="Taxe (DZD)">
-            <input className="input" type="number" min={0} step="any" value={tax} onChange={(e) => setTax(e.target.value)} />
+          <Field label="Taxe (%)" hint="Le taux seulement — le montant en DZD est calculé automatiquement">
+            <input
+              className="input"
+              type="number"
+              min={0}
+              step="any"
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(e.target.value)}
+              placeholder="Ex. 19"
+            />
           </Field>
         </div>
 

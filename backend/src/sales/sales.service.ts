@@ -1,9 +1,20 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { getItemQuantity } from '../stock/stock-math.js';
-import { canCancel, canEdit, canShip, lineTotal, orderTotals, round, summarizeCustomer } from './sales-math.js';
+import {
+  canCancel,
+  canEdit,
+  canReturn,
+  canShip,
+  lineTotal,
+  orderTotals,
+  returnableForLine,
+  returnedForLine,
+  round,
+  summarizeCustomer,
+} from './sales-math.js';
 import type { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto.js';
-import type { CreateOrderDto, UpdateOrderDto, SetOrderStatusDto, ShipOrderDto } from './dto/order.dto.js';
+import type { CreateOrderDto, UpdateOrderDto, ReturnOrderDto, SetOrderStatusDto, ShipOrderDto } from './dto/order.dto.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 
@@ -18,7 +29,8 @@ export interface OrderFilters {
 
 const ORDER_INCLUDE = {
   customer: true,
-  lines: { include: { item: { include: { inventoryType: true } } } },
+  lines: { include: { item: { include: { inventoryType: true } }, returnLines: true } },
+  returns: { include: { lines: true }, orderBy: { date: 'desc' as const } },
 };
 
 @Injectable()
@@ -121,9 +133,17 @@ export class SalesService {
     T extends {
       shipping: number;
       discount: number;
-      tax: number;
+      taxRate: number;
       shipmentStatus: string;
-      lines: Array<{ itemId: string; quantity: number; unitPrice: number; discount: number; item: { name: string; unit: string } }>;
+      lines: Array<{
+        id: string;
+        itemId: string;
+        quantity: number;
+        unitPrice: number;
+        discount: number;
+        item: { name: string; unit: string };
+        returnLines: Array<{ orderLineId: string; quantity: number }>;
+      }>;
     },
   >(orders: T[]) {
     const pending = orders.filter((o) => o.shipmentStatus === 'PENDING');
@@ -161,6 +181,7 @@ export class SalesService {
     if (!customer) throw new BadRequestException(`Client introuvable : ${dto.customerId}`);
     if (customer.archived) throw new BadRequestException(`Le client "${customer.fullName}" est archivé.`);
     await this.assertSellableItems(dto.lines.map((l) => l.itemId));
+    assertDiscount(dto.discountType, dto.discount);
 
     const code = dto.code ?? (await this.nextCode('CMD', 'order', new Date(dto.date)));
 
@@ -174,7 +195,8 @@ export class SalesService {
           paymentStatus: dto.paymentStatus ?? 'PENDING',
           shipping: dto.shipping ?? 0,
           discount: dto.discount ?? 0,
-          tax: dto.tax ?? 0,
+          discountType: dto.discountType ?? 'FIXED',
+          taxRate: dto.taxRate ?? 0,
           notes: dto.notes ?? null,
           shipToName: dto.shipToName ?? customer.fullName,
           shipToPhone: dto.shipToPhone ?? customer.phone,
@@ -210,6 +232,7 @@ export class SalesService {
       );
     }
     if (dto.lines) await this.assertSellableItems(dto.lines.map((l) => l.itemId));
+    assertDiscount(dto.discountType ?? order.discountType, dto.discount ?? order.discount);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.order.update({
@@ -219,7 +242,8 @@ export class SalesService {
           ...(dto.date ? { date: new Date(dto.date) } : {}),
           ...(dto.shipping !== undefined ? { shipping: dto.shipping } : {}),
           ...(dto.discount !== undefined ? { discount: dto.discount } : {}),
-          ...(dto.tax !== undefined ? { tax: dto.tax } : {}),
+          ...(dto.discountType !== undefined ? { discountType: dto.discountType } : {}),
+          ...(dto.taxRate !== undefined ? { taxRate: dto.taxRate } : {}),
           ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
           ...(dto.paymentStatus ? { paymentStatus: dto.paymentStatus } : {}),
           ...pickShipTo(dto),
@@ -303,6 +327,80 @@ export class SalesService {
   }
 
   /**
+   * Post a return: THIS is what restores stock, mirroring how ship() is what
+   * removes it. Deliberately independent of paymentStatus — see
+   * OrderReturn's doc comment in schema.prisma for why the two are not the
+   * same event. One IN movement per returned line, in a single transaction
+   * with the OrderReturn record itself.
+   */
+  async returnOrder(id: string, dto: ReturnOrderDto) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { lines: { include: { item: true, returnLines: true } } },
+    });
+    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!canReturn(order)) {
+      throw new ConflictException('Seule une commande expédiée peut faire l’objet d’un retour.');
+    }
+    if (dto.lines.length === 0) throw new BadRequestException('Indiquez au moins une ligne retournée.');
+
+    // Validate every line before opening the transaction, so a bad line fails
+    // with a message naming the product instead of rolling back silently.
+    const plans = dto.lines.map((line) => {
+      const orderLine = order.lines.find((l) => l.id === line.orderLineId);
+      if (!orderLine) throw new BadRequestException(`Ligne de commande introuvable : ${line.orderLineId}`);
+
+      const stillReturnable = returnableForLine(orderLine, orderLine.returnLines);
+      if (line.quantity > stillReturnable) {
+        throw new BadRequestException(
+          `Il ne reste que ${stillReturnable} ${orderLine.item.unit} retournable(s) pour "${orderLine.item.name}".`,
+        );
+      }
+      return { line, orderLine };
+    });
+
+    const date = new Date(dto.date);
+    const code = await this.nextCode('RET', 'orderReturn', date);
+
+    await this.prisma.$transaction(async (tx) => {
+      const orderReturn = await tx.orderReturn.create({
+        data: {
+          code,
+          orderId: id,
+          date,
+          reason: dto.reason ?? null,
+          notes: dto.notes ?? null,
+        },
+      });
+
+      for (const { line, orderLine } of plans) {
+        const movement = await tx.movement.create({
+          data: {
+            itemId: orderLine.itemId,
+            direction: 'IN',
+            quantity: line.quantity,
+            date,
+            reason: dto.reason ?? 'Retour client',
+            sourceType: 'SALE_RETURN',
+            sourceRef: order.code,
+          },
+        });
+
+        await tx.orderReturnLine.create({
+          data: {
+            returnId: orderReturn.id,
+            orderLineId: orderLine.id,
+            quantity: line.quantity,
+            movementId: movement.id,
+          },
+        });
+      }
+    });
+
+    return this.getOrder(id);
+  }
+
+  /**
    * Sets payment status, or cancels. Shipment status is NOT settable here —
    * shipping goes through ship() because it has to move stock.
    */
@@ -358,7 +456,9 @@ export class SalesService {
       pendingShipment: orders.filter((o) => o.shipmentStatus === 'PENDING').length,
       shipped: orders.filter((o) => o.shipmentStatus === 'SHIPPED').length,
       cancelled: orders.filter((o) => o.shipmentStatus === 'CANCELLED').length,
-      revenue: round(live.reduce((sum, o) => sum + totalOf(o), 0)),
+      // Chiffre d'affaires is money actually collected — an unpaid order is a
+      // commitment, not revenue yet, however far along its shipment is.
+      revenue: round(live.filter((o) => o.paymentStatus === 'PAID').reduce((sum, o) => sum + totalOf(o), 0)),
       outstanding: round(live.filter((o) => o.paymentStatus === 'PENDING').reduce((sum, o) => sum + totalOf(o), 0)),
     };
   }
@@ -382,9 +482,9 @@ export class SalesService {
     if (archived.length > 0) throw new BadRequestException(`Produit archivé : ${archived.map((i) => i.name).join(', ')}`);
   }
 
-  private async nextCode(prefix: string, model: 'order' | 'customer', date: Date) {
+  private async nextCode(prefix: string, model: 'order' | 'customer' | 'orderReturn', date: Date) {
     const year = date.getFullYear();
-    const table = model === 'order' ? this.prisma.order : this.prisma.customer;
+    const table = model === 'order' ? this.prisma.order : model === 'customer' ? this.prisma.customer : this.prisma.orderReturn;
     const last = await (table as { findFirst: (args: unknown) => Promise<{ code: string } | null> }).findFirst({
       where: { code: { startsWith: `${prefix}-${year}-` } },
       orderBy: { code: 'desc' },
@@ -404,19 +504,45 @@ function decorateOrder<
   T extends {
     shipping: number;
     discount: number;
-    tax: number;
+    taxRate: number;
     shipmentStatus: string;
-    lines: Array<{ quantity: number; unitPrice: number; discount: number }>;
+    lines: Array<{
+      id: string;
+      quantity: number;
+      unitPrice: number;
+      discount: number;
+      returnLines: Array<{ orderLineId: string; quantity: number }>;
+    }>;
   },
 >(order: T) {
+  const orderCanReturn = canReturn(order);
   return {
     ...order,
-    lines: order.lines.map((line) => ({ ...line, lineTotal: lineTotal(line) })),
+    lines: order.lines.map((line) => ({
+      ...line,
+      lineTotal: lineTotal(line),
+      returned: returnedForLine(line.id, line.returnLines),
+      returnable: orderCanReturn ? returnableForLine(line, line.returnLines) : 0,
+    })),
     totals: orderTotals(order.lines, order),
     canEdit: canEdit(order),
     canShip: canShip(order),
     canCancel: canCancel(order),
+    canReturn: orderCanReturn,
   };
+}
+
+/**
+ * A PERCENT discount is typed as a fraction, same rule as taxRate — DTO
+ * decorators can't compare it against the sibling discountType field, so
+ * that half of the check happens here.
+ */
+function assertDiscount(discountType: string | undefined, discount: number | undefined): void {
+  if (discountType === 'PERCENT' && (discount ?? 0) > 1) {
+    throw new BadRequestException(
+      'La remise en pourcentage se saisit en fraction (0,10 pour 10 %), pas en pourcentage brut.',
+    );
+  }
 }
 
 function buildOrderWhere(filters: OrderFilters) {

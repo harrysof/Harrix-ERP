@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { canCancel, canEdit, canShip, lineTotal, orderTotals, summarizeCustomer, type OrderLineLike } from './sales-math.js';
+import {
+  canCancel,
+  canEdit,
+  canReturn,
+  canShip,
+  lineTotal,
+  orderTotals,
+  returnableForLine,
+  returnedForLine,
+  summarizeCustomer,
+  type OrderLineLike,
+} from './sales-math.js';
 
 const line = (quantity: number, unitPrice: number, discount = 0): OrderLineLike => ({ quantity, unitPrice, discount });
 
@@ -15,9 +26,17 @@ describe('lineTotal', () => {
 
 describe('orderTotals', () => {
   it('computes the whole invoice from the lines — §16', () => {
-    const totals = orderTotals([line(2, 1500), line(1, 800)], { shipping: 500, discount: 300, tax: 200 });
+    const totals = orderTotals([line(2, 1500), line(1, 800)], { shipping: 500, discount: 300, taxRate: 0.19 });
     expect(totals.subtotal).toBe(3800);
-    expect(totals.total).toBe(3800 + 500 + 200 - 300);
+    const taxableBase = 3800 + 500 - 300;
+    expect(totals.tax).toBe(Math.round(taxableBase * 0.19 * 100) / 100);
+    expect(totals.total).toBe(taxableBase + totals.tax);
+  });
+
+  it('computes tax from a rate, not a typed amount', () => {
+    const totals = orderTotals([line(1, 1000)], { taxRate: 0.19 });
+    expect(totals.tax).toBe(190);
+    expect(totals.total).toBe(1190);
   });
 
   it('counts line discounts in the subtotal and reports them separately', () => {
@@ -42,6 +61,22 @@ describe('orderTotals', () => {
   it('treats a missing line discount as zero', () => {
     expect(orderTotals([{ quantity: 2, unitPrice: 50 }], {}).total).toBe(100);
   });
+
+  it('defaults to FIXED and treats discount as a DZD amount', () => {
+    const totals = orderTotals([line(1, 1000)], { discount: 100 });
+    expect(totals.discountType).toBe('FIXED');
+    expect(totals.discount).toBe(100);
+    expect(totals.discountRate).toBe(0);
+    expect(totals.total).toBe(900);
+  });
+
+  it('computes a PERCENT discount from the subtotal, before shipping', () => {
+    const totals = orderTotals([line(1, 1000)], { shipping: 200, discount: 0.1, discountType: 'PERCENT' });
+    expect(totals.discountType).toBe('PERCENT');
+    expect(totals.discountRate).toBe(0.1);
+    expect(totals.discount).toBe(100);
+    expect(totals.total).toBe(1100);
+  });
 });
 
 describe('status rules', () => {
@@ -61,6 +96,33 @@ describe('status rules', () => {
     expect(canCancel({ shipmentStatus: 'SHIPPED' })).toBe(false);
     expect(canCancel({ shipmentStatus: 'CANCELLED' })).toBe(false);
   });
+
+  it('only lets a shipped order accept a return — there is nothing outside to give back otherwise', () => {
+    expect(canReturn({ shipmentStatus: 'PENDING' })).toBe(false);
+    expect(canReturn({ shipmentStatus: 'SHIPPED' })).toBe(true);
+    expect(canReturn({ shipmentStatus: 'CANCELLED' })).toBe(false);
+  });
+});
+
+describe('returns', () => {
+  it('sums only the lines matching this order line', () => {
+    const returns = [
+      { orderLineId: 'a', quantity: 2 },
+      { orderLineId: 'b', quantity: 5 },
+      { orderLineId: 'a', quantity: 1 },
+    ];
+    expect(returnedForLine('a', returns)).toBe(3);
+    expect(returnedForLine('c', returns)).toBe(0);
+  });
+
+  it('caps what is still returnable at the shipped quantity, never negative', () => {
+    const line = { id: 'a', quantity: 10 };
+    expect(returnableForLine(line, [])).toBe(10);
+    expect(returnableForLine(line, [{ orderLineId: 'a', quantity: 4 }])).toBe(6);
+    expect(returnableForLine(line, [{ orderLineId: 'a', quantity: 10 }])).toBe(0);
+    // An over-return (e.g. two returns racing past each other) still clamps at zero.
+    expect(returnableForLine(line, [{ orderLineId: 'a', quantity: 15 }])).toBe(0);
+  });
 });
 
 describe('summarizeCustomer', () => {
@@ -70,7 +132,8 @@ describe('summarizeCustomer', () => {
     lines: [line(1, total)],
     shipping: 0,
     discount: 0,
-    tax: 0,
+    discountType: 'FIXED',
+    taxRate: 0,
   });
 
   it('totals purchases and separates what is still owed — §19', () => {

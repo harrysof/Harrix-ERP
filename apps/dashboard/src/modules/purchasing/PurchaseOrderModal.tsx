@@ -8,7 +8,7 @@ import { formatCurrency } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import type { ApiItem } from "../../lib/stockApi";
 import type { Supplier } from "../../lib/suppliersApi";
-import { createPurchaseOrder, updatePurchaseOrder, type ApiPurchaseOrder } from "../../lib/purchasingApi";
+import { createPurchaseOrder, updatePurchaseOrder, type ApiPurchaseOrder, type DiscountType } from "../../lib/purchasingApi";
 import { draftTotals, emptyPoLine, toLineInput, type PoLineDraft } from "./types";
 
 interface PurchaseOrderModalProps {
@@ -27,7 +27,11 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
   const [date, setDate] = useState(order ? order.date.slice(0, 10) : todayIso());
   const [expectedDate, setExpectedDate] = useState(order?.expectedDate?.slice(0, 10) ?? "");
   const [shipping, setShipping] = useState(String(order?.shipping ?? ""));
-  const [discount, setDiscount] = useState(String(order?.discount ?? ""));
+  const [discountType, setDiscountType] = useState<DiscountType>(order?.discountType ?? "FIXED");
+  // In FIXED mode this is a DZD amount; in PERCENT mode it's a percentage (e.g. "10") — the fraction the API wants is derived below.
+  const [discount, setDiscount] = useState(
+    order ? String(order.discountType === "PERCENT" ? order.discount * 100 : order.discount) : "",
+  );
   // Held as a percentage (e.g. "19") — the fraction the API wants is derived below.
   const [taxPercent, setTaxPercent] = useState(order ? String(order.taxRate * 100) : "");
   const [notes, setNotes] = useState(order?.notes ?? "");
@@ -41,7 +45,11 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
   const [saving, setSaving] = useState(false);
 
   const taxRate = (Number(taxPercent) || 0) / 100;
-  const extras = { shipping: Number(shipping) || 0, discount: Number(discount) || 0, taxRate };
+  // discount is typed as DZD in FIXED mode, or a whole percentage (e.g. "10") in
+  // PERCENT mode — converted to the fraction the API wants, exactly like taxRate above.
+  const discountInput = Number(discount) || 0;
+  const discountValue = discountType === "PERCENT" ? discountInput / 100 : discountInput;
+  const extras = { shipping: Number(shipping) || 0, discount: discountValue, discountType, taxRate };
   const activeLines = lines.filter((l) => l.itemId && l.quantity > 0);
   const totals = draftTotals(activeLines, extras);
 
@@ -168,8 +176,25 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
           <Field label="Transport (DZD)">
             <input className="input" type="number" min={0} step="any" value={shipping} onChange={(e) => setShipping(e.target.value)} />
           </Field>
-          <Field label="Remise (DZD)">
-            <input className="input" type="number" min={0} step="any" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+          <Field
+            label="Remise"
+            hint={discountType === "PERCENT" ? "Le taux seulement — le montant en DZD est calculé automatiquement" : undefined}
+          >
+            <div className="field-inline-group">
+              <input
+                className="input"
+                type="number"
+                min={0}
+                step="any"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder={discountType === "PERCENT" ? "Ex. 10" : ""}
+              />
+              <select className="input" value={discountType} onChange={(e) => setDiscountType(e.target.value as DiscountType)}>
+                <option value="FIXED">DZD</option>
+                <option value="PERCENT">%</option>
+              </select>
+            </div>
           </Field>
           <Field label="Taxe (%)" hint="Le taux seulement — le montant en DZD est calculé automatiquement">
             <input
@@ -207,6 +232,8 @@ export function TotalsPanel({
     subtotal: number;
     shipping: number;
     discount: number;
+    discountType?: DiscountType;
+    discountRate?: number;
     taxRate?: number;
     tax: number;
     total: number;
@@ -217,12 +244,16 @@ export function TotalsPanel({
     totals.taxRate != null && totals.taxRate > 0
       ? `Taxe (${(totals.taxRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)`
       : "Taxe";
+  const discountLabel =
+    totals.discountType === "PERCENT" && totals.discountRate
+      ? `Remise (${(totals.discountRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)`
+      : "Remise";
   return (
     <div className="totals-panel">
       <TotalRow label="Sous-total" value={totals.subtotal} />
       {totals.lineDiscounts ? <TotalRow label="dont remises par ligne" value={-totals.lineDiscounts} muted /> : null}
       <TotalRow label="Transport" value={totals.shipping} />
-      <TotalRow label="Remise" value={-totals.discount} />
+      <TotalRow label={discountLabel} value={-totals.discount} />
       <TotalRow label={taxLabel} value={totals.tax} />
       <TotalRow label="Total" value={totals.total} strong />
     </div>

@@ -50,10 +50,16 @@ export interface ApiReceipt {
   lines: Array<{ id: string; purchaseOrderLineId: string; quantity: number; movementId: string | null; batchId: string | null }>;
 }
 
+export type DiscountType = "FIXED" | "PERCENT";
+
 export interface PoTotals {
   subtotal: number;
   shipping: number;
+  /** Always computed, in DZD. */
   discount: number;
+  discountType: DiscountType;
+  /** The fraction typed when discountType is PERCENT, e.g. 0.10 for 10 %. Zero for FIXED. */
+  discountRate: number;
   /** The rate that produced `tax`, e.g. 0.19 for 19 %. */
   taxRate: number;
   /** Always computed by the backend from `taxRate` — never typed directly. */
@@ -70,7 +76,9 @@ export interface ApiPurchaseOrder {
   expectedDate: string | null;
   status: PoStatus;
   shipping: number;
+  /** A DZD amount when discountType is FIXED, or a fraction (0.10 for 10 %) when it's PERCENT — the DZD amount always lives on `totals.discount`. */
   discount: number;
+  discountType: DiscountType;
   taxRate: number;
   notes: string | null;
   createdAt: string;
@@ -141,6 +149,7 @@ export function createPurchaseOrder(input: {
   status?: string;
   shipping?: number;
   discount?: number;
+  discountType?: DiscountType;
   taxRate?: number;
   notes?: string;
   lines: PoLineInput[];
@@ -150,7 +159,17 @@ export function createPurchaseOrder(input: {
 
 export function updatePurchaseOrder(
   id: string,
-  input: { supplierId?: string; date?: string; expectedDate?: string; shipping?: number; discount?: number; taxRate?: number; notes?: string; lines?: PoLineInput[] },
+  input: {
+    supplierId?: string;
+    date?: string;
+    expectedDate?: string;
+    shipping?: number;
+    discount?: number;
+    discountType?: DiscountType;
+    taxRate?: number;
+    notes?: string;
+    lines?: PoLineInput[];
+  },
 ): Promise<ApiPurchaseOrder> {
   return api.patch<ApiPurchaseOrder>(`/purchasing/orders/${id}`, input);
 }

@@ -434,6 +434,13 @@ model PurchaseOrder {
   status       String    @default("DRAFT")
   /// Order-level money, in DZD. Line amounts live on the lines.
   shipping     Float     @default(0)
+  /// FIXED or PERCENT — see discount's own comment.
+  discountType String    @default("FIXED")
+  /// What the buyer typed: a DZD amount when discountType is FIXED, or a
+  /// fraction (0.10 for 10 %) when it's PERCENT — same "type the rate, never
+  /// the amount" reasoning as taxRate below. The DZD figure this produces is
+  /// always computed (see purchasing/purchasing-math.ts's poTotals), never
+  /// stored, so it can't drift when a line or the shipping changes.
   discount     Float     @default(0)
   /// The tax rate as a fraction (0.19 for 19 %) — what the buyer actually
   /// types. The DZD amount is always computed from it (see
@@ -543,8 +550,19 @@ model Order {
   /// PENDING | PAID | CANCELLED
   paymentStatus  String   @default("PENDING")
   shipping       Float    @default(0)
+  /// FIXED or PERCENT — see discount's own comment.
+  discountType   String   @default("FIXED")
+  /// What the seller typed: a DZD amount when discountType is FIXED, or a
+  /// fraction (0.10 for 10 %) when it's PERCENT — same "type the rate, never
+  /// the amount" reasoning as taxRate below. The DZD figure this produces is
+  /// always computed (see sales/sales-math.ts's orderTotals), never stored,
+  /// so it can't drift when a line or the shipping changes.
   discount       Float    @default(0)
-  tax            Float    @default(0)
+  /// The tax rate as a fraction (0.19 for 19 %) — what the seller actually
+  /// types, same reasoning as PurchaseOrder.taxRate. The DZD amount is always
+  /// computed from it (see sales/sales-math.ts's orderTotals), never stored,
+  /// so it can't drift when a line, the shipping or the discount changes.
+  taxRate        Float    @default(0)
   notes          String?
 
   /// The delivery address, SNAPSHOT from the customer when the order is
@@ -565,7 +583,8 @@ model Order {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  lines OrderLine[]
+  lines   OrderLine[]
+  returns OrderReturn[]
 
   @@index([customerId])
   @@index([shipmentStatus])
@@ -586,8 +605,53 @@ model OrderLine {
   /// The OUT movement created when the order shipped. Plain id — see ReceiptLine.
   movementId String?
 
+  returnLines OrderReturnLine[]
+
   @@index([orderId])
   @@index([itemId])
+}
+
+/// A return posted against a shipped order — the mirror of Receipt on the
+/// purchasing side, and what actually restores finished-goods stock (see
+/// sales.service.ts's returnOrder()).
+///
+/// Recorded separately from Order.paymentStatus on purpose: a cancelled
+/// payment does not always mean the goods came back (the customer may simply
+/// not have paid and kept them — that is bad debt, not a return), and goods
+/// coming back does not always mean the payment is in dispute (a refund can
+/// be issued cleanly). Conflating the two used to mean a "cancelled" order
+/// stayed permanently short in the finished-goods count with no way back.
+model OrderReturn {
+  id      String   @id @default(cuid())
+  /// "RET-2026-0007", unique, generated per calendar year.
+  code    String   @unique
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId String
+  date    DateTime
+  /// Why the goods came back, e.g. "ne convient pas au client".
+  reason    String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  lines OrderReturnLine[]
+
+  @@index([orderId])
+}
+
+model OrderReturnLine {
+  id          String      @id @default(cuid())
+  return      OrderReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  returnId    String
+  orderLine   OrderLine   @relation(fields: [orderLineId], references: [id])
+  orderLineId String
+  quantity    Float
+  /// The IN movement this line created, restoring finished-goods stock.
+  /// Plain id, not a relation — Movement is an append-only ledger and
+  /// nothing may cascade into it.
+  movementId String?
+
+  @@index([returnId])
+  @@index([orderLineId])
 }
 
 // ===========================================================================

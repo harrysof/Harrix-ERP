@@ -63,13 +63,45 @@ export interface ApiOrderLine {
   movementId: string | null;
   item: ApiItem;
   lineTotal: number;
+  /** How much of this line has already come back, across every return. */
+  returned: number;
+  /** Still returnable on this line. Zero for anything not yet shipped. */
+  returnable: number;
 }
+
+export interface ApiOrderReturnLine {
+  id: string;
+  orderLineId: string;
+  quantity: number;
+  movementId: string | null;
+}
+
+/** A return posted against a shipped order — restores finished-goods stock. */
+export interface ApiOrderReturn {
+  id: string;
+  code: string;
+  orderId: string;
+  date: string;
+  reason: string | null;
+  notes: string | null;
+  createdAt: string;
+  lines: ApiOrderReturnLine[];
+}
+
+export type DiscountType = "FIXED" | "PERCENT";
 
 export interface OrderTotals {
   subtotal: number;
   lineDiscounts: number;
   shipping: number;
+  /** Always computed, in DZD. */
   discount: number;
+  discountType: DiscountType;
+  /** The fraction typed when discountType is PERCENT, e.g. 0.10 for 10 %. Zero for FIXED. */
+  discountRate: number;
+  /** The rate typed, e.g. 0.19 for 19 %. */
+  taxRate: number;
+  /** Always computed, never typed — see `taxRate`. */
   tax: number;
   total: number;
 }
@@ -83,8 +115,11 @@ export interface ApiOrder {
   shipmentStatus: ShipmentStatus;
   paymentStatus: PaymentStatus;
   shipping: number;
+  /** A DZD amount when discountType is FIXED, or a fraction (0.10 for 10 %) when it's PERCENT — the DZD amount always lives on `totals.discount`. */
   discount: number;
-  tax: number;
+  discountType: DiscountType;
+  /** A fraction, e.g. 0.19 for 19 % — the DZD amount lives on `totals.tax`. */
+  taxRate: number;
   notes: string | null;
   shipToName: string | null;
   shipToPhone: string | null;
@@ -98,11 +133,14 @@ export interface ApiOrder {
   createdAt: string;
   updatedAt: string;
   lines: ApiOrderLine[];
+  returns: ApiOrderReturn[];
   totals: OrderTotals;
   /** What the backend will actually permit — the UI mirrors these, never guesses. */
   canEdit: boolean;
   canShip: boolean;
   canCancel: boolean;
+  /** Only a shipped order has stock outside to give back. */
+  canReturn: boolean;
   /**
    * Lines that could not be shipped right now. A warning, not a block —
    * the factory takes orders it intends to produce next week. Empty for
@@ -210,8 +248,11 @@ export function createOrder(input: {
   shipmentStatus?: string;
   paymentStatus?: string;
   shipping?: number;
+  /** A DZD amount when discountType is FIXED (the default), or a fraction (0.10 for 10 %) when it's PERCENT. */
   discount?: number;
-  tax?: number;
+  discountType?: DiscountType;
+  /** A fraction, e.g. 0.19 for 19 % — not a DZD amount. */
+  taxRate?: number;
   notes?: string;
   lines: OrderLineInput[];
   shipToName?: string;
@@ -237,6 +278,19 @@ export function setOrderStatus(id: string, input: { shipmentStatus?: string; pay
 /** The only sales action that moves stock. */
 export function shipOrder(id: string, input: { date?: string; markPaid?: boolean } = {}): Promise<ApiOrder> {
   return api.post<ApiOrder>(`/sales/orders/${id}/ship`, input);
+}
+
+export interface ReturnOrderLineInput {
+  orderLineId: string;
+  quantity: number;
+}
+
+/** Restores stock for a shipped order — the mirror of shipOrder. */
+export function returnOrder(
+  id: string,
+  input: { date: string; lines: ReturnOrderLineInput[]; reason?: string; notes?: string },
+): Promise<ApiOrder> {
+  return api.post<ApiOrder>(`/sales/orders/${id}/return`, input);
 }
 
 export function deleteOrder(id: string) {

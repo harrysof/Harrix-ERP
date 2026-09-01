@@ -1,39 +1,59 @@
+import {
+  LayoutDashboard,
+  Package,
+  Factory,
+  ShoppingCart,
+  Receipt,
+  Users,
+  Wallet,
+  UserCog,
+  History,
+  type LucideIcon,
+} from "lucide-react";
 import type { Permission } from "../../lib/authApi";
 import { useAuth } from "../../state/AuthContext";
 
-export type TabId = "dashboard" | "stock" | "production" | "purchasing" | "orders" | "hr" | "suppliers" | "users" | "audit";
+export type TabId = "dashboard" | "stock" | "production" | "purchasing" | "orders" | "hr" | "finance" | "users" | "audit";
 
 interface NavItem {
   id: TabId;
   label: string;
+  icon: LucideIcon;
   /**
-   * The permission that reveals this tab. Undefined means any logged-in user
-   * can see it. Hiding a tab is a convenience — the backend refuses the
+   * The permission(s) that reveal this tab. Undefined means any logged-in
+   * user can see it; an array means any one of them is enough (used by tabs
+   * that fold together more than one permission domain, e.g. Achats &
+   * fournisseurs). Hiding a tab is a convenience — the backend refuses the
    * request regardless (build plan Phase 2).
    */
-  permission?: Permission;
+  permission?: Permission | Permission[];
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Tableau de bord" },
-  { id: "stock", label: "Stock", permission: "stock:read" },
-  { id: "production", label: "Production", permission: "production:read" },
-  { id: "purchasing", label: "Achats", permission: "purchasing:read" },
-  { id: "orders", label: "Ventes & clients", permission: "orders:read" },
-  { id: "hr", label: "Ressources humaines", permission: "hr:read" },
-  { id: "suppliers", label: "Fournisseurs", permission: "suppliers:read" },
-  { id: "users", label: "Utilisateurs", permission: "users:manage" },
-  { id: "audit", label: "Journal d'activité", permission: "audit:read" },
+  { id: "dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+  { id: "stock", label: "Stock", icon: Package, permission: "stock:read" },
+  { id: "production", label: "Production", icon: Factory, permission: "production:read" },
+  { id: "purchasing", label: "Achats & fournisseurs", icon: ShoppingCart, permission: ["purchasing:read", "suppliers:read"] },
+  { id: "orders", label: "Ventes & clients", icon: Receipt, permission: "orders:read" },
+  { id: "hr", label: "Ressources humaines", icon: Users, permission: "hr:read" },
+  { id: "finance", label: "Finance", icon: Wallet, permission: "finance:read" },
+  { id: "users", label: "Utilisateurs", icon: UserCog, permission: "users:manage" },
+  { id: "audit", label: "Journal d'activité", icon: History, permission: "audit:read" },
 ];
 
+function allowed(item: NavItem, canAny: (...permissions: Permission[]) => boolean): boolean {
+  if (!item.permission) return true;
+  return Array.isArray(item.permission) ? canAny(...item.permission) : canAny(item.permission);
+}
+
 /** The tabs this user is allowed to see, in order. */
-export function visibleTabs(can: (permission: Permission) => boolean): TabId[] {
-  return NAV_ITEMS.filter((item) => !item.permission || can(item.permission)).map((item) => item.id);
+export function visibleTabs(canAny: (...permissions: Permission[]) => boolean): TabId[] {
+  return NAV_ITEMS.filter((item) => allowed(item, canAny)).map((item) => item.id);
 }
 
 export function Sidebar({ active, onNavigate }: { active: TabId; onNavigate: (tab: TabId) => void }) {
-  const { can } = useAuth();
-  const items = NAV_ITEMS.filter((item) => !item.permission || can(item.permission));
+  const { canAny } = useAuth();
+  const items = NAV_ITEMS.filter((item) => allowed(item, canAny));
 
   return (
     <aside className="sidebar">
@@ -50,6 +70,7 @@ export function Sidebar({ active, onNavigate }: { active: TabId; onNavigate: (ta
             className={`sidebar-link ${active === item.id ? "sidebar-link-active" : ""}`}
             onClick={() => onNavigate(item.id)}
           >
+            <item.icon className="sidebar-link-icon" size={17} strokeWidth={2} />
             <span>{item.label}</span>
           </button>
         ))}

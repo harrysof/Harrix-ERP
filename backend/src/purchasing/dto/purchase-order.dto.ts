@@ -14,7 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { PO_STATUSES } from '../purchasing-math.js';
+import { DISCOUNT_TYPES, PO_STATUSES } from '../purchasing-math.js';
 
 export class PurchaseOrderLineDto {
   @IsString()
@@ -108,10 +108,19 @@ export class CreatePurchaseOrderDto {
   @Min(0)
   shipping?: number;
 
+  /**
+   * A DZD amount when discountType is FIXED (the default), or a fraction
+   * (0.10 for 10 %) when it's PERCENT — validated against discountType in
+   * the service, since class-validator can't compare two fields inline here.
+   */
   @IsOptional()
   @IsNumber()
   @Min(0)
   discount?: number;
+
+  @IsOptional()
+  @IsIn(DISCOUNT_TYPES)
+  discountType?: string;
 
   /**
    * A fraction, not a DZD amount — 0.19 for 19 %. The system computes the
@@ -156,10 +165,19 @@ export class UpdatePurchaseOrderDto {
   @Min(0)
   shipping?: number;
 
+  /**
+   * A DZD amount when discountType is FIXED (the default), or a fraction
+   * (0.10 for 10 %) when it's PERCENT — validated against discountType in
+   * the service, since class-validator can't compare two fields inline here.
+   */
   @IsOptional()
   @IsNumber()
   @Min(0)
   discount?: number;
+
+  @IsOptional()
+  @IsIn(DISCOUNT_TYPES)
+  discountType?: string;
 
   /**
    * A fraction, not a DZD amount — 0.19 for 19 %. The system computes the

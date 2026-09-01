@@ -147,6 +147,7 @@ export class PurchasingService {
     if (!supplier) throw new BadRequestException(`Fournisseur introuvable : ${dto.supplierId}`);
     if (supplier.archived) throw new BadRequestException(`Le fournisseur "${supplier.name}" est archivé.`);
     await this.assertItemsExist(dto.lines.map((l) => l.itemId));
+    assertDiscount(dto.discountType, dto.discount);
 
     const code = dto.code ?? (await this.nextCode('BC', 'purchaseOrder', new Date(dto.date)));
 
@@ -160,6 +161,7 @@ export class PurchasingService {
           status: dto.status ?? 'DRAFT',
           shipping: dto.shipping ?? 0,
           discount: dto.discount ?? 0,
+          discountType: dto.discountType ?? 'FIXED',
           taxRate: dto.taxRate ?? 0,
           notes: dto.notes ?? null,
           lines: { create: dto.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost })) },
@@ -190,6 +192,7 @@ export class PurchasingService {
       }
       await this.assertItemsExist(dto.lines.map((l) => l.itemId));
     }
+    assertDiscount(dto.discountType ?? po.discountType, dto.discount ?? po.discount);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.purchaseOrder.update({
@@ -200,6 +203,7 @@ export class PurchasingService {
           ...(dto.expectedDate !== undefined ? { expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null } : {}),
           ...(dto.shipping !== undefined ? { shipping: dto.shipping } : {}),
           ...(dto.discount !== undefined ? { discount: dto.discount } : {}),
+          ...(dto.discountType !== undefined ? { discountType: dto.discountType } : {}),
           ...(dto.taxRate !== undefined ? { taxRate: dto.taxRate } : {}),
           ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
         },
@@ -399,6 +403,19 @@ export class PurchasingService {
     });
     const next = last ? Number(last.code.slice(-4)) + 1 : 1;
     return `${prefix}-${year}-${String(next).padStart(4, '0')}`;
+  }
+}
+
+/**
+ * A PERCENT discount is typed as a fraction, same rule as taxRate — DTO
+ * decorators can't compare it against the sibling discountType field, so
+ * that half of the check happens here.
+ */
+function assertDiscount(discountType: string | undefined, discount: number | undefined): void {
+  if (discountType === 'PERCENT' && (discount ?? 0) > 1) {
+    throw new BadRequestException(
+      'La remise en pourcentage se saisit en fraction (0,10 pour 10 %), pas en pourcentage brut.',
+    );
   }
 }
 

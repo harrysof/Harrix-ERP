@@ -12,7 +12,7 @@ import { ProductionPage } from "./modules/production/ProductionPage";
 import { PurchasingPage } from "./modules/purchasing/PurchasingPage";
 import { SalesPage } from "./modules/sales/SalesPage";
 import { HRPage } from "./modules/hr/HRPage";
-import { SuppliersPage } from "./modules/suppliers/SuppliersPage";
+import { FinancePage } from "./modules/finance/FinancePage";
 import { UsersPage } from "./modules/admin/UsersPage";
 import { AuditPage } from "./modules/admin/AuditPage";
 
@@ -20,10 +20,10 @@ const PAGE_COPY: Record<TabId, { title: string; subtitle: string }> = {
   dashboard: { title: "Tableau de bord", subtitle: "Vue d'ensemble de l'usine" },
   stock: { title: "Stock", subtitle: "Les 4 inventaires : produits chimiques, tige, pièces détachées, produits finis" },
   production: { title: "Production", subtitle: "Lots de production, traçabilité des matières, écarts et pertes" },
-  purchasing: { title: "Achats", subtitle: "Fournisseur → bon de commande → réception → stock" },
+  purchasing: { title: "Achats & fournisseurs", subtitle: "Fournisseur → bon de commande → réception → stock" },
   orders: { title: "Ventes & clients", subtitle: "Commandes, factures et base clients" },
   hr: { title: "Ressources humaines", subtitle: "Employés, heures travaillées et absences" },
-  suppliers: { title: "Fournisseurs", subtitle: "Fournisseurs de matières premières et de pièces détachées" },
+  finance: { title: "Finance", subtitle: "Calculateur de coût de revient et de marge, produit par produit" },
   users: { title: "Utilisateurs", subtitle: "Comptes, rôles et permissions" },
   audit: { title: "Journal d'activité", subtitle: "Qui a fait quoi, et quand" },
 };
@@ -57,8 +57,8 @@ function AuthenticatedApp() {
 }
 
 function MainApp() {
-  const { can } = useAuth();
-  const allowed = visibleTabs(can);
+  const { can, canAny } = useAuth();
+  const allowed = visibleTabs(canAny);
   const [tab, setTab] = useState<TabId>(allowed[0] ?? "dashboard");
   const [changingPassword, setChangingPassword] = useState(false);
 
@@ -85,7 +85,7 @@ function MainApp() {
       {tab === "purchasing" && <PurchasingPage />}
       {tab === "orders" && <SalesPage />}
       {tab === "hr" && <HRPage />}
-      {tab === "suppliers" && <SuppliersPage />}
+      {tab === "finance" && <FinancePage />}
       {tab === "users" && <UsersPage />}
       {tab === "audit" && <AuditPage />}
 
