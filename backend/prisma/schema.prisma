@@ -580,8 +580,15 @@ model Order {
   /// Set when the order ships — the OUT movements are created then, not at
   /// order time, because an unshipped order hasn't left the building.
   shippedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  /// Archived, not deleted — same rule as Customer.archived and
+  /// Employee.archived. A shipped order has a stock trail that must stay
+  /// attributable, so archiving (hide from the default list) is the escape
+  /// hatch removeOrder() can't be for it. Any order can be archived,
+  /// regardless of shipment/payment state — it only affects list visibility.
+  archived   Boolean   @default(false)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   lines   OrderLine[]
   returns OrderReturn[]
@@ -590,6 +597,7 @@ model Order {
   @@index([shipmentStatus])
   @@index([paymentStatus])
   @@index([date])
+  @@index([archived])
 }
 
 model OrderLine {
@@ -767,4 +775,85 @@ model OvertimeEntry {
   createdAt  DateTime @default(now())
 
   @@index([employeeId])
+}
+
+/// A general factory operating cost (rent, electricity, indirect wages,
+/// maintenance…) — free-form label like the margin calculator's cost lines,
+/// but persisted and dated so it accumulates into a monthly ledger instead of
+/// resetting every time the calculator is used.
+model FactoryCost {
+  id        String   @id @default(cuid())
+  label     String
+  amount    Float
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+/// One Zakat calculation, snapshotted at the moment it was made — a
+/// historical record, not a live figure, so a past year's Zakat never
+/// silently changes when this year's stock or receivables move (see the
+/// build's own rule: "a payslip must never recompute itself"). Only the raw
+/// inputs are stored; everything derived (totals, nisab comparison, zakat
+/// due, the Hijri due date) is computed on read from them — see
+/// zakat/zakat-math.ts, same "never store what can drift" rule as payroll
+/// and order totals.
+model ZakatCalculation {
+  id      String   @id @default(cuid())
+  /// The date this calculation is as-of — the hawl's anchor date.
+  calculationDate DateTime
+  /// "LUNAR" (default, the standard hawl) | "SOLAR" (alternative, Gregorian year).
+  methodology     String   @default("LUNAR")
+  /// DZD per gram, typed in by the gérant — nisab is 85 g of gold at this price.
+  goldPricePerGram Float
+
+  // Zakatable assets — cash/bank and "other" are typed in (this ERP has no
+  // treasury ledger); finished goods, raw materials and receivables are
+  // normally auto-filled from Stock and Ventes at calculation time, but
+  // stored as plain numbers either way so a past record never drifts.
+  cash               Float @default(0)
+  bank               Float @default(0)
+  finishedGoodsValue Float @default(0)
+  rawMaterialsValue  Float @default(0)
+  receivablesValue   Float @default(0)
+  otherAssets        Float @default(0)
+
+  /// Short-term liabilities eligible for deduction (e.g. amounts owed to
+  /// suppliers) — typed in; this ERP does not model accounts payable.
+  deductions Float @default(0)
+  /// A fraction, e.g. 0.025 for 2.5 % — typed, never hardcoded, in case a
+  /// different school/ruling applies a different rate.
+  zakatRate  Float @default(0.025)
+
+  amountPaid  Float     @default(0)
+  paymentDate DateTime?
+  notes       String?
+
+  /// The one calculation, if any, explicitly exported to the ZAKATI
+  /// dashboard — a deliberate action (see zakat.service.ts pinCalculation),
+  /// never automatic, so saving a calculation into the history never
+  /// silently changes what the automatic dashboard shows. At most one row
+  /// has this true at a time.
+  pinned Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([calculationDate])
+  @@index([pinned])
+}
+
+/// A fetched (or manually typed) gold price, DZD per gram — append-only, so
+/// "what did we use last time" is always answerable. The most recent row is
+/// "current"; zakat.service.ts refetches automatically once the newest row
+/// is more than a day old.
+model GoldPriceSnapshot {
+  id           String   @id @default(cuid())
+  pricePerGram Float
+  /// "goldrate24.com" | "manuel".
+  source       String
+  fetchedAt    DateTime @default(now())
+
+  @@index([fetchedAt])
 }

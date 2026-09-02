@@ -6,6 +6,7 @@ import {
   Receipt,
   Users,
   Wallet,
+  Moon,
   UserCog,
   History,
   type LucideIcon,
@@ -13,7 +14,7 @@ import {
 import type { Permission } from "../../lib/authApi";
 import { useAuth } from "../../state/AuthContext";
 
-export type TabId = "dashboard" | "stock" | "production" | "purchasing" | "orders" | "hr" | "finance" | "users" | "audit";
+export type TabId = "dashboard" | "stock" | "production" | "purchasing" | "orders" | "hr" | "finance" | "zakati" | "users" | "audit";
 
 interface NavItem {
   id: TabId;
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "orders", label: "Ventes & clients", icon: Receipt, permission: "orders:read" },
   { id: "hr", label: "Ressources humaines", icon: Users, permission: "hr:read" },
   { id: "finance", label: "Finance", icon: Wallet, permission: "finance:read" },
+  { id: "zakati", label: "ZAKATI", icon: Moon, permission: "finance:read" },
   { id: "users", label: "Utilisateurs", icon: UserCog, permission: "users:manage" },
   { id: "audit", label: "Journal d'activité", icon: History, permission: "audit:read" },
 ];

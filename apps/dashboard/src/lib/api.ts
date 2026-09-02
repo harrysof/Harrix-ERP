@@ -57,7 +57,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+
+  // A controller that returns `null` makes Nest send an empty body (Content-
+  // Length: 0), not the literal "null" — response.json() throws on that, so
+  // read as text first and treat "nothing there" as null rather than a parse error.
+  const text = await response.text();
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 export const api = {

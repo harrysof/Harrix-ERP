@@ -10,6 +10,7 @@ import { todayIso } from "../../lib/date";
 import {
   deleteOrder,
   returnOrder,
+  setOrderArchived,
   setOrderStatus,
   shipOrder,
   PAYMENT_LABELS,
@@ -98,6 +99,11 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
           <Button onClick={onClose}>Fermer</Button>
           <Button onClick={() => window.print()}>Imprimer</Button>
           {writable && order.canEdit ? <Button onClick={onEdit}>Modifier</Button> : null}
+          {writable ? (
+            <Button variant="ghost" disabled={busy} onClick={() => run(() => setOrderArchived(order.id, !order.archived))}>
+              {order.archived ? "Désarchiver" : "Archiver"}
+            </Button>
+          ) : null}
           {writable && order.canCancel ? (
             <Button
               variant="danger"
@@ -137,6 +143,7 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
           <div className="invoice-status">
             <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>Expédition : {SHIPMENT_LABELS[order.shipmentStatus]}</Pill>
             <Pill tone={PAYMENT_TONES[order.paymentStatus]}>Paiement : {PAYMENT_LABELS[order.paymentStatus]}</Pill>
+            {order.archived ? <Pill tone="neutral">Archivée</Pill> : null}
           </div>
         </div>
 

@@ -38,6 +38,7 @@ export const PERMISSIONS = {
   AUDIT_READ: 'audit:read',
 
   FINANCE_READ: 'finance:read',
+  FINANCE_WRITE: 'finance:write',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -99,7 +100,10 @@ export const PERMISSION_GROUPS: Array<{ label: string; permissions: Array<{ key:
   },
   {
     label: 'Finance',
-    permissions: [{ key: PERMISSIONS.FINANCE_READ, label: 'Utiliser le calculateur de marge' }],
+    permissions: [
+      { key: PERMISSIONS.FINANCE_READ, label: 'Utiliser le calculateur de marge, les coûts d’usine et le module Zakat' },
+      { key: PERMISSIONS.FINANCE_WRITE, label: "Ajouter des coûts d'usine et enregistrer des calculs de Zakat" },
+    ],
   },
 ];
 

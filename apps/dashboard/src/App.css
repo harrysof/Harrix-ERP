@@ -2197,3 +2197,66 @@ button.topbar-user:hover {
   opacity: 0.85;
   color: var(--danger);
 }
+
+/* ---------- zakat ---------- */
+
+/* The hero figure — ZAKAT DUE, or "below nisab" — gets its own banded strip
+   rather than sitting in the stat-grid, since it is the one number the whole
+   screen exists to answer. */
+.zakat-due-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.zakat-due-banner-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zakat-due-banner-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.zakat-due-banner-warn {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.zakat-due-banner-ok {
+  background: var(--ok-soft);
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+/* A subtotal/total line inside the zakatable-assets breakdown table. */
+.zakat-total-row td {
+  background: var(--surface-sunk);
+  border-top: 1px solid var(--border-strong);
+}
+
+/* The page-level help toggle — sits alone at the top so the disclaimer it
+   reveals doesn't have to sit permanently in the page, cluttering it. */
+.zakat-help-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* The reasoning behind the due banner above it — legible body text, not a
+   footnote, since it's the answer to "why", not decoration. */
+.zakat-due-explain {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+}

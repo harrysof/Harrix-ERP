@@ -130,6 +130,8 @@ export interface ApiOrder {
   shipToCountry: string | null;
   shipToPostalCode: string | null;
   shippedAt: string | null;
+  archived: boolean;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
   lines: ApiOrderLine[];
@@ -170,6 +172,7 @@ export interface OrderFilters {
   from?: string;
   to?: string;
   search?: string;
+  includeArchived?: boolean;
 }
 
 export interface OrderLineInput {
@@ -291,6 +294,10 @@ export function returnOrder(
   input: { date: string; lines: ReturnOrderLineInput[]; reason?: string; notes?: string },
 ): Promise<ApiOrder> {
   return api.post<ApiOrder>(`/sales/orders/${id}/return`, input);
+}
+
+export function setOrderArchived(id: string, archived: boolean): Promise<ApiOrder> {
+  return api.patch<ApiOrder>(`/sales/orders/${id}/${archived ? "archive" : "unarchive"}`, {});
 }
 
 export function deleteOrder(id: string) {

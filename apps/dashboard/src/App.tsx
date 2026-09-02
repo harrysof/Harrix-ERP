@@ -13,6 +13,7 @@ import { PurchasingPage } from "./modules/purchasing/PurchasingPage";
 import { SalesPage } from "./modules/sales/SalesPage";
 import { HRPage } from "./modules/hr/HRPage";
 import { FinancePage } from "./modules/finance/FinancePage";
+import { ZakatPage } from "./modules/zakat/ZakatPage";
 import { UsersPage } from "./modules/admin/UsersPage";
 import { AuditPage } from "./modules/admin/AuditPage";
 
@@ -24,6 +25,7 @@ const PAGE_COPY: Record<TabId, { title: string; subtitle: string }> = {
   orders: { title: "Ventes & clients", subtitle: "Commandes, factures et base clients" },
   hr: { title: "Ressources humaines", subtitle: "Employés, heures travaillées et absences" },
   finance: { title: "Finance", subtitle: "Calculateur de coût de revient et de marge, produit par produit" },
+  zakati: { title: "ZAKATI", subtitle: "Calcul, suivi et historique de la Zakat de l'entreprise" },
   users: { title: "Utilisateurs", subtitle: "Comptes, rôles et permissions" },
   audit: { title: "Journal d'activité", subtitle: "Qui a fait quoi, et quand" },
 };
@@ -86,6 +88,7 @@ function MainApp() {
       {tab === "orders" && <SalesPage />}
       {tab === "hr" && <HRPage />}
       {tab === "finance" && <FinancePage />}
+      {tab === "zakati" && <ZakatPage />}
       {tab === "users" && <UsersPage />}
       {tab === "audit" && <AuditPage />}
 

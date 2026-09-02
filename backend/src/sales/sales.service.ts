@@ -25,6 +25,7 @@ export interface OrderFilters {
   from?: string;
   to?: string;
   search?: string;
+  includeArchived?: string;
 }
 
 const ORDER_INCLUDE = {
@@ -432,6 +433,19 @@ export class SalesService {
     return this.getOrder(id);
   }
 
+  /**
+   * Archived, not deleted — the escape hatch for a shipped order, which
+   * removeOrder() refuses since it has a stock trail. Any order can be
+   * archived regardless of shipment/payment state; it only hides it from the
+   * default list, the same rule as Customer.archived and Employee.archived.
+   */
+  async setOrderArchived(id: string, archived: boolean) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    await this.prisma.order.update({ where: { id }, data: { archived, archivedAt: archived ? new Date() : null } });
+    return this.getOrder(id);
+  }
+
   /** Only an unshipped order can be deleted; a shipped one has a stock trail. */
   async removeOrder(id: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
@@ -546,8 +560,9 @@ function assertDiscount(discountType: string | undefined, discount: number | und
 }
 
 function buildOrderWhere(filters: OrderFilters) {
-  const { customerId, shipmentStatus, paymentStatus, from, to, search } = filters;
+  const { customerId, shipmentStatus, paymentStatus, from, to, search, includeArchived } = filters;
   return {
+    ...(includeArchived === 'true' ? {} : { archived: false }),
     ...(customerId ? { customerId } : {}),
     ...(shipmentStatus ? { shipmentStatus } : {}),
     ...(paymentStatus ? { paymentStatus } : {}),

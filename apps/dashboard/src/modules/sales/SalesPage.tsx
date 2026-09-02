@@ -15,6 +15,7 @@ import {
   fetchOrders,
   fetchOrdersSummary,
   setCustomerArchived,
+  setOrderArchived,
   PAYMENT_LABELS,
   PAYMENT_STATUSES,
   PAYMENT_TONES,
@@ -52,13 +53,15 @@ export function SalesPage() {
   const [summary, setSummary] = useState<OrdersSummary | null>(null);
   const [filters, setFilters] = useState<OrderFilters>({});
   const [showArchived, setShowArchived] = useState(false);
+  const [showArchivedOrders, setShowArchivedOrders] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<Modal>({ kind: "none" });
 
   const load = useCallback(() => {
     setLoading(true);
-    return Promise.all([fetchOrders(filters), fetchCustomers(true), fetchOrdersSummary(filters), fetchItems()])
+    const orderFilters = { ...filters, includeArchived: showArchivedOrders };
+    return Promise.all([fetchOrders(orderFilters), fetchCustomers(true), fetchOrdersSummary(orderFilters), fetchItems()])
       .then(([nextOrders, nextCustomers, nextSummary, items]) => {
         setOrders(nextOrders);
         setCustomers(nextCustomers);
@@ -68,7 +71,7 @@ export function SalesPage() {
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les ventes."))
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, [filters, showArchivedOrders]);
 
   useEffect(() => {
     load();
@@ -84,6 +87,11 @@ export function SalesPage() {
 
   async function toggleCustomerArchive(customer: ApiCustomer) {
     await setCustomerArchived(customer.id, !customer.archived);
+    await load();
+  }
+
+  async function toggleOrderArchive(order: ApiOrder) {
+    await setOrderArchived(order.id, !order.archived);
     await load();
   }
 
@@ -172,6 +180,10 @@ export function SalesPage() {
             <Field label="Au">
               <input className="input" type="date" value={filters.to ?? ""} onChange={(e) => set({ to: e.target.value })} />
             </Field>
+            <label className="checkbox-row">
+              <input type="checkbox" checked={showArchivedOrders} onChange={(e) => setShowArchivedOrders(e.target.checked)} />
+              <span>Afficher les commandes archivées</span>
+            </label>
             {hasFilters ? (
               <Button variant="ghost" onClick={() => setFilters({})}>
                 Réinitialiser
@@ -207,7 +219,7 @@ export function SalesPage() {
                       <tr
                         key={order.id}
                         className={
-                          order.shipmentStatus === "CANCELLED"
+                          order.archived || order.shipmentStatus === "CANCELLED"
                             ? "row-muted"
                             : order.stockWarnings.length > 0
                               ? "row-attention"
@@ -258,6 +270,16 @@ export function SalesPage() {
                                 onClick={() => setModal({ kind: "editOrder", order })}
                               >
                                 <Pencil size={16} strokeWidth={2} />
+                              </button>
+                            ) : null}
+                            {writable ? (
+                              <button
+                                type="button"
+                                className="icon-button"
+                                title={order.archived ? "Désarchiver" : "Archiver"}
+                                onClick={() => toggleOrderArchive(order)}
+                              >
+                                {order.archived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
                               </button>
                             ) : null}
                           </div>

@@ -107,6 +107,18 @@ export class SalesController {
     return this.sales.returnOrder(id, dto);
   }
 
+  @Patch('orders/:id/archive')
+  @RequirePermissions(PERMISSIONS.ORDERS_WRITE)
+  archiveOrder(@Param('id') id: string) {
+    return this.sales.setOrderArchived(id, true);
+  }
+
+  @Patch('orders/:id/unarchive')
+  @RequirePermissions(PERMISSIONS.ORDERS_WRITE)
+  unarchiveOrder(@Param('id') id: string) {
+    return this.sales.setOrderArchived(id, false);
+  }
+
   @Delete('orders/:id')
   @RequirePermissions(PERMISSIONS.ORDERS_WRITE)
   removeOrder(@Param('id') id: string) {
