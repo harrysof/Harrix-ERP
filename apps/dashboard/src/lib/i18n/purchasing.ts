@@ -156,7 +156,6 @@ export const purchasing = catalogue({
   "supplier.add": { fr: "Ajouter le fournisseur", ar: "إضافة المورّد" },
   "supplier.contactPerson": { fr: "Personne à contacter", ar: "الشخص المعني بالاتصال" },
   "supplier.err.name": { fr: "Le nom est obligatoire.", ar: "الاسم إلزامي." },
-  "supplier.notesHint": { fr: "Registre de commerce, NIF, NIS…", ar: "السجل التجاري، NIF، NIS…" },
 
   // --------------------------------------------------------- supplier fiche
   "supplier.loadFailed": { fr: "Impossible de charger la fiche fournisseur.", ar: "تعذّر تحميل بطاقة المورّد." },
@@ -191,10 +190,10 @@ export const purchasing = catalogue({
 
   "po.itemWithReference": { fr: "{name} ({reference})", ar: "{name} ({reference})" },
   "po.freightRow": { fr: "Transport", ar: "النقل" },
-  "supplier.registration": { fr: "Immatriculation", ar: "التسجيل" },
 
   "supplier.openOrders": { fr: "{count} en cours", ar: "{count} قيد التنفيذ" },
   "supplier.tabInfo": { fr: "Informations", ar: "المعلومات" },
+  "supplier.photoLabel": { fr: "Logo / photo", ar: "الشعار / الصورة" },
 
   "po.modalTitle": { fr: "Bon de commande {code}", ar: "سند الطلب {code}" },
   "po.confirmDeleteDraft": { fr: "Supprimer le brouillon {code} ?", ar: "حذف المسوّدة {code}؟" },
@@ -202,4 +201,12 @@ export const purchasing = catalogue({
   "po.paidOf": { fr: "Payé : {paid} sur {total}", ar: "المدفوع: {paid} من {total}" },
   "po.balanceDue": { fr: " — solde restant dû : {balance}", ar: " — الرصيد الباقي المستحق: {balance}" },
   "po.remainingQty": { fr: "{quantity} {unit} restant(s)", ar: "{quantity} {unit} متبقّية" },
+
+  "po.invoiceLabel": { fr: "Facture / bon de commande du fournisseur", ar: "فاتورة / سند طلب المورّد" },
+  "po.invoiceHint": {
+    fr: "Joignez le document reçu du fournisseur — PDF, Word ou photo (max 8 Mo).",
+    ar: "أرفق المستند الوارد من المورّد — PDF أو Word أو صورة (الحد الأقصى 8 ميغا).",
+  },
+  "po.attachment": { fr: "Pièce jointe", ar: "المرفق" },
+  "po.noAttachment": { fr: "Aucune pièce jointe.", ar: "لا يوجد مرفق." },
 });

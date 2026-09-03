@@ -21,14 +21,30 @@ export class CreateSupplierDto {
   @IsString()
   address?: string;
 
-  /**
-   * Free-text registration details (registre de commerce, NIF, NIS…). One
-   * field rather than four columns: the exact set differs by country and
-   * nothing computes on them.
-   */
+  /** Numéro d'Identification Fiscale. */
   @IsOptional()
   @IsString()
-  registration?: string;
+  nif?: string;
+
+  /** Numéro du Registre de Commerce. */
+  @IsOptional()
+  @IsString()
+  rc?: string;
+
+  /** Article d'Imposition. */
+  @IsOptional()
+  @IsString()
+  ai?: string;
+
+  /** Numéro d'Identification Statistique. */
+  @IsOptional()
+  @IsString()
+  nis?: string;
+
+  /** A URL (http/https) or a data-URI (inline image) — same convention as Item.photoUrl. */
+  @IsOptional()
+  @IsString()
+  photoUrl?: string;
 
   @IsOptional()
   @IsString()

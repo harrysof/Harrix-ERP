@@ -851,6 +851,17 @@ textarea.input {
   border-color: var(--border);
 }
 
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.icon-button:disabled:hover {
+  background: transparent;
+  color: var(--ink-faint);
+  border-color: transparent;
+}
+
 .table-scroll {
   overflow-x: auto;
   border-radius: var(--radius);
@@ -1252,6 +1263,16 @@ textarea.input {
   border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 8px;
+}
+
+.image-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-picker-input {
+  display: none;
 }
 
 .history-detail {

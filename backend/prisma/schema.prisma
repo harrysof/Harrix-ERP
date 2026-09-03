@@ -31,6 +31,14 @@ model InventoryType {
   label             String
   singular          String
   description       String
+  /// Arabic variants of the three fields above — optional because a factory
+  /// that only ever types French for a custom inventory it adds shouldn't be
+  /// forced to fill these in. Falls back to the French value when unset (see
+  /// settings/inventory-type-i18n.ts) rather than showing blank/French text
+  /// under an Arabic UI.
+  labelAr           String?
+  singularAr        String?
+  descriptionAr     String?
   hasBatches        Boolean @default(false)
   hasExpiry         Boolean @default(false)
   isProductionInput Boolean @default(false)
@@ -183,19 +191,26 @@ model Movement {
 }
 
 model Supplier {
-  id           String   @id @default(cuid())
-  name         String
-  contactName  String?
-  phone        String?
-  email        String?
-  address      String?
-  notes        String?
-  /// Free-text registration details (registre de commerce, NIF, NIS…). One
-  /// field rather than four columns: the exact set differs by country, and
-  /// nothing computes on them.
-  registration String?
-  archived     Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  /// Numéro d'Identification Fiscale.
+  nif         String?
+  /// Numéro du Registre de Commerce.
+  rc          String?
+  /// Article d'Imposition.
+  ai          String?
+  /// Numéro d'Identification Statistique.
+  nis         String?
+  /// A logo/photo — a URL (http/https) or a data-URI (inline image), same
+  /// convention as Item.photoUrl.
+  photoUrl    String?
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   movements      Movement[]
   purchaseOrders PurchaseOrder[]
@@ -421,44 +436,52 @@ model AuditEntry {
 /// from ReceiptLine, the same rule as stock quantity and production variance:
 /// a stored "received so far" can drift from the receipts it claims to total.
 model PurchaseOrder {
-  id           String    @id @default(cuid())
+  id              String    @id @default(cuid())
   /// Human-readable, unique, generated per calendar year: "BC-2026-0007".
   /// "BC" = bon de commande.
-  code         String    @unique
-  supplier     Supplier  @relation(fields: [supplierId], references: [id])
-  supplierId   String
-  date         DateTime
-  expectedDate DateTime?
+  code            String    @unique
+  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+  supplierId      String
+  date            DateTime
+  expectedDate    DateTime?
   /// DRAFT | SUBMITTED | APPROVED | PARTIALLY_RECEIVED | RECEIVED | CANCELLED
   /// Plain string, same portability reason as Movement.direction.
-  status       String    @default("DRAFT")
+  status          String    @default("DRAFT")
   /// PENDING | PARTIAL | PAID | CANCELLED — what has been paid to the
   /// supplier, derived from amountPaid vs the order total (see
   /// purchasing/purchasing-math.ts's paymentStatusOf) and independent of
   /// `status` above, except that cancelling the PO also cancels this. A
   /// supplier can be paid in installments regardless of how much has arrived.
-  paymentStatus String   @default("PENDING")
+  paymentStatus   String    @default("PENDING")
   /// What has actually been paid to the supplier so far, in DZD. Never
   /// exceeds the order total (see purchasing.service.ts's recordPayment).
-  amountPaid   Float     @default(0)
+  amountPaid      Float     @default(0)
   /// Order-level money, in DZD. Line amounts live on the lines.
-  shipping     Float     @default(0)
+  shipping        Float     @default(0)
   /// FIXED or PERCENT — see discount's own comment.
-  discountType String    @default("FIXED")
+  discountType    String    @default("FIXED")
   /// What the buyer typed: a DZD amount when discountType is FIXED, or a
   /// fraction (0.10 for 10 %) when it's PERCENT — same "type the rate, never
   /// the amount" reasoning as taxRate below. The DZD figure this produces is
   /// always computed (see purchasing/purchasing-math.ts's poTotals), never
   /// stored, so it can't drift when a line or the shipping changes.
-  discount     Float     @default(0)
+  discount        Float     @default(0)
   /// The tax rate as a fraction (0.19 for 19 %) — what the buyer actually
   /// types. The DZD amount is always computed from it (see
   /// purchasing/purchasing-math.ts), never stored: a flat figure would drift
   /// the moment a line, the shipping or the discount changed.
-  taxRate      Float     @default(0)
-  notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  taxRate         Float     @default(0)
+  notes           String?
+  /// The invoice or bon de commande the supplier sent back (PDF, Word or an
+  /// image of the paper document), attached by whoever placed the order.
+  /// Original filename — needed for download since the data-URI itself
+  /// carries no name.
+  invoiceFileName String?
+  /// A data-URI (data:<mime>;base64,…), same storage convention as
+  /// Item.photoUrl — there is no object storage in this deployment.
+  invoiceFileUrl  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   lines    PurchaseOrderLine[]
   receipts Receipt[]
@@ -536,6 +559,17 @@ model Customer {
   country    String?
   postalCode String?
   notes      String?
+  /// Numéro d'Identification Fiscale.
+  nif        String?
+  /// Numéro du Registre de Commerce.
+  rc         String?
+  /// Article d'Imposition.
+  ai         String?
+  /// Numéro d'Identification Statistique.
+  nis        String?
+  /// A logo/photo — a URL (http/https) or a data-URI (inline image), same
+  /// convention as Item.photoUrl.
+  photoUrl   String?
   /// Archived rather than deleted: a customer with orders must stay
   /// attributable, same rule as items and suppliers.
   archived   Boolean  @default(false)
@@ -596,7 +630,7 @@ model Order {
 
   /// Set when the order ships — the OUT movements are created then, not at
   /// order time, because an unshipped order hasn't left the building.
-  shippedAt DateTime?
+  shippedAt  DateTime?
   /// Archived, not deleted — same rule as Customer.archived and
   /// Employee.archived. A shipped order has a stock trail that must stay
   /// attributable, so archiving (hide from the default list) is the escape
@@ -647,12 +681,12 @@ model OrderLine {
 /// be issued cleanly). Conflating the two used to mean a "cancelled" order
 /// stayed permanently short in the finished-goods count with no way back.
 model OrderReturn {
-  id      String   @id @default(cuid())
+  id        String   @id @default(cuid())
   /// "RET-2026-0007", unique, generated per calendar year.
-  code    String   @unique
-  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId String
-  date    DateTime
+  code      String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  date      DateTime
   /// Why the goods came back, e.g. "ne convient pas au client".
   reason    String?
   notes     String?
@@ -673,7 +707,7 @@ model OrderReturnLine {
   /// The IN movement this line created, restoring finished-goods stock.
   /// Plain id, not a relation — Movement is an append-only ledger and
   /// nothing may cascade into it.
-  movementId String?
+  movementId  String?
 
   @@index([returnId])
   @@index([orderLineId])
@@ -736,8 +770,8 @@ model Employee {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  timeEntries    TimeEntry[]
-  absences       Absence[]
+  timeEntries     TimeEntry[]
+  absences        Absence[]
   overtimeEntries OvertimeEntry[]
 
   @@index([archived])
@@ -817,11 +851,11 @@ model FactoryCost {
 /// zakat/zakat-math.ts, same "never store what can drift" rule as payroll
 /// and order totals.
 model ZakatCalculation {
-  id      String   @id @default(cuid())
+  id               String   @id @default(cuid())
   /// The date this calculation is as-of — the hawl's anchor date.
-  calculationDate DateTime
+  calculationDate  DateTime
   /// "LUNAR" (default, the standard hawl) | "SOLAR" (alternative, Gregorian year).
-  methodology     String   @default("LUNAR")
+  methodology      String   @default("LUNAR")
   /// DZD per gram, typed in by the gérant — nisab is 85 g of gold at this price.
   goldPricePerGram Float
 

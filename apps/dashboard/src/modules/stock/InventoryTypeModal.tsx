@@ -21,6 +21,9 @@ export interface InventoryTypeDraft {
   label: string;
   singular: string;
   description: string;
+  labelAr: string;
+  singularAr: string;
+  descriptionAr: string;
   defaultUnit: string;
   hasBatches: boolean;
   hasExpiry: boolean;
@@ -82,6 +85,9 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
     label: type?.label ?? "",
     singular: type?.singular ?? "",
     description: type?.description ?? "",
+    labelAr: type?.labelAr ?? "",
+    singularAr: type?.singularAr ?? "",
+    descriptionAr: type?.descriptionAr ?? "",
     defaultUnit: type?.defaultUnit ?? "pièce",
     hasBatches: type?.hasBatches ?? false,
     hasExpiry: type?.hasExpiry ?? false,
@@ -138,6 +144,9 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
         label: draft.label.trim(),
         singular: draft.singular.trim(),
         description: draft.description.trim(),
+        labelAr: draft.labelAr.trim(),
+        singularAr: draft.singularAr.trim(),
+        descriptionAr: draft.descriptionAr.trim(),
         defaultUnit: draft.defaultUnit.trim(),
       });
     } catch (e) {
@@ -185,6 +194,27 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
         </div>
 
         <div className="form-row">
+          <Field label={t("inv.tabNameAr")} hint={t("inv.arHint")}>
+            <input
+              className="input"
+              dir="rtl"
+              value={draft.labelAr}
+              onChange={(e) => set("labelAr", e.target.value)}
+              placeholder={t("inv.ph.tabNameAr")}
+            />
+          </Field>
+          <Field label={t("inv.singularAr")} hint={t("inv.arHint")}>
+            <input
+              className="input"
+              dir="rtl"
+              value={draft.singularAr}
+              onChange={(e) => set("singularAr", e.target.value)}
+              placeholder={t("inv.ph.singularAr")}
+            />
+          </Field>
+        </div>
+
+        <div className="form-row">
           <Field label={t("inv.defaultUnit")} hint={t("inv.defaultUnitHint")}>
             <UnitSelect value={draft.defaultUnit} onChange={(unit) => set("defaultUnit", unit)} ariaLabel={t("inv.defaultUnit")} />
           </Field>
@@ -212,6 +242,17 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
             value={draft.description}
             onChange={(e) => set("description", e.target.value)}
             placeholder={t("inv.ph.description")}
+          />
+        </Field>
+
+        <Field label={t("inv.descriptionAr")} hint={t("inv.arHint")}>
+          <textarea
+            className="input"
+            dir="rtl"
+            rows={2}
+            value={draft.descriptionAr}
+            onChange={(e) => set("descriptionAr", e.target.value)}
+            placeholder={t("inv.ph.descriptionAr")}
           />
         </Field>
 

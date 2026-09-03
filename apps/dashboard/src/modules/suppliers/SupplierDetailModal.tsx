@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ClipboardList, Wallet, Truck, CircleAlert, History } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Pill } from "../../components/ui/Pill";
@@ -48,32 +49,43 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
         <div className="form-stack">
           <div className="stat-grid">
             <StatCard
+              icon={ClipboardList}
               label={t("po.tabOrders")}
               value={detail.summary.purchaseOrderCount}
               hint={t("supplier.openOrders", { count: detail.summary.openPurchaseOrderCount })}
             />
             <StatCard
+              icon={Wallet}
               label={t("supplier.totalPurchased")}
               value={formatCurrency(detail.summary.totalPurchased)}
               hint={t("po.kpi.totalHint")}
             />
             <StatCard
+              icon={Truck}
               label={t("po.commitments")}
               value={formatCurrency(detail.summary.outstandingCommitment)}
               hint={t("po.kpi.ordered")}
               tone={detail.summary.outstandingCommitment > 0 ? "warn" : "neutral"}
             />
             <StatCard
+              icon={CircleAlert}
               label={t("supplier.due")}
               value={formatCurrency(detail.summary.amountOwed)}
               hint={t("supplier.dueHint")}
               tone={detail.summary.amountOwed > 0 ? "warn" : "neutral"}
             />
             <StatCard
+              icon={History}
               label={t("supplier.lastPurchase")}
               value={detail.summary.lastPurchaseDate ? formatDate(detail.summary.lastPurchaseDate) : "—"}
             />
           </div>
+
+          {supplier.photoUrl ? (
+            <div className="field-photo-preview">
+              <img src={supplier.photoUrl} alt={supplier.name} />
+            </div>
+          ) : null}
 
           <div className="tab-strip">
             <TabButton active={tab === "info"} onClick={() => setTab("info")} label={t("supplier.tabInfo")} />
@@ -88,7 +100,10 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
               <Meta label={t("field.phone")} value={supplier.phone ?? "—"} />
               <Meta label={t("field.email")} value={supplier.email ?? "—"} />
               <Meta label={t("field.address")} value={supplier.address ?? "—"} />
-              <Meta label={t("supplier.registration")} value={supplier.registration ?? "—"} />
+              <Meta label={t("field.nif")} value={supplier.nif ?? "—"} />
+              <Meta label={t("field.rc")} value={supplier.rc ?? "—"} />
+              <Meta label={t("field.ai")} value={supplier.ai ?? "—"} />
+              <Meta label={t("field.nis")} value={supplier.nis ?? "—"} />
               <Meta
                 label={t("field.status")}
                 value={

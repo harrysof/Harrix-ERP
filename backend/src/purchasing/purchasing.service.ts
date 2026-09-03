@@ -183,6 +183,8 @@ export class PurchasingService {
           discountType: dto.discountType ?? 'FIXED',
           taxRate: dto.taxRate ?? 0,
           notes: dto.notes ?? null,
+          invoiceFileName: dto.invoiceFileName || null,
+          invoiceFileUrl: dto.invoiceFileUrl || null,
           lines: { create: dto.lines.map((l) => ({ itemId: l.itemId, quantity: l.quantity, unitCost: l.unitCost })) },
         },
       });
@@ -223,6 +225,9 @@ export class PurchasingService {
           ...(dto.discountType !== undefined ? { discountType: dto.discountType } : {}),
           ...(dto.taxRate !== undefined ? { taxRate: dto.taxRate } : {}),
           ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+          // An empty string is how the client says "remove the attachment".
+          ...(dto.invoiceFileName !== undefined ? { invoiceFileName: dto.invoiceFileName || null } : {}),
+          ...(dto.invoiceFileUrl !== undefined ? { invoiceFileUrl: dto.invoiceFileUrl || null } : {}),
         },
       });
 

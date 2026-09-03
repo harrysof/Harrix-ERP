@@ -38,6 +38,11 @@ export class CreateInventoryTypeDto {
   @MaxLength(400)
   description?: string;
 
+  /** Arabic variants — optional; the French value is shown under an Arabic UI when unset. */
+  @IsOptional() @IsString() @MaxLength(60) labelAr?: string;
+  @IsOptional() @IsString() @MaxLength(60) singularAr?: string;
+  @IsOptional() @IsString() @MaxLength(400) descriptionAr?: string;
+
   /**
    * A unit has to name something: "kg", "litre", "paire". A value of only
    * digits is refused because it produces quantities that read "0 100" and a
@@ -71,6 +76,9 @@ export class UpdateInventoryTypeDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(60) label?: string;
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(60) singular?: string;
   @IsOptional() @IsString() @MaxLength(400) description?: string;
+  @IsOptional() @IsString() @MaxLength(60) labelAr?: string;
+  @IsOptional() @IsString() @MaxLength(60) singularAr?: string;
+  @IsOptional() @IsString() @MaxLength(400) descriptionAr?: string;
   @IsOptional()
   @IsString()
   @IsNotEmpty()

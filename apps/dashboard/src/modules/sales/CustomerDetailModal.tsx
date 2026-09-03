@@ -124,6 +124,11 @@ export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOp
 
           <section>
             <h4 className="section-title">{t("customer.profile")}</h4>
+            {detail.photoUrl ? (
+              <div className="field-photo-preview">
+                <img src={detail.photoUrl} alt={detail.fullName} />
+              </div>
+            ) : null}
             <div className="batch-meta">
               <Meta label={t("field.reference")} value={detail.code} />
               <Meta label={t("field.email")} value={detail.email ?? "—"} />
@@ -142,6 +147,10 @@ export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOp
                 label={t("customer.provinceCountry")}
                 value={[detail.province, detail.country].filter(Boolean).join(", ") || "—"}
               />
+              <Meta label={t("field.nif")} value={detail.nif ?? "—"} />
+              <Meta label={t("field.rc")} value={detail.rc ?? "—"} />
+              <Meta label={t("field.ai")} value={detail.ai ?? "—"} />
+              <Meta label={t("field.nis")} value={detail.nis ?? "—"} />
             </div>
             {detail.notes ? <p className="batch-notes">{detail.notes}</p> : null}
           </section>

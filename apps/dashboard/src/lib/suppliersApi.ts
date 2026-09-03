@@ -7,8 +7,16 @@ export interface Supplier {
   phone: string | null;
   email: string | null;
   address: string | null;
-  /** Free-text registre de commerce / NIF / NIS — §13. */
-  registration: string | null;
+  /** Numéro d'Identification Fiscale. */
+  nif: string | null;
+  /** Numéro du Registre de Commerce. */
+  rc: string | null;
+  /** Article d'Imposition. */
+  ai: string | null;
+  /** Numéro d'Identification Statistique. */
+  nis: string | null;
+  /** A URL (http/https) or a data-URI (inline image) — same convention as ApiItem.photoUrl. */
+  photoUrl: string | null;
   notes: string | null;
   archived: boolean;
   createdAt: string;
@@ -23,7 +31,11 @@ export interface SupplierInput {
   phone?: string;
   email?: string;
   address?: string;
-  registration?: string;
+  nif?: string;
+  rc?: string;
+  ai?: string;
+  nis?: string;
+  photoUrl?: string | null;
   notes?: string;
 }
 

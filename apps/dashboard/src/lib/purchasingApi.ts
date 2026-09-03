@@ -107,6 +107,10 @@ export interface ApiPurchaseOrder {
   discountType: DiscountType;
   taxRate: number;
   notes: string | null;
+  /** The invoice/bon de commande attached to this order, if any (PDF, Word or image). */
+  invoiceFileName: string | null;
+  /** A data-URI holding the attached file's bytes. */
+  invoiceFileUrl: string | null;
   createdAt: string;
   updatedAt: string;
   lines: ApiPoLine[];
@@ -183,6 +187,8 @@ export function createPurchaseOrder(input: {
   discountType?: DiscountType;
   taxRate?: number;
   notes?: string;
+  invoiceFileName?: string;
+  invoiceFileUrl?: string;
   lines: PoLineInput[];
 }): Promise<ApiPurchaseOrder> {
   return api.post<ApiPurchaseOrder>("/purchasing/orders", input);
@@ -199,6 +205,9 @@ export function updatePurchaseOrder(
     discountType?: DiscountType;
     taxRate?: number;
     notes?: string;
+    /** Empty string removes the attachment. */
+    invoiceFileName?: string;
+    invoiceFileUrl?: string;
     lines?: PoLineInput[];
   },
 ): Promise<ApiPurchaseOrder> {

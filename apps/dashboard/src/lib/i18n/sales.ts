@@ -93,6 +93,7 @@ export const sales = catalogue({
   "customer.postalCode": { fr: "Code postal", ar: "الرمز البريدي" },
   "customer.country": { fr: "Pays", ar: "البلد" },
   "customer.defaultCountry": { fr: "Algérie", ar: "الجزائر" },
+  "customer.photoLabel": { fr: "Logo / photo", ar: "الشعار / الصورة" },
 
   // -------------------------------------------------------- customer fiche
   "customer.orderCount": { fr: "Commandes", ar: "الطلبات" },

@@ -5,6 +5,7 @@ import { UpdateItemDto } from './dto/update-item.dto.js';
 import { ReceiveStockDto } from './dto/receive-stock.dto.js';
 import { LogUsageDto } from './dto/log-usage.dto.js';
 import { t } from '../i18n/messages/index.js';
+import { localizeInventoryType } from '../settings/inventory-type-i18n.js';
 import { getAverageUnitCost, getBatchesWithRemaining, getBatchUnitCost, getCostSources, getExpiryStatus, getFifoBatch, getItemQuantity, getItemValuation, getLatestSupplier, getQualityCounts, getRecommendedBatch, getStockStatus, getUnaccounted, isLowStock, QUALITY_CLASSES, roundMoney, type BatchLike, type MovementDetail } from './stock-math.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
@@ -64,7 +65,16 @@ export class StockService {
       id: string;
       reorderThreshold: number;
       unitCost: number | null;
-      inventoryType: { hasBatches: boolean; hasQuality: boolean };
+      inventoryType: {
+        hasBatches: boolean;
+        hasQuality: boolean;
+        label: string;
+        singular: string;
+        description: string;
+        labelAr?: string | null;
+        singularAr?: string | null;
+        descriptionAr?: string | null;
+      };
     },
     movements: MovementDetail[],
     batches: BatchLike[],
@@ -84,6 +94,7 @@ export class StockService {
     const costSources = getCostSources(movements, item.id, item.unitCost);
     const view: Record<string, unknown> = {
       ...item,
+      inventoryType: localizeInventoryType(item.inventoryType),
       quantity,
       purchased,
       used,

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { t } from '../i18n/messages/index.js';
 import { ZakatService } from '../zakat/zakat.service.js';
 import { getAverageUnitCost, getItemQuantity, getItemValuation } from '../stock/stock-math.js';
+import { localizeInventoryType } from '../settings/inventory-type-i18n.js';
 import { orderTotals } from '../sales/sales-math.js';
 import { payEstimateOf } from '../hr/payroll-math.js';
 import { PERMISSIONS, type Permission } from '../auth/permissions.js';
@@ -289,7 +290,7 @@ export class AnalyticsService {
 
       const bucket = valueByType.get(item.inventoryTypeId) ?? {
         id: item.inventoryTypeId,
-        label: item.inventoryType.label,
+        label: localizeInventoryType(item.inventoryType).label,
         value: 0,
         itemCount: 0,
       };
@@ -306,7 +307,7 @@ export class AnalyticsService {
           unit: item.unit,
           quantity: round(quantity),
           reorderThreshold: item.reorderThreshold,
-          inventoryTypeLabel: item.inventoryType.label,
+          inventoryTypeLabel: localizeInventoryType(item.inventoryType).label,
         });
       }
     }

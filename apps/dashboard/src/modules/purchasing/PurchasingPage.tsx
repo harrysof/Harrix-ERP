@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ClipboardList, Truck, Wallet, Receipt as ReceiptIcon, CircleAlert } from "lucide-react";
 import { Banner } from "../../components/ui/Banner";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
@@ -108,20 +109,23 @@ export function PurchasingPage() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <div className="stat-grid">
-        <StatCard label={t("po.tabOrders")} value={orders.length} hint={t("po.kpi.orderedHint")} />
+        <StatCard icon={ClipboardList} label={t("po.tabOrders")} value={orders.length} hint={t("po.kpi.orderedHint")} />
         <StatCard
+          icon={Truck}
           label={t("po.kpi.inProgress")}
           value={open.length}
           hint={t("po.kpi.inProgressHint")}
           tone={open.length > 0 ? "warn" : "neutral"}
         />
-        <StatCard label={t("po.commitments")} value={formatCurrency(committed)} hint={t("po.kpi.ordered")} />
+        <StatCard icon={Wallet} label={t("po.commitments")} value={formatCurrency(committed)} hint={t("po.kpi.ordered")} />
         <StatCard
+          icon={ReceiptIcon}
           label={t("po.kpi.total")}
           value={formatCurrency(orders.filter((o) => o.status !== "CANCELLED").reduce((s, o) => s + o.totals.total, 0))}
           hint={t("po.kpi.totalHint")}
         />
         <StatCard
+          icon={CircleAlert}
           label={t("po.kpi.due")}
           value={formatCurrency(owed)}
           hint={t("po.kpi.dueHint")}

@@ -52,6 +52,16 @@ export interface ApiCustomer {
   province: string | null;
   country: string | null;
   postalCode: string | null;
+  /** Numéro d'Identification Fiscale. */
+  nif: string | null;
+  /** Numéro du Registre de Commerce. */
+  rc: string | null;
+  /** Article d'Imposition. */
+  ai: string | null;
+  /** Numéro d'Identification Statistique. */
+  nis: string | null;
+  /** A URL (http/https) or a data-URI (inline image) — same convention as ApiItem.photoUrl. */
+  photoUrl: string | null;
   notes: string | null;
   archived: boolean;
   createdAt: string;
@@ -203,6 +213,11 @@ export interface CustomerInput {
   province?: string;
   country?: string;
   postalCode?: string;
+  nif?: string;
+  rc?: string;
+  ai?: string;
+  nis?: string;
+  photoUrl?: string | null;
   notes?: string;
 }
 

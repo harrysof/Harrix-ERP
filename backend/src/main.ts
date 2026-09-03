@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module.js';
 
 /**
@@ -35,6 +36,14 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   assertUsableJwtSecret(config.getOrThrow<string>('JWT_SECRET'));
+
+  // Photos, supplier/customer logos and achats attachments (PDF/Word/image)
+  // travel as base64 data-URIs in the JSON body (see Item.photoUrl's doc
+  // comment) — Express's default 100kb limit would reject anything but a
+  // tiny image, so it's raised here rather than introducing separate
+  // multipart/object-storage infrastructure this deployment doesn't have.
+  app.use(json({ limit: '15mb' }));
+  app.use(urlencoded({ extended: true, limit: '15mb' }));
 
   app.setGlobalPrefix('api');
   app.useGlobalPipes(

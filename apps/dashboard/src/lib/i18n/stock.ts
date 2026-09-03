@@ -235,11 +235,8 @@ export const stock = catalogue({
     fr: "Ce à quoi l'article est vendu — distinct du coût unitaire ci-dessus",
     ar: "ما تُباع به المادة — يختلف عن تكلفة الوحدة أعلاه",
   },
-  "item.photoLabel": { fr: "Photo (URL)", ar: "صورة (رابط)" },
-  "item.photoHint": {
-    fr: "Adresse d'une image (https…) ou image intégrée (données data:image/…). Facultatif.",
-    ar: "عنوان صورة (https…) أو صورة مدمجة (بيانات data:image/…). اختياري.",
-  },
+  "item.photoLabel": { fr: "Photo", ar: "صورة" },
+  "item.photoHint": { fr: "Facultatif.", ar: "اختياري." },
   "item.existingStock": { fr: "Stock déjà en place", ar: "مخزون موجود مسبقًا" },
   "item.existingStockHint": {
     fr: "Ce stock initial est enregistré comme une {reception}",
@@ -405,6 +402,19 @@ export const stock = catalogue({
   "inv.singularRequired": {
     fr: "Indiquez le nom au singulier — il sert dans les messages de l'écran.",
     ar: "اذكر الاسم بالمفرد — يُستعمل في رسائل الشاشة.",
+  },
+  "inv.tabNameAr": { fr: "Nom (onglet) — arabe", ar: "الاسم (التبويب) — عربي" },
+  "inv.ph.tabNameAr": { fr: "مثال: تغليف", ar: "مثال: تغليف" },
+  "inv.singularAr": { fr: "Au singulier — arabe", ar: "بالمفرد — عربي" },
+  "inv.ph.singularAr": { fr: "مثال: تغليفة", ar: "مثال: تغليفة" },
+  "inv.descriptionAr": { fr: "Description libre — arabe", ar: "وصف حرّ — عربي" },
+  "inv.ph.descriptionAr": {
+    fr: "مثال: كراتين ومواد تغليف. بلا صلاحية وبلا دفعات.",
+    ar: "مثال: كراتين ومواد تغليف. بلا صلاحية وبلا دفعات.",
+  },
+  "inv.arHint": {
+    fr: "Facultatif — le français est affiché si vide.",
+    ar: "اختياري — يُعرض النص الفرنسي إذا تُرك فارغًا.",
   },
   "inv.key": { fr: "Clé technique", ar: "المفتاح التقني" },
   "inv.keyHint": {
@@ -617,7 +627,6 @@ export const stock = catalogue({
     fr: "Ce stock initial est enregistré comme une {reception} : {quantity} valorisés à {value}. Pour une livraison avec fournisseur, utilisez le bouton « Réception » de la ligne — la quantité d'un article vient toujours de ses mouvements, jamais d'une case qu'on réécrit.",
     ar: "يُسجَّل هذا المخزون الأولي بوصفه {reception}: {quantity} مُقيَّمة بـ{value}. أما التسليم مع مورّد فاستعمل زرّ «استلام» في السطر — كمية المادة تأتي دائمًا من حركاتها، لا من خانة يُعاد كتابتها.",
   },
-  "item.ph.photoUrl": { fr: "https://… ou data:image/…", ar: "https://… أو data:image/…" },
 
   // ------------------------------------------------------------ usage modal
   "usage.modalTitle": { fr: "Sortie — {item}", ar: "إخراج — {item}" },

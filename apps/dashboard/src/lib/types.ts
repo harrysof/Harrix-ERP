@@ -17,6 +17,16 @@ export interface InventoryTypeConfig {
   label: string;
   singular: string;
   description: string;
+  /**
+   * Arabic variants of the three fields above, edited alongside them in
+   * Settings — optional, since a factory that only ever types French for a
+   * custom inventory shouldn't be forced to fill these in. Display code
+   * never reads these directly; use lib/inventoryTypeI18n.ts, which falls
+   * back to the French value when one is missing.
+   */
+  labelAr?: string | null;
+  singularAr?: string | null;
+  descriptionAr?: string | null;
   hasBatches: boolean;
   hasExpiry: boolean;
   isProductionInput: boolean;

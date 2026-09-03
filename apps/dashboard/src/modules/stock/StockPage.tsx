@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { PackagePlus, PackageMinus, Eye, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { useInventoryTypes } from "../../state/InventoryTypesContext";
 import {
   createInventoryType,
@@ -17,6 +18,7 @@ import { fetchSuppliers, type Supplier } from "../../lib/suppliersApi";
 import { ApiError } from "../../lib/api";
 import { formatCurrency, formatDate, formatQuantity } from "../../lib/format";
 import type { InventoryTypeConfig } from "../../lib/types";
+import { inventoryTypeLabel, inventoryTypeSingular, inventoryTypeDescription } from "../../lib/inventoryTypeI18n";
 import { Button } from "../../components/ui/Button";
 import { Pill } from "../../components/ui/Pill";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -110,7 +112,7 @@ type ModalState =
   | { kind: "detail"; item: ApiItem };
 
 export function StockPage() {
-  const { t, tn } = useI18n();
+  const { t, tn, lang } = useI18n();
   const { types, loading: typesLoading, error: typesError, reload: reloadTypes } = useInventoryTypes();
   const [activeTypeId, setActiveTypeId] = useState<string | null>(null);
   const [items, setItems] = useState<ApiItem[]>([]);
@@ -167,7 +169,7 @@ export function StockPage() {
    * pointing at nothing — so this only ever succeeds on an empty one.
    */
   async function removeType(type: InventoryTypeConfig) {
-    if (!window.confirm(t("stock.confirmDeleteType", { label: type.label }))) return;
+    if (!window.confirm(t("stock.confirmDeleteType", { label: inventoryTypeLabel(type, lang) }))) return;
     setLoadError(null);
     try {
       await deleteInventoryType(type.id);
@@ -248,7 +250,7 @@ export function StockPage() {
               className={`tab-strip-item ${activeTypeId === type.id ? "tab-strip-item-active" : ""}`}
               onClick={() => setActiveTypeId(type.id)}
             >
-              {type.label}
+              {inventoryTypeLabel(type, lang)}
               {count > 0 ? <span className="tab-strip-badge">{count}</span> : null}
             </button>
           );
@@ -266,7 +268,7 @@ export function StockPage() {
       </div>
 
       <div className="inventory-heading">
-        <p className="inventory-description">{inventoryType.description}</p>
+        <p className="inventory-description">{inventoryTypeDescription(inventoryType, lang)}</p>
         <div className="row-actions">
           <Button variant="ghost" onClick={() => setModal({ kind: "edit-type", type: inventoryType })}>
             {t("stock.configureInventory")}
@@ -331,8 +333,8 @@ export function StockPage() {
         <p className="loading-text">{t("stock.loading")}</p>
       ) : visibleItems.length === 0 ? (
         <EmptyState
-          title={search ? t("stock.noMatch") : t("stock.emptyTitle", { singular: inventoryType.singular })}
-          description={!search ? t("stock.emptyDesc", { label: inventoryType.label }) : undefined}
+          title={search ? t("stock.noMatch") : t("stock.emptyTitle", { singular: inventoryTypeSingular(inventoryType, lang) })}
+          description={!search ? t("stock.emptyDesc", { label: inventoryTypeLabel(inventoryType, lang) }) : undefined}
           action={
             !search ? (
               <Button variant="primary" onClick={() => setModal({ kind: "add" })}>
@@ -483,25 +485,42 @@ export function StockPage() {
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="row-actions">
-                      <Button variant="secondary" onClick={() => setModal({ kind: "receive", item })} disabled={item.archived}>
-                        {t("stock.receive")}
-                      </Button>
-                      <Button variant="secondary" onClick={() => setModal({ kind: "usage", item })} disabled={item.archived || item.quantity <= 0}>
-                        {t("stock.issue")}
-                      </Button>
-                      <Button variant="ghost" onClick={() => setModal({ kind: "detail", item })}>
-                        {t("action.details")}
-                      </Button>
-                      <Button variant="ghost" onClick={() => setModal({ kind: "edit", item })}>
-                        {t("action.edit")}
-                      </Button>
-                      <Button variant="ghost" onClick={() => toggleArchive(item)}>
-                        {t(item.archived ? "action.unarchive" : "action.archive")}
-                      </Button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title={t("stock.receive")}
+                        disabled={item.archived}
+                        onClick={() => setModal({ kind: "receive", item })}
+                      >
+                        <PackagePlus size={16} strokeWidth={2} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title={t("stock.issue")}
+                        disabled={item.archived || item.quantity <= 0}
+                        onClick={() => setModal({ kind: "usage", item })}
+                      >
+                        <PackageMinus size={16} strokeWidth={2} />
+                      </button>
+                      <button type="button" className="icon-button" title={t("action.details")} onClick={() => setModal({ kind: "detail", item })}>
+                        <Eye size={16} strokeWidth={2} />
+                      </button>
+                      <button type="button" className="icon-button" title={t("action.edit")} onClick={() => setModal({ kind: "edit", item })}>
+                        <Pencil size={16} strokeWidth={2} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title={t(item.archived ? "action.unarchive" : "action.archive")}
+                        onClick={() => toggleArchive(item)}
+                      >
+                        {item.archived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
+                      </button>
                       {item.deletable ? (
-                        <Button variant="danger" onClick={() => removeItem(item)}>
-                          {t("action.delete")}
-                        </Button>
+                        <button type="button" className="icon-button" title={t("action.delete")} onClick={() => removeItem(item)}>
+                          <Trash2 size={16} strokeWidth={2} />
+                        </button>
                       ) : null}
                     </div>
                   </td>

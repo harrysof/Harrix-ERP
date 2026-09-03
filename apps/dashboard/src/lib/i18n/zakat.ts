@@ -19,11 +19,11 @@ export const zakat = catalogue({
   // ------------------------------------------------------------ vocabulary
   "zk.methodology.LUNAR": {
     fr: "Année lunaire (hégirienne) — hawl standard",
-    ar: "السنة القمرية (الهجرية) — الحول المعتمد",
+    ar: "هجري",
   },
   "zk.methodology.SOLAR": {
     fr: "Année solaire (grégorienne) — méthode alternative",
-    ar: "السنة الشمسية (الميلادية) — طريقة بديلة",
+    ar: "ميلادي",
   },
   "zk.payment.NOT_PAID": { fr: "Non payée", ar: "غير مدفوعة" },
   "zk.payment.PARTIALLY_PAID": { fr: "Partiellement payée", ar: "مدفوعة جزئيًا" },

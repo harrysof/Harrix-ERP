@@ -9,6 +9,16 @@ const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Returns the RAW French/Arabic pair, not the language-picked display
+   * string — this list doubles as the source for the "edit this inventory"
+   * form (InventoryTypeModal), and pre-filling that form with whichever
+   * language happened to be active would silently overwrite the other one on
+   * save. Display screens (Stock tabs, the dashboard chart) pick the right
+   * variant themselves — see lib/inventoryTypeI18n.ts on the frontend and
+   * settings/inventory-type-i18n.ts's localizeInventoryType() for the
+   * read-only embeddings (an item's inventoryType, the dashboard aggregate).
+   */
   listInventoryTypes() {
     return this.prisma.inventoryType.findMany({ orderBy: { sortOrder: 'asc' } });
   }
@@ -29,12 +39,15 @@ export class SettingsService {
     const last = await this.prisma.inventoryType.findFirst({ orderBy: { sortOrder: 'desc' }, select: { sortOrder: true } });
 
     try {
-      return await this.prisma.inventoryType.create({
+      const created = await this.prisma.inventoryType.create({
         data: {
           key: dto.key,
           label: dto.label,
           singular: dto.singular,
           description: dto.description ?? '',
+          labelAr: dto.labelAr ?? null,
+          singularAr: dto.singularAr ?? null,
+          descriptionAr: dto.descriptionAr ?? null,
           defaultUnit: dto.defaultUnit,
           hasBatches: dto.hasBatches ?? false,
           hasExpiry: dto.hasExpiry ?? false,
@@ -49,6 +62,7 @@ export class SettingsService {
           sortOrder: dto.sortOrder ?? (last ? last.sortOrder + 1 : 0),
         },
       });
+      return created;
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw new ConflictException(t('settings.typeKeyExists', { key: dto.key }));

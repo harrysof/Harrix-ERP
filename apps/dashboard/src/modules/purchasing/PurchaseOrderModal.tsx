@@ -3,6 +3,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Banner } from "../../components/ui/Banner";
+import { FilePicker } from "../../components/ui/FilePicker";
 import { useI18n } from "../../state/LanguageContext";
 import { ApiError } from "../../lib/api";
 import { formatCurrency, formatPercent } from "../../lib/format";
@@ -41,6 +42,8 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
   // Held as a percentage (e.g. "19") — the fraction the API wants is derived below.
   const [taxPercent, setTaxPercent] = useState(order ? String(order.taxRate * 100) : "");
   const [notes, setNotes] = useState(order?.notes ?? "");
+  const [invoiceFileName, setInvoiceFileName] = useState(order?.invoiceFileName ?? "");
+  const [invoiceFileUrl, setInvoiceFileUrl] = useState(order?.invoiceFileUrl ?? "");
   const [lines, setLines] = useState<PoLineDraft[]>(
     order
       ? order.lines.map((l) => ({ itemId: l.itemId, itemName: l.item.name, unit: l.item.unit, quantity: l.quantity, unitCost: l.unitCost }))
@@ -85,6 +88,10 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
         ...(!editing && deposit > 0 ? { amountPaid: deposit } : {}),
         ...extras,
         ...(notes.trim() ? { notes: notes.trim() } : {}),
+        // Sent even when empty so clearing a previously attached file (via
+        // FilePicker's "Retirer") actually removes it on save.
+        invoiceFileName: invoiceFileName,
+        invoiceFileUrl: invoiceFileUrl,
         lines: activeLines.map(toLineInput),
       };
       if (order) await updatePurchaseOrder(order.id, payload);
@@ -239,6 +246,21 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
 
         <Field label={t("field.notes")}>
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </Field>
+
+        <Field label={t("po.invoiceLabel")} hint={t("po.invoiceHint")}>
+          <FilePicker
+            fileName={invoiceFileName || null}
+            fileUrl={invoiceFileUrl || null}
+            onSelect={(name, url) => {
+              setInvoiceFileName(name);
+              setInvoiceFileUrl(url);
+            }}
+            onClear={() => {
+              setInvoiceFileName("");
+              setInvoiceFileUrl("");
+            }}
+          />
         </Field>
 
         <Banner tone="info">

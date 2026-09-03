@@ -150,6 +150,16 @@ export class CreatePurchaseOrderDto {
   @IsString()
   notes?: string;
 
+  /** Original filename of the attached invoice/bon de commande, if any. */
+  @IsOptional()
+  @IsString()
+  invoiceFileName?: string;
+
+  /** The attached invoice/bon de commande as a data-URI (PDF, Word or image). */
+  @IsOptional()
+  @IsString()
+  invoiceFileUrl?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -206,6 +216,16 @@ export class UpdatePurchaseOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /** Original filename of the attached invoice/bon de commande. Send an empty string to remove it. */
+  @IsOptional()
+  @IsString()
+  invoiceFileName?: string;
+
+  /** The attached invoice/bon de commande as a data-URI. Send an empty string to remove it. */
+  @IsOptional()
+  @IsString()
+  invoiceFileUrl?: string;
 
   /** Replaces every line. Only accepted while the PO is DRAFT or SUBMITTED. */
   @IsOptional()

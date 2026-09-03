@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
+import { ImagePicker } from "../../components/ui/ImagePicker";
 import { ApiError } from "../../lib/api";
 import { createCustomer, updateCustomer, type ApiCustomer, type CustomerInput } from "../../lib/salesApi";
 import { useI18n } from "../../state/LanguageContext";
@@ -26,6 +27,11 @@ export function CustomerModal({
     province: customer?.province ?? "",
     country: customer?.country ?? t("customer.defaultCountry"),
     postalCode: customer?.postalCode ?? "",
+    nif: customer?.nif ?? "",
+    rc: customer?.rc ?? "",
+    ai: customer?.ai ?? "",
+    nis: customer?.nis ?? "",
+    photoUrl: customer?.photoUrl ?? "",
     notes: customer?.notes ?? "",
   });
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +48,9 @@ export function CustomerModal({
       Object.entries(form).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]).filter(([, v]) => v !== ""),
     ) as unknown as CustomerInput;
     payload.fullName = form.fullName.trim();
+    // Explicit null (not omitted) so the "Retirer" button in ImagePicker
+    // actually clears a previously saved photo instead of leaving it as-is.
+    payload.photoUrl = (form.photoUrl ?? "").trim() || null;
 
     setSaving(true);
     try {
@@ -98,6 +107,25 @@ export function CustomerModal({
             <input className="input" value={form.country} onChange={(e) => set({ country: e.target.value })} />
           </Field>
         </div>
+        <div className="form-row">
+          <Field label={t("field.nif")} hint={t("field.nifHint")}>
+            <input className="input" value={form.nif} onChange={(e) => set({ nif: e.target.value })} />
+          </Field>
+          <Field label={t("field.rc")} hint={t("field.rcHint")}>
+            <input className="input" value={form.rc} onChange={(e) => set({ rc: e.target.value })} />
+          </Field>
+        </div>
+        <div className="form-row">
+          <Field label={t("field.ai")} hint={t("field.aiHint")}>
+            <input className="input" value={form.ai} onChange={(e) => set({ ai: e.target.value })} />
+          </Field>
+          <Field label={t("field.nis")} hint={t("field.nisHint")}>
+            <input className="input" value={form.nis} onChange={(e) => set({ nis: e.target.value })} />
+          </Field>
+        </div>
+        <Field label={t("customer.photoLabel")}>
+          <ImagePicker value={form.photoUrl || null} onChange={(value) => set({ photoUrl: value ?? "" })} />
+        </Field>
         <Field label={t("field.notes")}>
           <input className="input" value={form.notes} onChange={(e) => set({ notes: e.target.value })} />
         </Field>

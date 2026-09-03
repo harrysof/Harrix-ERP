@@ -23,6 +23,16 @@ export class CreateCustomerDto {
   @IsOptional() @IsString() @MaxLength(100) province?: string;
   @IsOptional() @IsString() @MaxLength(100) country?: string;
   @IsOptional() @IsString() @MaxLength(20) postalCode?: string;
+  /** Numéro d'Identification Fiscale. */
+  @IsOptional() @IsString() @MaxLength(50) nif?: string;
+  /** Numéro du Registre de Commerce. */
+  @IsOptional() @IsString() @MaxLength(50) rc?: string;
+  /** Article d'Imposition. */
+  @IsOptional() @IsString() @MaxLength(50) ai?: string;
+  /** Numéro d'Identification Statistique. */
+  @IsOptional() @IsString() @MaxLength(50) nis?: string;
+  /** A URL (http/https) or a data-URI (inline image) — same convention as Item.photoUrl. */
+  @IsOptional() @IsString() photoUrl?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }
 
@@ -43,5 +53,15 @@ export class UpdateCustomerDto {
   @IsOptional() @IsString() @MaxLength(100) province?: string;
   @IsOptional() @IsString() @MaxLength(100) country?: string;
   @IsOptional() @IsString() @MaxLength(20) postalCode?: string;
+  /** Numéro d'Identification Fiscale. */
+  @IsOptional() @IsString() @MaxLength(50) nif?: string;
+  /** Numéro du Registre de Commerce. */
+  @IsOptional() @IsString() @MaxLength(50) rc?: string;
+  /** Article d'Imposition. */
+  @IsOptional() @IsString() @MaxLength(50) ai?: string;
+  /** Numéro d'Identification Statistique. */
+  @IsOptional() @IsString() @MaxLength(50) nis?: string;
+  /** A URL (http/https) or a data-URI (inline image) — same convention as Item.photoUrl. */
+  @IsOptional() @IsString() photoUrl?: string;
   @IsOptional() @IsString() @MaxLength(2000) notes?: string;
 }

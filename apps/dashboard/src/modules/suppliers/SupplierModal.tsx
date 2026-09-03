@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Modal } from "../../components/ui/Modal";
 import { Field } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
+import { ImagePicker } from "../../components/ui/ImagePicker";
 import type { Supplier, SupplierInput } from "../../lib/suppliersApi";
 import { useI18n } from "../../state/LanguageContext";
 
@@ -20,7 +21,11 @@ export function SupplierModal({
   const [phone, setPhone] = useState(supplier?.phone ?? "");
   const [email, setEmail] = useState(supplier?.email ?? "");
   const [address, setAddress] = useState(supplier?.address ?? "");
-  const [registration, setRegistration] = useState(supplier?.registration ?? "");
+  const [nif, setNif] = useState(supplier?.nif ?? "");
+  const [rc, setRc] = useState(supplier?.rc ?? "");
+  const [ai, setAi] = useState(supplier?.ai ?? "");
+  const [nis, setNis] = useState(supplier?.nis ?? "");
+  const [photoUrl, setPhotoUrl] = useState(supplier?.photoUrl ?? "");
   const [notes, setNotes] = useState(supplier?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +44,11 @@ export function SupplierModal({
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
         address: address.trim() || undefined,
-        registration: registration.trim() || undefined,
+        nif: nif.trim() || undefined,
+        rc: rc.trim() || undefined,
+        ai: ai.trim() || undefined,
+        nis: nis.trim() || undefined,
+        photoUrl: photoUrl.trim() || null,
         notes: notes.trim() || undefined,
       });
     } catch (e) {
@@ -81,8 +90,24 @@ export function SupplierModal({
         <Field label={t("field.address")}>
           <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
         </Field>
-        <Field label={t("supplier.registration")} hint={t("supplier.notesHint")}>
-          <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value)} />
+        <div className="form-row">
+          <Field label={t("field.nif")} hint={t("field.nifHint")}>
+            <input className="input" value={nif} onChange={(e) => setNif(e.target.value)} />
+          </Field>
+          <Field label={t("field.rc")} hint={t("field.rcHint")}>
+            <input className="input" value={rc} onChange={(e) => setRc(e.target.value)} />
+          </Field>
+        </div>
+        <div className="form-row">
+          <Field label={t("field.ai")} hint={t("field.aiHint")}>
+            <input className="input" value={ai} onChange={(e) => setAi(e.target.value)} />
+          </Field>
+          <Field label={t("field.nis")} hint={t("field.nisHint")}>
+            <input className="input" value={nis} onChange={(e) => setNis(e.target.value)} />
+          </Field>
+        </div>
+        <Field label={t("supplier.photoLabel")}>
+          <ImagePicker value={photoUrl || null} onChange={(value) => setPhotoUrl(value ?? "")} />
         </Field>
 
         <Field label={t("field.notes")}>

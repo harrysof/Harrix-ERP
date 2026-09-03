@@ -10,6 +10,8 @@ import { isValidUnit } from "../../lib/units";
 import { todayIso } from "../../lib/date";
 import { Banner } from "../../components/ui/Banner";
 import { Rich } from "../../components/ui/Rich";
+import { ImagePicker } from "../../components/ui/ImagePicker";
+import { inventoryTypeLabel, inventoryTypeSingular } from "../../lib/inventoryTypeI18n";
 import { useI18n } from "../../state/LanguageContext";
 
 interface AddItemModalProps {
@@ -44,7 +46,7 @@ interface AddItemModalProps {
 }
 
 export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItemModalProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [name, setName] = useState(item?.name ?? "");
   const [reference, setReference] = useState(item?.reference ?? "");
   const [unit, setUnit] = useState(item?.unit ?? inventoryType.defaultUnit);
@@ -169,7 +171,7 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
       title={
         item
           ? t("item.editTitle", { name: item.name })
-          : t("item.newTitle", { inventory: inventoryType.label })
+          : t("item.newTitle", { inventory: inventoryTypeLabel(inventoryType, lang) })
       }
       onClose={onClose}
       footer={
@@ -185,7 +187,7 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
     >
       <div className="form-stack">
         <Field label={t("field.name")}>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("item.namePlaceholder", { singular: inventoryType.singular })}
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("item.namePlaceholder", { singular: inventoryTypeSingular(inventoryType, lang) })}
             autoFocus
           />
         </Field>
@@ -339,16 +341,8 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
           </>
         ) : null}
 
-        <Field
-          label={t("item.photoLabel")}
-          hint={t("item.photoHint")}
-        >
-          {photoUrl ? (
-            <div className="field-photo-preview">
-              <img src={photoUrl} alt="" />
-            </div>
-          ) : null}
-          <input className="input" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder={t("item.ph.photoUrl")} />
+        <Field label={t("item.photoLabel")} hint={t("item.photoHint")}>
+          <ImagePicker value={photoUrl || null} onChange={(value) => setPhotoUrl(value ?? "")} />
         </Field>
         {error ? <p className="form-error">{error}</p> : null}
       </div>

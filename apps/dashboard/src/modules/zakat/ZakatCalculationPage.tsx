@@ -208,7 +208,7 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
             <select className="input" value={methodology} onChange={(e) => setMethodology(e.target.value as ZakatMethodology)}>
               {ZAKAT_METHODOLOGIES.map((m) => (
                 <option key={m} value={m}>
-                  {ZAKAT_METHODOLOGY_LABELS[m]}
+                  {t(ZAKAT_METHODOLOGY_LABELS[m])}
                 </option>
               ))}
             </select>

@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Pill } from "../../components/ui/Pill";
 import { Banner } from "../../components/ui/Banner";
+import { FilePicker } from "../../components/ui/FilePicker";
 import { ApiError } from "../../lib/api";
 import { formatCurrency, formatDate, formatQuantity } from "../../lib/format";
 import { todayIso } from "../../lib/date";
@@ -16,6 +17,7 @@ import {
   receivePurchaseOrder,
   recordPurchasePayment,
   setPurchaseOrderStatus,
+  updatePurchaseOrder,
   type ApiPurchaseOrder,
   type PoStatus,
   type ReceiptLineInput,
@@ -61,6 +63,10 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
   const [paying, setPaying] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(todayIso());
+
+  const [attachmentDirty, setAttachmentDirty] = useState(false);
+  const [invoiceFileName, setInvoiceFileName] = useState(order.invoiceFileName ?? "");
+  const [invoiceFileUrl, setInvoiceFileUrl] = useState(order.invoiceFileUrl ?? "");
 
   const canReceive = order.status === "APPROVED" || order.status === "PARTIALLY_RECEIVED";
   const nextStatuses = NEXT_STATUSES[order.status] ?? [];
@@ -129,6 +135,11 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
       setPaying(false);
       setPaymentAmount("");
     }
+  }
+
+  async function saveAttachment() {
+    const ok = await run(() => updatePurchaseOrder(order.id, { invoiceFileName, invoiceFileUrl }));
+    if (ok) setAttachmentDirty(false);
   }
 
   return (
@@ -216,6 +227,39 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
             </table>
           </div>
           <TotalsPanel totals={order.totals} />
+        </section>
+
+        <section>
+          <h4 className="section-title">{t("po.attachment")}</h4>
+          {can("purchasing:write") ? (
+            <>
+              <FilePicker
+                fileName={invoiceFileName || null}
+                fileUrl={invoiceFileUrl || null}
+                onSelect={(name, url) => {
+                  setInvoiceFileName(name);
+                  setInvoiceFileUrl(url);
+                  setAttachmentDirty(true);
+                }}
+                onClear={() => {
+                  setInvoiceFileName("");
+                  setInvoiceFileUrl("");
+                  setAttachmentDirty(true);
+                }}
+              />
+              {attachmentDirty ? (
+                <Button variant="primary" style={{ marginTop: 10 }} disabled={busy} onClick={saveAttachment}>
+                  {busy ? t("action.saving") : t("action.save")}
+                </Button>
+              ) : null}
+            </>
+          ) : order.invoiceFileName && order.invoiceFileUrl ? (
+            <a href={order.invoiceFileUrl} download={order.invoiceFileName} target="_blank" rel="noreferrer">
+              {order.invoiceFileName}
+            </a>
+          ) : (
+            <p className="muted">{t("po.noAttachment")}</p>
+          )}
         </section>
 
         {nextStatuses.length > 0 && can("purchasing:approve") ? (
