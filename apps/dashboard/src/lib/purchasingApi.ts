@@ -29,6 +29,25 @@ export const PO_STATUS_TONES: Record<PoStatus, "ok" | "warn" | "danger" | "neutr
 /** Statuses a user may set by hand. RECEIVED/PARTIALLY_RECEIVED are consequences of receipts. */
 export const SETTABLE_PO_STATUSES: PoStatus[] = ["DRAFT", "SUBMITTED", "APPROVED", "CANCELLED"];
 
+/** Independent of PoStatus above — a supplier can be paid regardless of what has arrived. */
+export type PoPaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "CANCELLED";
+
+export const PO_PAYMENT_LABELS: Record<PoPaymentStatus, string> = {
+  PENDING: "En attente",
+  PARTIAL: "Partiellement payé",
+  PAID: "Payé",
+  CANCELLED: "Annulé",
+};
+
+export const PO_PAYMENT_TONES: Record<PoPaymentStatus, "ok" | "warn" | "danger" | "neutral"> = {
+  PENDING: "warn",
+  PARTIAL: "warn",
+  PAID: "ok",
+  CANCELLED: "neutral",
+};
+
+export const PO_PAYMENT_STATUSES: PoPaymentStatus[] = ["PENDING", "PARTIAL", "PAID", "CANCELLED"];
+
 export interface ApiPoLine {
   id: string;
   itemId: string;
@@ -75,6 +94,11 @@ export interface ApiPurchaseOrder {
   date: string;
   expectedDate: string | null;
   status: PoStatus;
+  paymentStatus: PoPaymentStatus;
+  /** How much has actually been paid to the supplier so far, in DZD. */
+  amountPaid: number;
+  /** What's still owed to the supplier — totals.total minus amountPaid, never negative. */
+  balanceDue: number;
   shipping: number;
   /** A DZD amount when discountType is FIXED, or a fraction (0.10 for 10 %) when it's PERCENT — the DZD amount always lives on `totals.discount`. */
   discount: number;
@@ -99,6 +123,8 @@ export interface SupplierDetail {
     openPurchaseOrderCount: number;
     totalPurchased: number;
     outstandingCommitment: number;
+    /** Accounts payable — what's still owed to this supplier, in money. */
+    amountOwed: number;
     lastPurchaseDate: string | null;
   };
 }
@@ -106,6 +132,7 @@ export interface SupplierDetail {
 export interface PoFilters {
   supplierId?: string;
   status?: string;
+  paymentStatus?: string;
   from?: string;
   to?: string;
 }
@@ -147,6 +174,8 @@ export function createPurchaseOrder(input: {
   date: string;
   expectedDate?: string;
   status?: string;
+  /** A deposit paid to the supplier at order time. paymentStatus is derived from it. */
+  amountPaid?: number;
   shipping?: number;
   discount?: number;
   discountType?: DiscountType;
@@ -176,6 +205,11 @@ export function updatePurchaseOrder(
 
 export function setPurchaseOrderStatus(id: string, status: PoStatus): Promise<ApiPurchaseOrder> {
   return api.patch<ApiPurchaseOrder>(`/purchasing/orders/${id}/status`, { status });
+}
+
+/** Adds to amountPaid — "half now, the rest later" — never a status typed directly. */
+export function recordPurchasePayment(id: string, input: { amount: number; date?: string }): Promise<ApiPurchaseOrder> {
+  return api.post<ApiPurchaseOrder>(`/purchasing/orders/${id}/payments`, input);
 }
 
 /** Posting a delivery — the only purchasing action that moves stock. */

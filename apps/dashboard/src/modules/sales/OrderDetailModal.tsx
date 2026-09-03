@@ -9,12 +9,12 @@ import { formatCurrency, formatDate } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import {
   deleteOrder,
+  recordPayment,
   returnOrder,
   setOrderArchived,
   setOrderStatus,
   shipOrder,
   PAYMENT_LABELS,
-  PAYMENT_STATUSES,
   PAYMENT_TONES,
   SHIPMENT_LABELS,
   SHIPMENT_TONES,
@@ -46,6 +46,10 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
   const [shipping, setShipping] = useState(false);
   const [shipDate, setShipDate] = useState(todayIso());
   const [markPaid, setMarkPaid] = useState(false);
+
+  const [paying, setPaying] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(todayIso());
 
   const [returning, setReturning] = useState(false);
   const [returnDate, setReturnDate] = useState(todayIso());
@@ -86,6 +90,19 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
       setReturning(false);
       setReturnDraft({});
       setReturnReason("");
+    }
+  }
+
+  async function submitPayment() {
+    const amount = Number(paymentAmount);
+    if (!(amount > 0)) {
+      setError("Indiquez un montant de paiement supérieur à zéro.");
+      return;
+    }
+    const ok = await run(() => recordPayment(order.id, { amount, date: paymentDate }));
+    if (ok) {
+      setPaying(false);
+      setPaymentAmount("");
     }
   }
 
@@ -255,29 +272,50 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
               )
             ) : null}
 
-            <div className="form-row" style={{ marginTop: 12 }}>
-              <Field
-                label="Statut de paiement"
-                hint={
-                  order.shipmentStatus === "SHIPPED"
-                    ? "Ne touche pas au stock. Pour reprendre des articles déjà expédiés, utilisez « Enregistrer un retour » ci-dessous."
-                    : undefined
-                }
-              >
-                <select
-                  className="input"
-                  value={order.paymentStatus}
-                  disabled={busy}
-                  onChange={(e) => run(() => setOrderStatus(order.id, { paymentStatus: e.target.value }))}
-                >
-                  {PAYMENT_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {PAYMENT_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+            <div className="invoice-block" style={{ marginTop: 12 }}>
+              <p>
+                Payé : <strong>{formatCurrency(order.amountPaid)}</strong> sur {formatCurrency(order.totals.total)}
+                {order.balanceDue > 0 ? (
+                  <>
+                    {" "}
+                    — solde restant dû : <strong>{formatCurrency(order.balanceDue)}</strong>
+                  </>
+                ) : null}
+              </p>
             </div>
+
+            {order.paymentStatus !== "CANCELLED" && order.balanceDue > 0 ? (
+              paying ? (
+                <div className="form-stack" style={{ marginTop: 10 }}>
+                  <div className="form-row">
+                    <Field label="Montant payé (DZD)" hint={`Solde restant dû : ${formatCurrency(order.balanceDue)}`}>
+                      <input
+                        className="input"
+                        type="number"
+                        min={0}
+                        max={order.balanceDue}
+                        step="any"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Date du paiement">
+                      <input className="input" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+                    </Field>
+                  </div>
+                  <div className="row-actions">
+                    <Button variant="primary" disabled={busy} onClick={submitPayment}>
+                      {busy ? "Enregistrement…" : "Enregistrer le paiement"}
+                    </Button>
+                    <Button onClick={() => setPaying(false)}>Annuler</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="primary" style={{ marginTop: 10 }} onClick={() => setPaying(true)}>
+                  + Enregistrer un paiement
+                </Button>
+              )
+            ) : null}
           </section>
         ) : null}
 

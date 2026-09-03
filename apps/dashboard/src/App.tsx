@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import { InventoryTypesProvider } from "./state/InventoryTypesContext";
 import { AuthProvider, useAuth } from "./state/AuthContext";
+import { ThemeProvider } from "./state/ThemeContext";
+import { LanguageProvider, useI18n } from "./state/LanguageContext";
+import type { TranslationKey } from "./lib/i18n";
 import { AppShell } from "./components/layout/AppShell";
 import { visibleTabs, type TabId } from "./components/layout/Sidebar";
 import { LoginPage } from "./modules/auth/LoginPage";
@@ -17,24 +20,32 @@ import { ZakatPage } from "./modules/zakat/ZakatPage";
 import { UsersPage } from "./modules/admin/UsersPage";
 import { AuditPage } from "./modules/admin/AuditPage";
 
-const PAGE_COPY: Record<TabId, { title: string; subtitle: string }> = {
-  dashboard: { title: "Tableau de bord", subtitle: "Vue d'ensemble de l'usine" },
-  stock: { title: "Stock", subtitle: "Les 4 inventaires : produits chimiques, tige, pièces détachées, produits finis" },
-  production: { title: "Production", subtitle: "Lots de production, traçabilité des matières, écarts et pertes" },
-  purchasing: { title: "Achats & fournisseurs", subtitle: "Fournisseur → bon de commande → réception → stock" },
-  orders: { title: "Ventes & clients", subtitle: "Commandes, factures et base clients" },
-  hr: { title: "Ressources humaines", subtitle: "Employés, heures travaillées et absences" },
-  finance: { title: "Finance", subtitle: "Calculateur de coût de revient et de marge, produit par produit" },
-  zakati: { title: "ZAKATI", subtitle: "Calcul, suivi et historique de la Zakat de l'entreprise" },
-  users: { title: "Utilisateurs", subtitle: "Comptes, rôles et permissions" },
-  audit: { title: "Journal d'activité", subtitle: "Qui a fait quoi, et quand" },
+/**
+ * Each tab's heading. The title reuses the sidebar's nav label so the two can
+ * never drift apart; the subtitle has its own key.
+ */
+const PAGE_COPY: Record<TabId, { title: TranslationKey; subtitle: TranslationKey }> = {
+  dashboard: { title: "nav.dashboard", subtitle: "page.dashboard.subtitle" },
+  stock: { title: "nav.stock", subtitle: "page.stock.subtitle" },
+  production: { title: "nav.production", subtitle: "page.production.subtitle" },
+  purchasing: { title: "nav.purchasing", subtitle: "page.purchasing.subtitle" },
+  orders: { title: "nav.orders", subtitle: "page.orders.subtitle" },
+  hr: { title: "nav.hr", subtitle: "page.hr.subtitle" },
+  finance: { title: "nav.finance", subtitle: "page.finance.subtitle" },
+  zakati: { title: "nav.zakati", subtitle: "page.zakati.subtitle" },
+  users: { title: "nav.users", subtitle: "page.users.subtitle" },
+  audit: { title: "nav.audit", subtitle: "page.audit.subtitle" },
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthenticatedApp />
-    </AuthProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AuthenticatedApp />
+        </AuthProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }
 
@@ -45,8 +56,9 @@ export default function App() {
  */
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
+  const { t } = useI18n();
 
-  if (loading) return <div className="boot-screen">Chargement…</div>;
+  if (loading) return <div className="boot-screen">{t("app.loading")}</div>;
   if (!user) return <LoginPage />;
 
   // Keyed on the user id so switching accounts remounts everything: no page
@@ -60,6 +72,7 @@ function AuthenticatedApp() {
 
 function MainApp() {
   const { can, canAny } = useAuth();
+  const { t } = useI18n();
   const allowed = visibleTabs(canAny);
   const [tab, setTab] = useState<TabId>(allowed[0] ?? "dashboard");
   const [changingPassword, setChangingPassword] = useState(false);
@@ -77,8 +90,8 @@ function MainApp() {
     <AppShell
       active={tab}
       onNavigate={setTab}
-      title={copy.title}
-      subtitle={copy.subtitle}
+      title={t(copy.title)}
+      subtitle={t(copy.subtitle)}
       onChangePassword={() => setChangingPassword(true)}
     >
       {tab === "dashboard" && <DashboardPage onGoToStock={() => can("stock:read") && setTab("stock")} />}

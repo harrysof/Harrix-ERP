@@ -8,13 +8,21 @@ import {
   canShip,
   lineTotal,
   orderTotals,
+  paymentStatusOf,
   returnableForLine,
   returnedForLine,
   round,
   summarizeCustomer,
 } from './sales-math.js';
 import type { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto.js';
-import type { CreateOrderDto, UpdateOrderDto, ReturnOrderDto, SetOrderStatusDto, ShipOrderDto } from './dto/order.dto.js';
+import type {
+  CreateOrderDto,
+  UpdateOrderDto,
+  RecordPaymentDto,
+  ReturnOrderDto,
+  SetOrderStatusDto,
+  ShipOrderDto,
+} from './dto/order.dto.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 
@@ -136,6 +144,7 @@ export class SalesService {
       discount: number;
       taxRate: number;
       shipmentStatus: string;
+      amountPaid: number;
       lines: Array<{
         id: string;
         itemId: string;
@@ -186,6 +195,14 @@ export class SalesService {
 
     const code = dto.code ?? (await this.nextCode('CMD', 'order', new Date(dto.date)));
 
+    const total = orderTotals(dto.lines, dto).total;
+    const amountPaid = dto.amountPaid ?? 0;
+    if (amountPaid > total) {
+      throw new BadRequestException(
+        `Le paiement initial (${amountPaid} DZD) dépasse le total de la commande (${total} DZD).`,
+      );
+    }
+
     try {
       const created = await this.prisma.order.create({
         data: {
@@ -193,7 +210,8 @@ export class SalesService {
           customerId: dto.customerId,
           date: new Date(dto.date),
           shipmentStatus: dto.shipmentStatus ?? 'PENDING',
-          paymentStatus: dto.paymentStatus ?? 'PENDING',
+          paymentStatus: paymentStatusOf(total, amountPaid),
+          amountPaid,
           shipping: dto.shipping ?? 0,
           discount: dto.discount ?? 0,
           discountType: dto.discountType ?? 'FIXED',
@@ -246,7 +264,6 @@ export class SalesService {
           ...(dto.discountType !== undefined ? { discountType: dto.discountType } : {}),
           ...(dto.taxRate !== undefined ? { taxRate: dto.taxRate } : {}),
           ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-          ...(dto.paymentStatus ? { paymentStatus: dto.paymentStatus } : {}),
           ...pickShipTo(dto),
         },
       });
@@ -314,12 +331,13 @@ export class SalesService {
         });
         await tx.orderLine.update({ where: { id: line.id }, data: { movementId: movement.id } });
       }
+      const total = orderTotals(order.lines, order).total;
       await tx.order.update({
         where: { id },
         data: {
           shipmentStatus: 'SHIPPED',
           shippedAt: date,
-          ...(dto.markPaid ? { paymentStatus: 'PAID' } : {}),
+          ...(dto.markPaid ? { paymentStatus: 'PAID', amountPaid: total } : {}),
         },
       });
     });
@@ -434,6 +452,37 @@ export class SalesService {
   }
 
   /**
+   * Records a payment against an order — "he can only pay half now, and the
+   * rest later" — by adding to amountPaid rather than typing a status
+   * directly, so amountPaid and paymentStatus can never disagree (see
+   * sales-math.ts's paymentStatusOf). Refused past the order total: an
+   * overpayment isn't owed money, it's a different problem (a refund, a
+   * credit note) that this ledger-less model doesn't represent.
+   */
+  async recordPayment(id: string, dto: RecordPaymentDto) {
+    const order = await this.prisma.order.findUnique({ where: { id }, include: { lines: true } });
+    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (order.paymentStatus === 'CANCELLED') {
+      throw new ConflictException('Cette commande est annulée — aucun paiement ne peut lui être associé.');
+    }
+
+    const total = orderTotals(order.lines, order).total;
+    const amountPaid = round(order.amountPaid + dto.amount);
+    if (amountPaid > total) {
+      const remaining = round(total - order.amountPaid);
+      throw new BadRequestException(
+        `Ce paiement (${dto.amount} DZD) dépasse le solde restant dû (${remaining} DZD).`,
+      );
+    }
+
+    await this.prisma.order.update({
+      where: { id },
+      data: { amountPaid, paymentStatus: paymentStatusOf(total, amountPaid) },
+    });
+    return this.getOrder(id);
+  }
+
+  /**
    * Archived, not deleted — the escape hatch for a shipped order, which
    * removeOrder() refuses since it has a stock trail. Any order can be
    * archived regardless of shipment/payment state; it only hides it from the
@@ -471,9 +520,14 @@ export class SalesService {
       shipped: orders.filter((o) => o.shipmentStatus === 'SHIPPED').length,
       cancelled: orders.filter((o) => o.shipmentStatus === 'CANCELLED').length,
       // Chiffre d'affaires is money actually collected — an unpaid order is a
-      // commitment, not revenue yet, however far along its shipment is.
-      revenue: round(live.filter((o) => o.paymentStatus === 'PAID').reduce((sum, o) => sum + totalOf(o), 0)),
-      outstanding: round(live.filter((o) => o.paymentStatus === 'PENDING').reduce((sum, o) => sum + totalOf(o), 0)),
+      // commitment, not revenue yet, however far along its shipment is. A
+      // PARTIAL order contributes only what's actually been paid on it.
+      revenue: round(live.reduce((sum, o) => sum + o.amountPaid, 0)),
+      outstanding: round(
+        live
+          .filter((o) => o.paymentStatus === 'PENDING' || o.paymentStatus === 'PARTIAL')
+          .reduce((sum, o) => sum + Math.max(0, totalOf(o) - o.amountPaid), 0),
+      ),
     };
   }
 
@@ -520,6 +574,7 @@ function decorateOrder<
     discount: number;
     taxRate: number;
     shipmentStatus: string;
+    amountPaid: number;
     lines: Array<{
       id: string;
       quantity: number;
@@ -530,6 +585,7 @@ function decorateOrder<
   },
 >(order: T) {
   const orderCanReturn = canReturn(order);
+  const totals = orderTotals(order.lines, order);
   return {
     ...order,
     lines: order.lines.map((line) => ({
@@ -538,7 +594,9 @@ function decorateOrder<
       returned: returnedForLine(line.id, line.returnLines),
       returnable: orderCanReturn ? returnableForLine(line, line.returnLines) : 0,
     })),
-    totals: orderTotals(order.lines, order),
+    totals,
+    /** What's still owed, in DZD — total minus amountPaid, never negative. */
+    balanceDue: round(Math.max(0, totals.total - order.amountPaid)),
     canEdit: canEdit(order),
     canShip: canShip(order),
     canCancel: canCancel(order),

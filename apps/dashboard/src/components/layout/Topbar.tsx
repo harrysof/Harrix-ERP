@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../state/AuthContext";
-
-const dateFormatter = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+import { useI18n } from "../../state/LanguageContext";
+import { NotificationBell } from "./NotificationBell";
+import { ThemeToggle } from "./ThemeToggle";
+import { LanguageToggle } from "./LanguageToggle";
 
 export function Topbar({ title, subtitle, onChangePassword }: { title: string; subtitle: string; onChangePassword: () => void }) {
   const { user, logout } = useAuth();
+  const { locale, t } = useI18n();
+  const dateFormatter = new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" });
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +37,10 @@ export function Topbar({ title, subtitle, onChangePassword }: { title: string; s
       <div className="topbar-right">
         <span className="topbar-date">{dateFormatter.format(new Date())}</span>
 
+        <LanguageToggle />
+        <ThemeToggle />
+        <NotificationBell />
+
         <div className="user-menu" ref={menuRef}>
           <button type="button" className="topbar-user" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
             {initials(user?.fullName ?? "?")}
@@ -46,10 +54,10 @@ export function Topbar({ title, subtitle, onChangePassword }: { title: string; s
                 <span className="user-menu-login">{user?.login}</span>
               </div>
               <button type="button" className="user-menu-item" onClick={() => { setOpen(false); onChangePassword(); }}>
-                Changer mon mot de passe
+                {t("user.changePassword")}
               </button>
               <button type="button" className="user-menu-item user-menu-item-danger" onClick={logout}>
-                Se déconnecter
+                {t("user.logout")}
               </button>
             </div>
           ) : null}

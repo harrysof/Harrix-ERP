@@ -1,6 +1,10 @@
 @echo off
 title Harrix ERP - Launcher
-setlocal
+rem Delayed expansion is required: %VAR% inside a parenthesised block is
+rem substituted when the block is PARSED, not when it runs, so a variable set
+rem inside the block still reads as empty later in that same block. The
+rem first-time JWT secret below is set and then checked inside one such block.
+setlocal EnableDelayedExpansion
 
 set "ROOT=%~dp0"
 set "BACKEND=%ROOT%backend"
@@ -27,10 +31,19 @@ if not exist "%BACKEND%\.env" (
 
     echo First-time setup: generating a random JWT secret...
     for /f "delims=" %%S in ('node -e "console.log(require(\"crypto\").randomBytes(48).toString(\"base64url\"))"') do set "JWTSECRET=%%S"
-    if "%JWTSECRET%"=="" goto :error
+    if "!JWTSECRET!"=="" goto :error
 
-    powershell -NoProfile -Command "(Get-Content -Raw '%BACKEND%\.env') -replace 'changez-moi-par-une-longue-chaine-aleatoire', '%JWTSECRET%' | Set-Content -NoNewline -Encoding utf8 '%BACKEND%\.env'"
+    powershell -NoProfile -Command "(Get-Content -Raw '%BACKEND%\.env') -replace 'changez-moi-par-une-longue-chaine-aleatoire', '!JWTSECRET!' | Set-Content -NoNewline -Encoding utf8 '%BACKEND%\.env'"
     if errorlevel 1 goto :error
+
+    rem Refuse to start on the placeholder secret: it is published in the
+    rem committed .env.example, so anyone holding a copy of the source could
+    rem sign a token for any account.
+    findstr /c:"changez-moi-par-une-longue-chaine-aleatoire" "%BACKEND%\.env" >nul 2>nul
+    if not errorlevel 1 (
+        echo [ERROR] The JWT secret was not replaced. Refusing to start with the default.
+        goto :error
+    )
 )
 
 if not exist "%BACKEND%\node_modules" (
@@ -64,6 +77,20 @@ if not exist "%BACKEND%\dev.db" (
     echo First-time setup: creating the first login account...
     call npm run seed:auth --prefix "%BACKEND%"
     if errorlevel 1 goto :error
+)
+
+rem A snapshot every time the ERP starts, so a backup exists without anyone
+rem having to remember. Never fatal: a failed backup must not stop the factory
+rem from working, it just has to say so loudly.
+if exist "%BACKEND%\dev.db" (
+    echo Backing up the database...
+    call npm run backup --prefix "%BACKEND%"
+    if errorlevel 1 (
+        echo.
+        echo [WARNING] The backup FAILED. Starting anyway - but fix this today.
+        echo.
+        timeout /t 5 /nobreak >nul
+    )
 )
 
 echo.

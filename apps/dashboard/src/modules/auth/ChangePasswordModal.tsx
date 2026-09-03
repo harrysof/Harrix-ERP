@@ -5,11 +5,13 @@ import { Field } from "../../components/ui/Field";
 import { Banner } from "../../components/ui/Banner";
 import { ApiError } from "../../lib/api";
 import { changeOwnPassword } from "../../lib/authApi";
+import { useI18n } from "../../state/LanguageContext";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 /** Anyone changing their own password. Requires the current one. */
 export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -19,18 +21,18 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
   async function handleSave() {
     setError(null);
-    if (!currentPassword) return setError("Entrez votre mot de passe actuel.");
+    if (!currentPassword) return setError(t("password.missingCurrent"));
     if (newPassword.length < MIN_PASSWORD_LENGTH) {
-      return setError(`Le nouveau mot de passe doit faire au moins ${MIN_PASSWORD_LENGTH} caractères.`);
+      return setError(t("password.tooShort", { count: MIN_PASSWORD_LENGTH }));
     }
-    if (newPassword !== confirmPassword) return setError("Les deux nouveaux mots de passe ne correspondent pas.");
+    if (newPassword !== confirmPassword) return setError(t("password.mismatch"));
 
     setSaving(true);
     try {
       await changeOwnPassword({ currentPassword, newPassword });
       setDone(true);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Changement impossible.");
+      setError(e instanceof ApiError ? e.message : t("password.failed"));
     } finally {
       setSaving(false);
     }
@@ -38,28 +40,28 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Changer mon mot de passe"
+      title={t("password.title")}
       onClose={onClose}
       footer={
         done ? (
           <Button variant="primary" onClick={onClose}>
-            Fermer
+            {t("password.close")}
           </Button>
         ) : (
           <>
-            <Button onClick={onClose}>Annuler</Button>
+            <Button onClick={onClose}>{t("password.cancel")}</Button>
             <Button variant="primary" onClick={handleSave} disabled={saving}>
-              {saving ? "Enregistrement…" : "Changer"}
+              {saving ? t("password.saving") : t("password.save")}
             </Button>
           </>
         )
       }
     >
       {done ? (
-        <Banner tone="info">Votre mot de passe a été changé. Il sera demandé à votre prochaine connexion.</Banner>
+        <Banner tone="info">{t("password.done")}</Banner>
       ) : (
         <div className="form-stack">
-          <Field label="Mot de passe actuel">
+          <Field label={t("password.current")}>
             <input
               className="input"
               type="password"
@@ -69,10 +71,10 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
               autoFocus
             />
           </Field>
-          <Field label="Nouveau mot de passe" hint={`Au moins ${MIN_PASSWORD_LENGTH} caractères.`}>
+          <Field label={t("password.new")} hint={t("password.hint", { count: MIN_PASSWORD_LENGTH })}>
             <input className="input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
           </Field>
-          <Field label="Confirmer le nouveau mot de passe">
+          <Field label={t("password.confirm")}>
             <input className="input" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
           </Field>
           {error ? <p className="form-error">{error}</p> : null}

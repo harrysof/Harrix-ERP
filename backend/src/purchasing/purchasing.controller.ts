@@ -3,6 +3,7 @@ import { PurchasingService, type PoFilters } from './purchasing.service.js';
 import {
   CreatePurchaseOrderDto,
   ReceivePurchaseOrderDto,
+  RecordPoPaymentDto,
   SetPoStatusDto,
   UpdatePurchaseOrderDto,
 } from './dto/purchase-order.dto.js';
@@ -49,6 +50,13 @@ export class PurchasingController {
   @RequirePermissions(PERMISSIONS.PURCHASING_APPROVE)
   setStatus(@Param('id') id: string, @Body() dto: SetPoStatusDto) {
     return this.purchasing.setStatus(id, dto);
+  }
+
+  /** Adds to amountPaid — "half now, the rest later" — and re-derives paymentStatus. */
+  @Post('orders/:id/payments')
+  @RequirePermissions(PERMISSIONS.PURCHASING_WRITE)
+  recordPayment(@Param('id') id: string, @Body() dto: RecordPoPaymentDto) {
+    return this.purchasing.recordPayment(id, dto);
   }
 
   /** Posting a delivery — the only thing here that moves stock. */

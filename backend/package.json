@@ -26,7 +26,8 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "seed:auth": "tsx prisma/seed-auth.ts",
-    "reset:data": "tsx prisma/reset-data.ts"
+    "reset:data": "tsx prisma/reset-data.ts",
+    "backup": "node scripts/backup-db.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -26,6 +26,10 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
   const [supplierId, setSupplierId] = useState(order?.supplierId ?? suppliers[0]?.id ?? "");
   const [date, setDate] = useState(order ? order.date.slice(0, 10) : todayIso());
   const [expectedDate, setExpectedDate] = useState(order?.expectedDate?.slice(0, 10) ?? "");
+  // Only meaningful at creation — a deposit paid to the supplier up front.
+  // Editing an existing order never touches amountPaid; that goes through
+  // "Enregistrer un paiement" on the order detail view instead.
+  const [amountPaid, setAmountPaid] = useState("");
   const [shipping, setShipping] = useState(String(order?.shipping ?? ""));
   const [discountType, setDiscountType] = useState<DiscountType>(order?.discountType ?? "FIXED");
   // In FIXED mode this is a DZD amount; in PERCENT mode it's a percentage (e.g. "10") — the fraction the API wants is derived below.
@@ -65,12 +69,18 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
       if (line.itemId && line.quantity <= 0) return setError(`Indiquez une quantité pour « ${line.itemName} ».`);
     }
 
+    const deposit = Number(amountPaid) || 0;
+    if (!editing && deposit > totals.total) {
+      return setError(`Le paiement initial (${deposit} DZD) dépasse le total du bon de commande (${totals.total} DZD).`);
+    }
+
     setSaving(true);
     try {
       const payload = {
         supplierId,
         date,
         ...(expectedDate ? { expectedDate } : {}),
+        ...(!editing && deposit > 0 ? { amountPaid: deposit } : {}),
         ...extras,
         ...(notes.trim() ? { notes: notes.trim() } : {}),
         lines: activeLines.map(toLineInput),
@@ -117,6 +127,20 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
           <Field label="Livraison prévue" hint="Facultatif">
             <input className="input" type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
           </Field>
+          {!editing ? (
+            <Field label="Paiement initial (DZD)" hint="Facultatif — un acompte versé au fournisseur, par ex. la moitié maintenant">
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={totals.total || undefined}
+                step="any"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          ) : null}
         </div>
 
         <div>

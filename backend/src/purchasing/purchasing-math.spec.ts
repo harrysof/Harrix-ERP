@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  amountOwed,
   outstandingCommitment,
   outstandingForLine,
+  paymentStatusOf,
   poTotals,
   receivedForLine,
   statusAfterReceipt,
@@ -106,5 +108,47 @@ describe('outstandingCommitment', () => {
 
   it('is zero with nothing outstanding', () => {
     expect(outstandingCommitment([])).toBe(0);
+  });
+});
+
+describe('paymentStatusOf', () => {
+  it('is PENDING when nothing has been paid', () => {
+    expect(paymentStatusOf(1000, 0)).toBe('PENDING');
+  });
+
+  it('is PARTIAL between nothing and the full total — "half now, half later"', () => {
+    expect(paymentStatusOf(1000, 500)).toBe('PARTIAL');
+  });
+
+  it('is PAID once amountPaid reaches the total, and never overshoots past it', () => {
+    expect(paymentStatusOf(1000, 1000)).toBe('PAID');
+    expect(paymentStatusOf(1000, 1200)).toBe('PAID');
+  });
+});
+
+describe('amountOwed', () => {
+  const po = (status: string, paymentStatus: string, total: number, amountPaid = 0) => ({
+    status,
+    paymentStatus,
+    amountPaid,
+    lines: [line('a', 1, total)],
+    shipping: 0,
+    discount: 0,
+    discountType: 'FIXED',
+    taxRate: 0,
+  });
+
+  it('sums the remaining balance on every PENDING or PARTIAL order', () => {
+    expect(
+      amountOwed([po('APPROVED', 'PENDING', 1000), po('RECEIVED', 'PARTIAL', 2000, 800), po('RECEIVED', 'PAID', 500, 500)]),
+    ).toBe(1000 + 1200);
+  });
+
+  it('excludes an order cancelled on either dimension', () => {
+    expect(amountOwed([po('CANCELLED', 'CANCELLED', 1000), po('APPROVED', 'CANCELLED', 500)])).toBe(0);
+  });
+
+  it('is zero with no orders', () => {
+    expect(amountOwed([])).toBe(0);
   });
 });

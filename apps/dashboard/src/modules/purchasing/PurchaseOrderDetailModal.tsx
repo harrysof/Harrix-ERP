@@ -9,9 +9,12 @@ import { formatCurrency, formatDate, formatQuantity } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import {
   deletePurchaseOrder,
+  PO_PAYMENT_LABELS,
+  PO_PAYMENT_TONES,
   PO_STATUS_LABELS,
   PO_STATUS_TONES,
   receivePurchaseOrder,
+  recordPurchasePayment,
   setPurchaseOrderStatus,
   type ApiPurchaseOrder,
   type PoStatus,
@@ -52,6 +55,10 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
   const [deliveryNote, setDeliveryNote] = useState("");
   const [allowOver, setAllowOver] = useState(false);
   const [draft, setDraft] = useState<Record<string, { quantity: string; batchNumber: string; expiryDate: string }>>({});
+
+  const [paying, setPaying] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(todayIso());
 
   const canReceive = order.status === "APPROVED" || order.status === "PARTIALLY_RECEIVED";
   const nextStatuses = NEXT_STATUSES[order.status] ?? [];
@@ -109,6 +116,19 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
     }
   }
 
+  async function submitPayment() {
+    const amount = Number(paymentAmount);
+    if (!(amount > 0)) {
+      setError("Indiquez un montant de paiement supérieur à zéro.");
+      return;
+    }
+    const ok = await run(() => recordPurchasePayment(order.id, { amount, date: paymentDate }));
+    if (ok) {
+      setPaying(false);
+      setPaymentAmount("");
+    }
+  }
+
   return (
     <Modal
       title={`Bon de commande ${order.code}`}
@@ -140,6 +160,10 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
       <div className="form-stack">
         <div className="batch-meta">
           <Meta label="Statut" value={<Pill tone={PO_STATUS_TONES[order.status]}>{PO_STATUS_LABELS[order.status]}</Pill>} />
+          <Meta
+            label="Paiement"
+            value={<Pill tone={PO_PAYMENT_TONES[order.paymentStatus]}>{PO_PAYMENT_LABELS[order.paymentStatus]}</Pill>}
+          />
           <Meta label="Fournisseur" value={order.supplier.name} />
           <Meta label="Date" value={formatDate(order.date)} />
           <Meta label="Livraison prévue" value={order.expectedDate ? formatDate(order.expectedDate) : "—"} />
@@ -204,6 +228,56 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
                 </Button>
               ))}
             </div>
+          </section>
+        ) : null}
+
+        {can("purchasing:write") ? (
+          <section>
+            <h4 className="section-title">Paiement</h4>
+            <div className="invoice-block">
+              <p>
+                Payé : <strong>{formatCurrency(order.amountPaid)}</strong> sur {formatCurrency(order.totals.total)}
+                {order.balanceDue > 0 ? (
+                  <>
+                    {" "}
+                    — solde restant dû : <strong>{formatCurrency(order.balanceDue)}</strong>
+                  </>
+                ) : null}
+              </p>
+            </div>
+
+            {order.paymentStatus !== "CANCELLED" && order.balanceDue > 0 ? (
+              paying ? (
+                <div className="form-stack" style={{ marginTop: 10 }}>
+                  <div className="form-row">
+                    <Field label="Montant payé (DZD)" hint={`Solde restant dû : ${formatCurrency(order.balanceDue)}`}>
+                      <input
+                        className="input"
+                        type="number"
+                        min={0}
+                        max={order.balanceDue}
+                        step="any"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Date du paiement">
+                      <input className="input" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+                    </Field>
+                  </div>
+                  <div className="row-actions">
+                    <Button variant="primary" disabled={busy} onClick={submitPayment}>
+                      {busy ? "Enregistrement…" : "Enregistrer le paiement"}
+                    </Button>
+                    <Button onClick={() => setPaying(false)}>Annuler</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="primary" style={{ marginTop: 10 }} onClick={() => setPaying(true)}>
+                  + Enregistrer un paiement
+                </Button>
+              )
+            ) : null}
           </section>
         ) : null}
 

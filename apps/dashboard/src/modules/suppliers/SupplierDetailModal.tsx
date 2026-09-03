@@ -7,7 +7,14 @@ import { StatCard } from "../../components/ui/StatCard";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ApiError } from "../../lib/api";
 import { formatCurrency, formatDate, formatQuantity } from "../../lib/format";
-import { fetchSupplierDetail, PO_STATUS_LABELS, PO_STATUS_TONES, type SupplierDetail } from "../../lib/purchasingApi";
+import {
+  fetchSupplierDetail,
+  PO_PAYMENT_LABELS,
+  PO_PAYMENT_TONES,
+  PO_STATUS_LABELS,
+  PO_STATUS_TONES,
+  type SupplierDetail,
+} from "../../lib/purchasingApi";
 import type { Supplier } from "../../lib/suppliersApi";
 
 type Tab = "info" | "items" | "orders" | "receipts";
@@ -44,6 +51,12 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
               value={formatCurrency(detail.summary.outstandingCommitment)}
               hint="Commandé, pas encore livré"
               tone={detail.summary.outstandingCommitment > 0 ? "warn" : "neutral"}
+            />
+            <StatCard
+              label="Montant dû"
+              value={formatCurrency(detail.summary.amountOwed)}
+              hint="Restant à payer à ce fournisseur"
+              tone={detail.summary.amountOwed > 0 ? "warn" : "neutral"}
             />
             <StatCard
               label="Dernier achat"
@@ -119,6 +132,7 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
                       <th className="num">Lignes</th>
                       <th className="num">Total</th>
                       <th>Statut</th>
+                      <th>Paiement</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -130,6 +144,9 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
                         <td className="tabular num">{formatCurrency(po.totals.total)}</td>
                         <td>
                           <Pill tone={PO_STATUS_TONES[po.status]}>{PO_STATUS_LABELS[po.status]}</Pill>
+                        </td>
+                        <td>
+                          <Pill tone={PO_PAYMENT_TONES[po.paymentStatus]}>{PO_PAYMENT_LABELS[po.paymentStatus]}</Pill>
                         </td>
                       </tr>
                     ))}

@@ -8,7 +8,7 @@
  */
 
 export const SHIPMENT_STATUSES = ['PENDING', 'SHIPPED', 'CANCELLED'] as const;
-export const PAYMENT_STATUSES = ['PENDING', 'PAID', 'CANCELLED'] as const;
+export const PAYMENT_STATUSES = ['PENDING', 'PARTIAL', 'PAID', 'CANCELLED'] as const;
 /** FIXED: `discount` is a DZD amount. PERCENT: it's a fraction, like taxRate. */
 export const DISCOUNT_TYPES = ['FIXED', 'PERCENT'] as const;
 
@@ -91,6 +91,19 @@ export function orderTotals(
   };
 }
 
+/**
+ * Payment status is derived from amountPaid vs the order total, mirroring
+ * zakat-math.ts's paymentStatusOf — the two amounts can never disagree
+ * because the status is never typed on its own. CANCELLED is the one
+ * exception: that is only ever set directly, on order cancellation, and
+ * never comes back out of this function.
+ */
+export function paymentStatusOf(total: number, amountPaid: number): Exclude<PaymentStatus, 'CANCELLED'> {
+  if (total <= 0 || amountPaid >= total) return 'PAID';
+  if (amountPaid <= 0) return 'PENDING';
+  return 'PARTIAL';
+}
+
 /** Shipping may only be recorded once, and never for a cancelled order. */
 export function canShip(order: { shipmentStatus: string }): boolean {
   return order.shipmentStatus === 'PENDING';
@@ -138,15 +151,17 @@ export interface CustomerSummary {
 /**
  * §19's customer summaries.
  *
- * - totalPurchased counts every non-cancelled order.
- * - outstandingBalance is what is still owed: orders whose payment is
- *   PENDING. There is no payments ledger (a deliberate scope call), so this
- *   is whole-order, not partial — an order is owed in full or not at all.
+ * - totalPurchased counts every non-cancelled order, in full.
+ * - outstandingBalance is what is still owed: for every PENDING or PARTIAL
+ *   order, the total minus whatever amountPaid already covers — so a
+ *   half-paid order contributes only its remaining half, not the whole
+ *   order (see sales.service.ts's recordPayment).
  */
 export function summarizeCustomer(
   orders: Array<{
     shipmentStatus: string;
     paymentStatus: string;
+    amountPaid?: number;
     lines: OrderLineLike[];
     shipping: number;
     discount: number;
@@ -160,7 +175,11 @@ export function summarizeCustomer(
   return {
     orderCount: live.length,
     totalPurchased: round(live.reduce((sum, o) => sum + totalOf(o), 0)),
-    outstandingBalance: round(live.filter((o) => o.paymentStatus === 'PENDING').reduce((sum, o) => sum + totalOf(o), 0)),
+    outstandingBalance: round(
+      live
+        .filter((o) => o.paymentStatus === 'PENDING' || o.paymentStatus === 'PARTIAL')
+        .reduce((sum, o) => sum + Math.max(0, totalOf(o) - (o.amountPaid ?? 0)), 0),
+    ),
   };
 }
 

@@ -7,15 +7,7 @@ import { ApiError } from "../../lib/api";
 import { formatCurrency, formatQuantity } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import type { ApiItem } from "../../lib/stockApi";
-import {
-  createOrder,
-  updateOrder,
-  PAYMENT_LABELS,
-  PAYMENT_STATUSES,
-  type ApiCustomer,
-  type ApiOrder,
-  type DiscountType,
-} from "../../lib/salesApi";
+import { createOrder, updateOrder, type ApiCustomer, type ApiOrder, type DiscountType } from "../../lib/salesApi";
 import { OrderTotalsPanel } from "./OrderTotalsPanel";
 
 interface OrderLineDraft {
@@ -47,7 +39,10 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
   const editing = Boolean(order);
   const [customerId, setCustomerId] = useState(order?.customerId ?? customers[0]?.id ?? "");
   const [date, setDate] = useState(order ? order.date.slice(0, 10) : todayIso());
-  const [paymentStatus, setPaymentStatus] = useState<string>(order?.paymentStatus ?? "PENDING");
+  // Only meaningful at creation — a deposit paid up front (e.g. half now, the
+  // rest later). Editing an existing order never touches amountPaid; that
+  // goes through "Enregistrer un paiement" on the order detail view instead.
+  const [amountPaid, setAmountPaid] = useState("");
   const [shipping, setShipping] = useState(String(order?.shipping ?? ""));
   const [discountType, setDiscountType] = useState<DiscountType>(order?.discountType ?? "FIXED");
   // In FIXED mode this is a DZD amount; in PERCENT mode it's a percentage (e.g. "10") — the fraction the API wants is derived below.
@@ -110,12 +105,17 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
     if (!customerId) return setError("Choisissez un client.");
     if (activeLines.length === 0) return setError("Ajoutez au moins un produit avec une quantité.");
 
+    const deposit = Number(amountPaid) || 0;
+    if (!editing && deposit > totals.total) {
+      return setError(`Le paiement initial (${deposit} DZD) dépasse le total de la commande (${totals.total} DZD).`);
+    }
+
     setSaving(true);
     try {
       const payload = {
         customerId,
         date,
-        paymentStatus,
+        ...(!editing && deposit > 0 ? { amountPaid: deposit } : {}),
         ...extras,
         ...(notes.trim() ? { notes: notes.trim() } : {}),
         lines: activeLines.map((l) => ({
@@ -165,15 +165,20 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
           <Field label="Date">
             <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
-          <Field label="Paiement">
-            <select className="input" value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
-              {PAYMENT_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {PAYMENT_LABELS[s]}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {!editing ? (
+            <Field label="Paiement initial (DZD)" hint="Facultatif — un acompte payé à la commande, par ex. la moitié maintenant">
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={totals.total || undefined}
+                step="any"
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          ) : null}
         </div>
 
         <div>

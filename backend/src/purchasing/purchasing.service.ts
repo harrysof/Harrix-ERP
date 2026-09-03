@@ -1,10 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import {
+  amountOwed,
   CLOSED_PO_STATUSES,
   EDITABLE_PO_STATUSES,
   outstandingCommitment,
   outstandingForLine,
+  paymentStatusOf,
   poTotals,
   receivedForLine,
   RECEIVABLE_PO_STATUSES,
@@ -12,13 +14,20 @@ import {
   statusAfterReceipt,
   type PoStatus,
 } from './purchasing-math.js';
-import type { CreatePurchaseOrderDto, UpdatePurchaseOrderDto, ReceivePurchaseOrderDto, SetPoStatusDto } from './dto/purchase-order.dto.js';
+import type {
+  CreatePurchaseOrderDto,
+  UpdatePurchaseOrderDto,
+  ReceivePurchaseOrderDto,
+  RecordPoPaymentDto,
+  SetPoStatusDto,
+} from './dto/purchase-order.dto.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 
 export interface PoFilters {
   supplierId?: string;
   status?: string;
+  paymentStatus?: string;
   from?: string;
   to?: string;
 }
@@ -135,6 +144,7 @@ export class PurchasingService {
             receiptLines: po.lines.flatMap((l) => l.receiptLines),
           })),
         ),
+        amountOwed: amountOwed(decorated),
         lastPurchaseDate: decorated[0]?.date ?? null,
       },
     };
@@ -151,6 +161,14 @@ export class PurchasingService {
 
     const code = dto.code ?? (await this.nextCode('BC', 'purchaseOrder', new Date(dto.date)));
 
+    const total = poTotals(dto.lines, dto).total;
+    const amountPaid = dto.amountPaid ?? 0;
+    if (amountPaid > total) {
+      throw new BadRequestException(
+        `Le paiement initial (${amountPaid} DZD) dépasse le total du bon de commande (${total} DZD).`,
+      );
+    }
+
     try {
       const created = await this.prisma.purchaseOrder.create({
         data: {
@@ -159,6 +177,8 @@ export class PurchasingService {
           date: new Date(dto.date),
           expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null,
           status: dto.status ?? 'DRAFT',
+          paymentStatus: paymentStatusOf(total, amountPaid),
+          amountPaid,
           shipping: dto.shipping ?? 0,
           discount: dto.discount ?? 0,
           discountType: dto.discountType ?? 'FIXED',
@@ -247,7 +267,46 @@ export class PurchasingService {
       }
     }
 
-    await this.prisma.purchaseOrder.update({ where: { id }, data: { status: dto.status } });
+    await this.prisma.purchaseOrder.update({
+      where: { id },
+      data: {
+        status: dto.status,
+        // Cancelling the order also cancels what's owed on it — a voided PO
+        // isn't a payable any more, the same way sales cancels both dimensions
+        // together (see sales.service.ts's OrderDetailModal cancel action).
+        ...(dto.status === 'CANCELLED' ? { paymentStatus: 'CANCELLED' } : {}),
+      },
+    });
+    return this.findOne(id);
+  }
+
+  /**
+   * Records a payment to the supplier — "half now, the rest later" — by
+   * adding to amountPaid rather than typing a status directly, so amountPaid
+   * and paymentStatus can never disagree (see purchasing-math.ts's
+   * paymentStatusOf). Refused past the order total, same reasoning as
+   * sales.service.ts's recordPayment.
+   */
+  async recordPayment(id: string, dto: RecordPoPaymentDto) {
+    const po = await this.prisma.purchaseOrder.findUnique({ where: { id }, include: { lines: true } });
+    if (!po) throw new NotFoundException(`Bon de commande introuvable : ${id}`);
+    if (po.paymentStatus === 'CANCELLED') {
+      throw new ConflictException('Ce bon de commande est annulé — aucun paiement ne peut lui être associé.');
+    }
+
+    const total = poTotals(po.lines, po).total;
+    const amountPaid = round(po.amountPaid + dto.amount);
+    if (amountPaid > total) {
+      const remaining = round(total - po.amountPaid);
+      throw new BadRequestException(
+        `Ce paiement (${dto.amount} DZD) dépasse le solde restant dû (${remaining} DZD).`,
+      );
+    }
+
+    await this.prisma.purchaseOrder.update({
+      where: { id },
+      data: { amountPaid, paymentStatus: paymentStatusOf(total, amountPaid) },
+    });
     return this.findOne(id);
   }
 
@@ -425,10 +484,12 @@ function decorate<
     shipping: number;
     discount: number;
     taxRate: number;
+    amountPaid: number;
     lines: Array<{ id: string; quantity: number; unitCost: number; receiptLines: Array<{ purchaseOrderLineId: string; quantity: number }> }>;
   },
 >(po: T) {
   const allReceiptLines = po.lines.flatMap((l) => l.receiptLines);
+  const totals = poTotals(po.lines, po);
   return {
     ...po,
     lines: po.lines.map((line) => ({
@@ -437,15 +498,18 @@ function decorate<
       outstanding: outstandingForLine(line, allReceiptLines),
       lineTotal: round(line.quantity * line.unitCost),
     })),
-    totals: poTotals(po.lines, po),
+    totals,
+    /** What's still owed to the supplier, in DZD — total minus amountPaid, never negative. */
+    balanceDue: round(Math.max(0, totals.total - po.amountPaid)),
   };
 }
 
 function buildWhere(filters: PoFilters) {
-  const { supplierId, status, from, to } = filters;
+  const { supplierId, status, paymentStatus, from, to } = filters;
   return {
     ...(supplierId ? { supplierId } : {}),
     ...(status ? { status } : {}),
+    ...(paymentStatus ? { paymentStatus } : {}),
     ...(from || to
       ? {
           date: {

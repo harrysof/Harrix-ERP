@@ -25,6 +25,10 @@ export const PO_STATUSES = [
 
 export type PoStatus = (typeof PO_STATUSES)[number];
 
+/** Independent of PoStatus above — a supplier can be paid regardless of what has arrived. */
+export const PAYMENT_STATUSES = ['PENDING', 'PARTIAL', 'PAID', 'CANCELLED'] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
 /** FIXED: `discount` is a DZD amount. PERCENT: it's a fraction, like taxRate. */
 export const DISCOUNT_TYPES = ['FIXED', 'PERCENT'] as const;
 export type DiscountType = (typeof DISCOUNT_TYPES)[number];
@@ -89,7 +93,7 @@ export interface PoTotals {
  * before tax applies to it.
  */
 export function poTotals(
-  lines: LineLike[],
+  lines: Array<{ quantity: number; unitCost: number }>,
   extras: { shipping?: number; discount?: number; discountType?: string; taxRate?: number } = {},
 ): PoTotals {
   const subtotal = round(lines.reduce((sum, l) => sum + l.quantity * l.unitCost, 0));
@@ -120,6 +124,44 @@ export function statusAfterReceipt(current: PoStatus, lines: LineLike[], receipt
   if (allReceived) return 'RECEIVED';
   if (anyReceived) return 'PARTIALLY_RECEIVED';
   return current;
+}
+
+/**
+ * Payment status is derived from amountPaid vs the order total, mirroring
+ * sales/sales-math.ts's paymentStatusOf — the two can never disagree because
+ * the status is never typed on its own. CANCELLED is the one exception: it
+ * only ever follows the PO's own status going CANCELLED.
+ */
+export function paymentStatusOf(total: number, amountPaid: number): Exclude<PaymentStatus, 'CANCELLED'> {
+  if (total <= 0 || amountPaid >= total) return 'PAID';
+  if (amountPaid <= 0) return 'PENDING';
+  return 'PARTIAL';
+}
+
+/**
+ * What is still owed to suppliers, in money — accounts payable. Every PO
+ * that is neither CANCELLED (either dimension) nor fully paid contributes
+ * its remaining balance (total minus amountPaid), so a partially-paid PO
+ * counts only what's left, not the whole order.
+ */
+export function amountOwed(
+  orders: Array<{
+    status: string;
+    paymentStatus: string;
+    amountPaid: number;
+    lines: LineLike[];
+    shipping: number;
+    discount: number;
+    discountType: string;
+    taxRate: number;
+  }>,
+): number {
+  return round(
+    orders
+      .filter((po) => po.status !== 'CANCELLED' && po.paymentStatus !== 'CANCELLED')
+      .filter((po) => po.paymentStatus === 'PENDING' || po.paymentStatus === 'PARTIAL')
+      .reduce((sum, po) => sum + Math.max(0, poTotals(po.lines, po).total - po.amountPaid), 0),
+  );
 }
 
 /**

@@ -11,6 +11,9 @@ import { fetchItems, type ApiItem } from "../../lib/stockApi";
 import { createSupplier, fetchSuppliers, setSupplierArchived, updateSupplier, type Supplier } from "../../lib/suppliersApi";
 import {
   fetchPurchaseOrders,
+  PO_PAYMENT_LABELS,
+  PO_PAYMENT_STATUSES,
+  PO_PAYMENT_TONES,
   PO_STATUS_LABELS,
   PO_STATUS_ORDER,
   PO_STATUS_TONES,
@@ -87,6 +90,10 @@ export function PurchasingPage() {
 
   const open = orders.filter((o) => o.status !== "RECEIVED" && o.status !== "CANCELLED");
   const committed = open.reduce((sum, o) => sum + o.lines.reduce((s, l) => s + l.outstanding * l.unitCost, 0), 0);
+  const owed = orders
+    .filter((o) => o.status !== "CANCELLED" && o.paymentStatus !== "CANCELLED")
+    .filter((o) => o.paymentStatus === "PENDING" || o.paymentStatus === "PARTIAL")
+    .reduce((sum, o) => sum + o.balanceDue, 0);
 
   async function toggleSupplierArchive(supplier: Supplier) {
     await setSupplierArchived(supplier.id, !supplier.archived);
@@ -106,6 +113,7 @@ export function PurchasingPage() {
           value={formatCurrency(orders.filter((o) => o.status !== "CANCELLED").reduce((s, o) => s + o.totals.total, 0))}
           hint="Hors bons annulés"
         />
+        <StatCard label="Montant dû" value={formatCurrency(owed)} hint="Restant à payer aux fournisseurs" tone={owed > 0 ? "warn" : "neutral"} />
       </div>
 
       <div className="toolbar">
@@ -165,6 +173,16 @@ export function PurchasingPage() {
                 ))}
               </select>
             </Field>
+            <Field label="Paiement">
+              <select className="input" value={filters.paymentStatus ?? ""} onChange={(e) => set({ paymentStatus: e.target.value })}>
+                <option value="">Tous</option>
+                {PO_PAYMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {PO_PAYMENT_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Du">
               <input className="input" type="date" value={filters.from ?? ""} onChange={(e) => set({ from: e.target.value })} />
             </Field>
@@ -198,6 +216,7 @@ export function PurchasingPage() {
                     <th className="num">Reçu</th>
                     <th className="num">Total</th>
                     <th>Statut</th>
+                    <th>Paiement</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -229,6 +248,9 @@ export function PurchasingPage() {
                         <td className="tabular num">{formatCurrency(order.totals.total)}</td>
                         <td>
                           <Pill tone={PO_STATUS_TONES[order.status]}>{PO_STATUS_LABELS[order.status]}</Pill>
+                        </td>
+                        <td>
+                          <Pill tone={PO_PAYMENT_TONES[order.paymentStatus]}>{PO_PAYMENT_LABELS[order.paymentStatus]}</Pill>
                         </td>
                       </tr>
                     );

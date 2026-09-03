@@ -14,7 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { DISCOUNT_TYPES, PAYMENT_STATUSES, SHIPMENT_STATUSES } from '../sales-math.js';
+import { DISCOUNT_TYPES, SHIPMENT_STATUSES } from '../sales-math.js';
 
 export class OrderLineDto {
   @IsString()
@@ -67,9 +67,16 @@ export class CreateOrderDto {
   @IsIn(SHIPMENT_STATUSES)
   shipmentStatus?: string;
 
+  /**
+   * A deposit paid at order time (e.g. a counter sale, or a client paying
+   * half up front) — in DZD, never more than the order total. paymentStatus
+   * is derived from this, not typed directly (see sales-math.ts's
+   * paymentStatusOf); omit it for a normal order-on-credit.
+   */
   @IsOptional()
-  @IsIn(PAYMENT_STATUSES)
-  paymentStatus?: string;
+  @IsNumber()
+  @Min(0)
+  amountPaid?: number;
 
   @IsOptional()
   @IsNumber()
@@ -133,10 +140,6 @@ export class UpdateOrderDto {
   date?: string;
 
   @IsOptional()
-  @IsIn(PAYMENT_STATUSES)
-  paymentStatus?: string;
-
-  @IsOptional()
   @IsNumber()
   @Min(0)
   shipping?: number;
@@ -189,9 +192,25 @@ export class SetOrderStatusDto {
   @IsIn(SHIPMENT_STATUSES)
   shipmentStatus?: string;
 
+  /**
+   * Only CANCELLED — PENDING/PARTIAL/PAID are derived from amountPaid (see
+   * sales-math.ts's paymentStatusOf) and set through recordPayment instead,
+   * so they can never disagree with the money actually recorded.
+   */
   @IsOptional()
-  @IsIn(PAYMENT_STATUSES)
+  @IsIn(['CANCELLED'])
   paymentStatus?: string;
+}
+
+/** How much the customer paid just now — added to amountPaid, never typed as an absolute total. */
+export class RecordPaymentDto {
+  @IsNumber()
+  @IsPositive()
+  amount!: number;
+
+  @IsOptional()
+  @IsISO8601()
+  date?: string;
 }
 
 export class ShipOrderDto {

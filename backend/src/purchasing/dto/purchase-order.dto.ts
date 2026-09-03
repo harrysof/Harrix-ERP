@@ -103,6 +103,16 @@ export class CreatePurchaseOrderDto {
   @IsIn(PO_STATUSES)
   status?: string;
 
+  /**
+   * A deposit paid to the supplier at order time — in DZD, never more than
+   * the order total. paymentStatus is derived from this, not typed directly
+   * (see purchasing-math.ts's paymentStatusOf); omit it to order on credit.
+   */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amountPaid?: number;
+
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -208,4 +218,15 @@ export class UpdatePurchaseOrderDto {
 export class SetPoStatusDto {
   @IsIn(PO_STATUSES)
   status!: string;
+}
+
+/** How much was just paid to the supplier — added to amountPaid, never typed as an absolute total. */
+export class RecordPoPaymentDto {
+  @IsNumber()
+  @IsPositive()
+  amount!: number;
+
+  @IsOptional()
+  @IsISO8601()
+  date?: string;
 }

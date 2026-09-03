@@ -25,34 +25,105 @@
   --radius-sm: 8px;
   --radius-lg: 16px;
 
+  /* A six-color palette cycled by name (see Avatar.tsx) — not semantic status colors. */
+  --avatar-blue-bg: #e3e9ff;
+  --avatar-blue-fg: #3d57d6;
+  --avatar-amber-bg: #fdf1dc;
+  --avatar-amber-fg: #b8790a;
+  --avatar-green-bg: #e3f8ee;
+  --avatar-green-fg: #0f9463;
+  --avatar-pink-bg: #fde3ec;
+  --avatar-pink-fg: #c23a70;
+  --avatar-purple-bg: #ece3ff;
+  --avatar-purple-fg: #6a3dd6;
+  --avatar-teal-bg: #dcf5f3;
+  --avatar-teal-fg: #0e8f86;
+
   color-scheme: light dark;
 }
 
+/*
+ * Three states: an explicit toggle stamps [data-theme] on <html> (see
+ * ThemeContext.tsx) and always wins; with no explicit choice, the OS
+ * preference decides. The :not([data-theme="light"]) guard keeps the media
+ * query from fighting an explicit light choice.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #10141c;
-    --surface: #171c26;
-    --surface-sunk: #1f2530;
-    --ink: #e9ecf3;
-    --ink-soft: #a3aec2;
-    --ink-faint: #6b7690;
-    --border: #2a3140;
-    --border-strong: #3b4457;
+  :root:not([data-theme="light"]) {
+    --bg: #101828;
+    --surface: #182030;
+    --surface-sunk: #1d2939;
+    --ink: #eef1f6;
+    --ink-soft: #98a2b3;
+    --ink-faint: #667085;
+    --border: #1d2939;
+    --border-strong: #344054;
 
-    --accent: #7089ff;
-    --accent-strong: #92a5ff;
-    --accent-soft: #232a48;
+    --accent: #7592ff;
+    --accent-strong: #9cb9ff;
+    --accent-soft: #202a4d;
 
-    --ok: #3ddc9b;
-    --ok-soft: #142e26;
-    --warn: #eeb84f;
-    --warn-soft: #362a12;
-    --danger: #f0847c;
-    --danger-soft: #3a1e1c;
+    --ok: #32d583;
+    --ok-soft: #16281f;
+    --warn: #fdb022;
+    --warn-soft: #302311;
+    --danger: #f97066;
+    --danger-soft: #34201d;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+
+    --avatar-blue-bg: #232a48;
+    --avatar-blue-fg: #93a5ff;
+    --avatar-amber-bg: #362a12;
+    --avatar-amber-fg: #eeb84f;
+    --avatar-green-bg: #142e26;
+    --avatar-green-fg: #3ddc9b;
+    --avatar-pink-bg: #35202b;
+    --avatar-pink-fg: #f28ab0;
+    --avatar-purple-bg: #271f42;
+    --avatar-purple-fg: #b39bff;
+    --avatar-teal-bg: #123330;
+    --avatar-teal-fg: #4fd6ca;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #101828;
+  --surface: #182030;
+  --surface-sunk: #1d2939;
+  --ink: #eef1f6;
+  --ink-soft: #98a2b3;
+  --ink-faint: #667085;
+  --border: #1d2939;
+  --border-strong: #344054;
+
+  --accent: #7592ff;
+  --accent-strong: #9cb9ff;
+  --accent-soft: #202a4d;
+
+  --ok: #32d583;
+  --ok-soft: #16281f;
+  --warn: #fdb022;
+  --warn-soft: #302311;
+  --danger: #f97066;
+  --danger-soft: #34201d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+
+  --avatar-blue-bg: #232a48;
+  --avatar-blue-fg: #93a5ff;
+  --avatar-amber-bg: #362a12;
+  --avatar-amber-fg: #eeb84f;
+  --avatar-green-bg: #142e26;
+  --avatar-green-fg: #3ddc9b;
+  --avatar-pink-bg: #35202b;
+  --avatar-pink-fg: #f28ab0;
+  --avatar-purple-bg: #271f42;
+  --avatar-purple-fg: #b39bff;
+  --avatar-teal-bg: #123330;
+  --avatar-teal-fg: #4fd6ca;
 }
 
 * {
@@ -68,7 +139,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "Inter", "Noto Sans Arabic", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14.5px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;

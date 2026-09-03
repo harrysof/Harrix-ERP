@@ -1,7 +1,14 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { SalesService, type OrderFilters } from './sales.service.js';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto.js';
-import { CreateOrderDto, ReturnOrderDto, SetOrderStatusDto, ShipOrderDto, UpdateOrderDto } from './dto/order.dto.js';
+import {
+  CreateOrderDto,
+  RecordPaymentDto,
+  ReturnOrderDto,
+  SetOrderStatusDto,
+  ShipOrderDto,
+  UpdateOrderDto,
+} from './dto/order.dto.js';
 import { RequirePermissions } from '../auth/require-permission.decorator.js';
 import { PERMISSIONS } from '../auth/permissions.js';
 
@@ -98,6 +105,13 @@ export class SalesController {
   @RequirePermissions(PERMISSIONS.ORDERS_WRITE)
   shipOrder(@Param('id') id: string, @Body() dto: ShipOrderDto) {
     return this.sales.shipOrder(id, dto);
+  }
+
+  /** Adds to amountPaid — "half now, the rest later" — and re-derives paymentStatus. */
+  @Post('orders/:id/payments')
+  @RequirePermissions(PERMISSIONS.ORDERS_WRITE)
+  recordPayment(@Param('id') id: string, @Body() dto: RecordPaymentDto) {
+    return this.sales.recordPayment(id, dto);
   }
 
   /** Restores stock for a shipped order — the mirror of ship(). */

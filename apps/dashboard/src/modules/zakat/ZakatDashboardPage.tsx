@@ -112,7 +112,7 @@ export function ZakatDashboardPage({ onNavigate }: { onNavigate: (tab: ZakatTab)
           </div>
         ) : null}
 
-        <div className={`zakat-due-banner ${live.belowNisab ? "zakat-due-banner-ok" : "zakat-due-banner-warn"}`} style={{ marginTop: 14 }}>
+        <div className={`zakat-due-banner ${live.belowNisab ? "zakat-due-banner-danger" : "zakat-due-banner-ok"}`} style={{ marginTop: 14 }}>
           <span className="zakat-due-banner-label">
             {live.belowNisab ? "Estimation : sous le nisab, aucune Zakat due" : "Estimation : Zakat probablement due"}
           </span>

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PERMISSIONS, type Permission } from '../auth/permissions.js';
+import type { AuthenticatedUser } from '../auth/current-user.js';
 
 export interface AuditFilters {
   userId?: string;
@@ -48,4 +50,67 @@ export class AuditService {
       actions: [...new Set(entries.map((e) => e.action))].sort(),
     };
   }
+
+  /**
+   * A lightweight activity feed for the topbar bell — unlike list() above,
+   * this is open to any logged-in user (see AuditController's notifications
+   * route), so it does its own filtering: only entities the caller's role
+   * can actually open (NOTIFICATION_PERMISSION), never the caller's own
+   * actions (nobody needs to be told what they just did), and never the
+   * account-security entities (auth/session/password) — those belong to the
+   * full journal, which stays audit:read-only.
+   */
+  notifications(user: AuthenticatedUser) {
+    const domains = Object.entries(NOTIFICATION_PERMISSION)
+      .filter(([, required]) => user.permissions.includes(required))
+      .map(([domain]) => domain);
+    if (domains.length === 0) return Promise.resolve([]);
+
+    return this.prisma.auditEntry.findMany({
+      where: {
+        action: { in: NOTIFIABLE_ACTIONS },
+        userId: { not: user.id },
+        OR: domains.flatMap((d) => [{ entity: d }, { entity: { startsWith: `${d}/` } }]),
+      },
+      // `select`, not `include`: this route is open to every logged-in user,
+      // so it returns only the six fields the bell actually renders. In
+      // particular it does not hand out `userId` (an internal account id) or
+      // `changes` (the submitted body, which for an HR edit is somebody's
+      // salary). The full journal still returns both — it is audit:read only.
+      select: {
+        id: true,
+        action: true,
+        entity: true,
+        userLogin: true,
+        createdAt: true,
+        user: { select: { fullName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: NOTIFICATIONS_LIMIT,
+    });
+  }
 }
+
+const NOTIFIABLE_ACTIONS = ['CREATE', 'UPDATE', 'DELETE'];
+const NOTIFICATIONS_LIMIT = 20;
+
+/**
+ * Which permission lets a user be notified about an entity — keyed by the
+ * entity's leading path segment (see audit.interceptor.ts's describeTarget,
+ * e.g. "hr/employees" → "hr"). A domain absent from this table (auth,
+ * session, audit itself) never produces a notification for anyone short of
+ * the full journal.
+ */
+const NOTIFICATION_PERMISSION: Record<string, Permission> = {
+  hr: PERMISSIONS.HR_READ,
+  production: PERMISSIONS.PRODUCTION_READ,
+  purchasing: PERMISSIONS.PURCHASING_READ,
+  sales: PERMISSIONS.ORDERS_READ,
+  stock: PERMISSIONS.STOCK_READ,
+  settings: PERMISSIONS.STOCK_READ,
+  'supplier-orders': PERMISSIONS.STOCK_READ,
+  suppliers: PERMISSIONS.SUPPLIERS_READ,
+  users: PERMISSIONS.USERS_MANAGE,
+  finance: PERMISSIONS.FINANCE_READ,
+  zakat: PERMISSIONS.FINANCE_READ,
+};

@@ -170,3 +170,8 @@ export function fetchAudit(filters: AuditFilters = {}) {
 export function fetchAuditFilterOptions() {
   return api.get<{ entities: string[]; actions: string[] }>("/audit/filter-options");
 }
+
+/** The topbar bell's feed — filtered server-side to what this user's role can see. */
+export function fetchAuditNotifications() {
+  return api.get<AuditEntry[]>("/audit/notifications");
+}

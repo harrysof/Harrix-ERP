@@ -4,7 +4,7 @@ import type { ApiItem } from "./stockApi";
 /** Typed client for /api/sales — §15–19: orders, order details, customers. */
 
 export type ShipmentStatus = "PENDING" | "SHIPPED" | "CANCELLED";
-export type PaymentStatus = "PENDING" | "PAID" | "CANCELLED";
+export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "CANCELLED";
 
 export const SHIPMENT_LABELS: Record<ShipmentStatus, string> = {
   PENDING: "En attente",
@@ -14,6 +14,7 @@ export const SHIPMENT_LABELS: Record<ShipmentStatus, string> = {
 
 export const PAYMENT_LABELS: Record<PaymentStatus, string> = {
   PENDING: "En attente",
+  PARTIAL: "Partiellement payé",
   PAID: "Payé",
   CANCELLED: "Annulé",
 };
@@ -26,12 +27,13 @@ export const SHIPMENT_TONES: Record<ShipmentStatus, "ok" | "warn" | "danger" | "
 
 export const PAYMENT_TONES: Record<PaymentStatus, "ok" | "warn" | "danger" | "neutral"> = {
   PENDING: "warn",
+  PARTIAL: "warn",
   PAID: "ok",
   CANCELLED: "neutral",
 };
 
 export const SHIPMENT_STATUSES: ShipmentStatus[] = ["PENDING", "SHIPPED", "CANCELLED"];
-export const PAYMENT_STATUSES: PaymentStatus[] = ["PENDING", "PAID", "CANCELLED"];
+export const PAYMENT_STATUSES: PaymentStatus[] = ["PENDING", "PARTIAL", "PAID", "CANCELLED"];
 
 export interface ApiCustomer {
   id: string;
@@ -114,6 +116,10 @@ export interface ApiOrder {
   date: string;
   shipmentStatus: ShipmentStatus;
   paymentStatus: PaymentStatus;
+  /** How much the customer has actually paid so far, in DZD. */
+  amountPaid: number;
+  /** What's still owed — totals.total minus amountPaid, never negative. */
+  balanceDue: number;
   shipping: number;
   /** A DZD amount when discountType is FIXED, or a fraction (0.10 for 10 %) when it's PERCENT — the DZD amount always lives on `totals.discount`. */
   discount: number;
@@ -249,7 +255,8 @@ export function createOrder(input: {
   customerId: string;
   date: string;
   shipmentStatus?: string;
-  paymentStatus?: string;
+  /** A deposit paid at order time (e.g. a client paying half up front). paymentStatus is derived from it. */
+  amountPaid?: number;
   shipping?: number;
   /** A DZD amount when discountType is FIXED (the default), or a fraction (0.10 for 10 %) when it's PERCENT. */
   discount?: number;
@@ -281,6 +288,11 @@ export function setOrderStatus(id: string, input: { shipmentStatus?: string; pay
 /** The only sales action that moves stock. */
 export function shipOrder(id: string, input: { date?: string; markPaid?: boolean } = {}): Promise<ApiOrder> {
   return api.post<ApiOrder>(`/sales/orders/${id}/ship`, input);
+}
+
+/** Adds to amountPaid — "half now, the rest later" — never a status typed directly. */
+export function recordPayment(id: string, input: { amount: number; date?: string }): Promise<ApiOrder> {
+  return api.post<ApiOrder>(`/sales/orders/${id}/payments`, input);
 }
 
 export interface ReturnOrderLineInput {

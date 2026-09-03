@@ -6,6 +6,7 @@ import {
   canShip,
   lineTotal,
   orderTotals,
+  paymentStatusOf,
   returnableForLine,
   returnedForLine,
   summarizeCustomer,
@@ -125,10 +126,30 @@ describe('returns', () => {
   });
 });
 
+describe('paymentStatusOf', () => {
+  it('is PENDING when nothing has been paid', () => {
+    expect(paymentStatusOf(1000, 0)).toBe('PENDING');
+  });
+
+  it('is PARTIAL between nothing and the full total — the "half now, half later" case', () => {
+    expect(paymentStatusOf(1000, 500)).toBe('PARTIAL');
+  });
+
+  it('is PAID once amountPaid reaches the total, and never overshoots past it', () => {
+    expect(paymentStatusOf(1000, 1000)).toBe('PAID');
+    expect(paymentStatusOf(1000, 1200)).toBe('PAID');
+  });
+
+  it('treats a zero-total order as already PAID', () => {
+    expect(paymentStatusOf(0, 0)).toBe('PAID');
+  });
+});
+
 describe('summarizeCustomer', () => {
-  const order = (paymentStatus: string, shipmentStatus: string, total: number) => ({
+  const order = (paymentStatus: string, shipmentStatus: string, total: number, amountPaid = 0) => ({
     paymentStatus,
     shipmentStatus,
+    amountPaid,
     lines: [line(1, total)],
     shipping: 0,
     discount: 0,
@@ -138,7 +159,7 @@ describe('summarizeCustomer', () => {
 
   it('totals purchases and separates what is still owed — §19', () => {
     const summary = summarizeCustomer([
-      order('PAID', 'SHIPPED', 1000),
+      order('PAID', 'SHIPPED', 1000, 1000),
       order('PENDING', 'PENDING', 400),
       order('PENDING', 'SHIPPED', 600),
     ]);
@@ -147,8 +168,14 @@ describe('summarizeCustomer', () => {
     expect(summary.outstandingBalance).toBe(1000);
   });
 
+  it('counts only the remaining balance on a PARTIAL order, not the whole thing', () => {
+    const summary = summarizeCustomer([order('PARTIAL', 'SHIPPED', 1000, 400)]);
+    expect(summary.totalPurchased).toBe(1000);
+    expect(summary.outstandingBalance).toBe(600);
+  });
+
   it('excludes cancelled orders from both figures', () => {
-    const summary = summarizeCustomer([order('PAID', 'SHIPPED', 1000), order('CANCELLED', 'CANCELLED', 9999)]);
+    const summary = summarizeCustomer([order('PAID', 'SHIPPED', 1000, 1000), order('CANCELLED', 'CANCELLED', 9999)]);
     expect(summary.orderCount).toBe(1);
     expect(summary.totalPurchased).toBe(1000);
   });

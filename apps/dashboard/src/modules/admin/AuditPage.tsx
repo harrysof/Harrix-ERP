@@ -6,23 +6,8 @@ import { Banner } from "../../components/ui/Banner";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ApiError } from "../../lib/api";
 import { fetchAudit, fetchAuditFilterOptions, type AuditEntry, type AuditFilters } from "../../lib/authApi";
+import { ACTION_LABELS, ACTION_TONES } from "../../lib/auditLabels";
 import { entityLabel, renderAuditChanges } from "./auditChanges";
-
-const ACTION_LABELS: Record<string, string> = {
-  CREATE: "Création",
-  UPDATE: "Modification",
-  DELETE: "Suppression",
-  LOGIN: "Connexion",
-  LOGIN_FAILED: "Échec de connexion",
-};
-
-const ACTION_TONES: Record<string, "ok" | "warn" | "danger" | "neutral"> = {
-  CREATE: "ok",
-  UPDATE: "neutral",
-  DELETE: "danger",
-  LOGIN: "neutral",
-  LOGIN_FAILED: "warn",
-};
 
 /**
  * "Log who did what, and when. When the numbers disagree, this is the only

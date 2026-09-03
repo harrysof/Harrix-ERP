@@ -47,21 +47,25 @@ export class ZakatService {
 
     // "Cash and bank" — this ERP keeps no treasury ledger, so the money the
     // business actually holds is approximated as revenue already collected:
-    // every non-cancelled order marked PAID. Pre-fills the Banque field;
-    // physical till cash (Caisse) has no ledger to pull from and stays manual.
-    const paidOrders = await this.prisma.order.findMany({
-      where: { paymentStatus: 'PAID', shipmentStatus: { not: 'CANCELLED' } },
+    // amountPaid summed across every non-cancelled order, whether it's fully
+    // PAID or only PARTIAL. Pre-fills the Banque field; physical till cash
+    // (Caisse) has no ledger to pull from and stays manual.
+    const nonCancelledOrders = await this.prisma.order.findMany({
+      where: { shipmentStatus: { not: 'CANCELLED' }, paymentStatus: { not: 'CANCELLED' } },
       include: { lines: true },
     });
-    const bankValue = round(paidOrders.reduce((sum, o) => sum + orderTotals(o.lines, o).total, 0));
+    const bankValue = round(nonCancelledOrders.reduce((sum, o) => sum + o.amountPaid, 0));
 
     // Receivables — money owed AND already earned: goods shipped but not
-    // yet paid. An unshipped order isn't a receivable yet, just a promise.
+    // yet fully paid. An unshipped order isn't a receivable yet, just a
+    // promise. A PARTIAL order contributes only its remaining balance.
     const shippedUnpaidOrders = await this.prisma.order.findMany({
-      where: { shipmentStatus: 'SHIPPED', paymentStatus: 'PENDING' },
+      where: { shipmentStatus: 'SHIPPED', paymentStatus: { in: ['PENDING', 'PARTIAL'] } },
       include: { lines: true },
     });
-    const receivablesValue = round(shippedUnpaidOrders.reduce((sum, o) => sum + orderTotals(o.lines, o).total, 0));
+    const receivablesValue = round(
+      shippedUnpaidOrders.reduce((sum, o) => sum + Math.max(0, orderTotals(o.lines, o).total - o.amountPaid), 0),
+    );
 
     return { bankValue, finishedGoodsValue, rawMaterialsValue, receivablesValue, asOf: new Date().toISOString() };
   }

@@ -432,6 +432,15 @@ model PurchaseOrder {
   /// DRAFT | SUBMITTED | APPROVED | PARTIALLY_RECEIVED | RECEIVED | CANCELLED
   /// Plain string, same portability reason as Movement.direction.
   status       String    @default("DRAFT")
+  /// PENDING | PARTIAL | PAID | CANCELLED — what has been paid to the
+  /// supplier, derived from amountPaid vs the order total (see
+  /// purchasing/purchasing-math.ts's paymentStatusOf) and independent of
+  /// `status` above, except that cancelling the PO also cancels this. A
+  /// supplier can be paid in installments regardless of how much has arrived.
+  paymentStatus String   @default("PENDING")
+  /// What has actually been paid to the supplier so far, in DZD. Never
+  /// exceeds the order total (see purchasing.service.ts's recordPayment).
+  amountPaid   Float     @default(0)
   /// Order-level money, in DZD. Line amounts live on the lines.
   shipping     Float     @default(0)
   /// FIXED or PERCENT — see discount's own comment.
@@ -456,6 +465,7 @@ model PurchaseOrder {
 
   @@index([supplierId])
   @@index([status])
+  @@index([paymentStatus])
   @@index([date])
 }
 
@@ -547,8 +557,15 @@ model Order {
   date           DateTime
   /// PENDING | SHIPPED | CANCELLED
   shipmentStatus String   @default("PENDING")
-  /// PENDING | PAID | CANCELLED
+  /// PENDING | PARTIAL | PAID | CANCELLED — derived from amountPaid vs the
+  /// order total (see sales/sales-math.ts's paymentStatusOf), except
+  /// CANCELLED which is only ever set directly, on order cancellation.
   paymentStatus  String   @default("PENDING")
+  /// What the customer has actually paid so far, in DZD. Never exceeds the
+  /// order total (see sales.service.ts's recordPayment) — a partial payment
+  /// (e.g. "half now, the rest later") increments this instead of flipping
+  /// paymentStatus straight to PAID.
+  amountPaid     Float    @default(0)
   shipping       Float    @default(0)
   /// FIXED or PERCENT — see discount's own comment.
   discountType   String   @default("FIXED")
