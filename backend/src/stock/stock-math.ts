@@ -10,6 +10,8 @@
  * stock-math.spec.ts.
  */
 
+import { t, type MessageKey } from '../i18n/messages/index.js';
+
 export interface MovementLike {
   itemId: string;
   batchId: string | null;
@@ -233,13 +235,13 @@ export function getRecommendedBatch(batchesWithRemaining: BatchWithRemaining[]):
 export const MOVEMENT_SOURCES = ['MANUAL', 'SUPPLIER_ORDER', 'PURCHASE', 'PRODUCTION', 'SALE'] as const;
 export type MovementSource = (typeof MOVEMENT_SOURCES)[number];
 
-/** French labels for the provenance shown next to each entry in the item fiche. */
-export const MOVEMENT_SOURCE_LABELS: Record<MovementSource, string> = {
-  MANUAL: 'Réception directe',
-  SUPPLIER_ORDER: 'Commande fournisseur',
-  PURCHASE: 'Achat (bon de commande)',
-  PRODUCTION: 'Production',
-  SALE: 'Vente',
+/** Translated labels for the provenance shown next to each entry in the item fiche. */
+export const MOVEMENT_SOURCE_KEYS: Record<MovementSource, MessageKey> = {
+  MANUAL: 'stock.source.manual',
+  SUPPLIER_ORDER: 'stock.source.supplierOrder',
+  PURCHASE: 'stock.source.purchase',
+  PRODUCTION: 'stock.source.production',
+  SALE: 'stock.source.sale',
 };
 
 /** A movement with the money on it. Everything MovementLike has, plus cost and provenance. */
@@ -356,7 +358,7 @@ export function getCostSources(
     if (!bucket) {
       bucket = {
         source,
-        label: MOVEMENT_SOURCE_LABELS[source as MovementSource] ?? source,
+        label: source in MOVEMENT_SOURCE_KEYS ? t(MOVEMENT_SOURCE_KEYS[source as MovementSource]) : source,
         quantity: 0,
         value: 0,
         averageUnitCost: null,

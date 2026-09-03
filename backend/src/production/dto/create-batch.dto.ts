@@ -15,6 +15,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PRODUCTION_STATUSES } from '../production-math.js';
+import { t } from '../../i18n/messages/index.js';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -100,11 +101,11 @@ export class CreateBatchDto {
   operator?: string;
 
   @IsOptional()
-  @Matches(TIME_PATTERN, { message: 'startTime doit être au format HH:MM.' })
+  @Matches(TIME_PATTERN, { message: () => t('common.timeFormat', { field: 'startTime' }) })
   startTime?: string;
 
   @IsOptional()
-  @Matches(TIME_PATTERN, { message: 'endTime doit être au format HH:MM.' })
+  @Matches(TIME_PATTERN, { message: () => t('common.timeFormat', { field: 'endTime' }) })
   endTime?: string;
 
   @IsNumber()
@@ -174,11 +175,11 @@ export class UpdateBatchDto {
   operator?: string;
 
   @IsOptional()
-  @Matches(TIME_PATTERN, { message: 'startTime doit être au format HH:MM.' })
+  @Matches(TIME_PATTERN, { message: () => t('common.timeFormat', { field: 'startTime' }) })
   startTime?: string;
 
   @IsOptional()
-  @Matches(TIME_PATTERN, { message: 'endTime doit être au format HH:MM.' })
+  @Matches(TIME_PATTERN, { message: () => t('common.timeFormat', { field: 'endTime' }) })
   endTime?: string;
 
   @IsOptional()

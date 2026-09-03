@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateSupplierOrderDto } from './dto/create-supplier-order.dto.js';
 import { ReceiveSupplierOrderDto } from './dto/receive-supplier-order.dto.js';
+import { t } from '../i18n/messages/index.js';
 
 @Injectable()
 export class SupplierOrdersService {
@@ -21,18 +22,18 @@ export class SupplierOrdersService {
 
   async get(id: string) {
     const order = await this.prisma.supplierOrder.findUnique({ where: { id }, include: this.include });
-    if (!order) throw new NotFoundException(`Commande fournisseur introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('purchasing.supplierOrderNotFound', { id }));
     return order;
   }
 
   async create(dto: CreateSupplierOrderDto) {
     const supplier = await this.prisma.supplier.findUnique({ where: { id: dto.supplierId } });
-    if (!supplier) throw new BadRequestException(`Fournisseur introuvable : ${dto.supplierId}`);
+    if (!supplier) throw new BadRequestException(t('purchasing.supplierNotFound', { id: dto.supplierId }));
 
     const itemIds = dto.lines.map((line) => line.itemId);
     const items = await this.prisma.item.findMany({ where: { id: { in: itemIds } }, select: { id: true } });
     if (items.length !== itemIds.length) {
-      throw new BadRequestException('Une ou plusieurs références de la commande sont introuvables.');
+      throw new BadRequestException(t('purchasing.oneOrMoreRefsNotFound'));
     }
 
     return this.prisma.supplierOrder.create({
@@ -61,7 +62,7 @@ export class SupplierOrdersService {
   async receive(id: string, dto: ReceiveSupplierOrderDto) {
     const order = await this.get(id);
     if (order.status !== 'open') {
-      throw new BadRequestException('Cette commande a déjà été réceptionnée.');
+      throw new BadRequestException(t('purchasing.orderAlreadyReceived'));
     }
 
     const detailsByLine = new Map((dto.lines ?? []).map((l) => [l.lineId, l]));
@@ -74,10 +75,10 @@ export class SupplierOrdersService {
         const needsExpiry = line.item.inventoryType.hasExpiry;
 
         if (needsBatch && !details?.batchNumber) {
-          throw new BadRequestException(`Le numéro de lot est obligatoire pour "${line.item.name}".`);
+          throw new BadRequestException(t('common.lotNumberRequiredFor', { item: line.item.name }));
         }
         if (needsExpiry && !details?.expiryDate) {
-          throw new BadRequestException(`La date de péremption est obligatoire pour "${line.item.name}".`);
+          throw new BadRequestException(t('common.expiryRequiredFor', { item: line.item.name }));
         }
 
         let batchId: string | null = null;
@@ -110,7 +111,7 @@ export class SupplierOrdersService {
             // into the stock, and the item fiche can say which it was.
             unitCost: line.unitCost ?? line.item.unitCost ?? null,
             sourceType: 'SUPPLIER_ORDER',
-            sourceRef: `Commande du ${order.orderDate.toISOString().slice(0, 10)}`,
+            sourceRef: t('purchasing.orderDateRef', { date: order.orderDate.toISOString().slice(0, 10) }),
           },
         });
       }

@@ -6,6 +6,8 @@ import { Banner } from "../../components/ui/Banner";
 import type { InventoryTypeConfig } from "../../lib/types";
 import { UnitSelect } from "../../components/ui/UnitSelect";
 import { isValidUnit } from "../../lib/units";
+import { useI18n } from "../../state/LanguageContext";
+import type { TranslationKey } from "../../lib/i18n";
 
 interface InventoryTypeModalProps {
   /** Present when editing an existing inventory; absent when adding one. */
@@ -38,17 +40,17 @@ type ToggleField = {
 }[keyof InventoryTypeDraft];
 
 /** Each switch, and what turning it on actually changes on the Stock screens. */
-const OPTIONS: Array<{ field: ToggleField; label: string; hint: string }> = [
-  { field: "hasBatches", label: "Suivi par lot", hint: "Chaque réception crée un lot numéroté, consommé en FIFO." },
-  { field: "hasExpiry", label: "Péremption", hint: "Chaque lot porte une date d'expiration ; la consommation passe en FEFO." },
-  { field: "isProductionInput", label: "Matière de production", hint: "Utilisable comme matière première dans un lot de production." },
-  { field: "hasColor", label: "Couleur", hint: "Variante couleur sur chaque article." },
-  { field: "hasSize", label: "Taille", hint: "Variante taille ou pointure." },
-  { field: "hasDescription", label: "Description libre", hint: "Champ texte : usage, remplaçabilité…" },
-  { field: "hasMachineInfo", label: "Infos machine", hint: "Machine, compatibilité, fabricant, localisation, criticité." },
-  { field: "hasGender", label: "Sexe", hint: "Variante homme / femme." },
-  { field: "hasPrice", label: "Prix de vente", hint: "Prix auquel l'article est vendu — distinct de son coût d'achat." },
-  { field: "hasQuality", label: "Qualité de production", hint: "Classement 1er / 2ème choix / rebut, avec réconciliation des unités inconnues." },
+const OPTIONS: Array<{ field: ToggleField; label: TranslationKey; hint: TranslationKey }> = [
+  { field: "hasBatches", label: "inv.opt.batches", hint: "inv.opt.batchesHint" },
+  { field: "hasExpiry", label: "inv.opt.expiry", hint: "inv.opt.expiryHint" },
+  { field: "isProductionInput", label: "inv.opt.productionInput", hint: "inv.opt.productionInputHint" },
+  { field: "hasColor", label: "inv.opt.color", hint: "inv.opt.colorHint" },
+  { field: "hasSize", label: "inv.opt.size", hint: "inv.opt.sizeHint" },
+  { field: "hasDescription", label: "inv.opt.description", hint: "inv.opt.descriptionHint" },
+  { field: "hasMachineInfo", label: "inv.opt.machineInfo", hint: "inv.opt.machineInfoHint" },
+  { field: "hasGender", label: "inv.opt.gender", hint: "inv.opt.genderHint" },
+  { field: "hasPrice", label: "inv.opt.price", hint: "inv.opt.priceHint" },
+  { field: "hasQuality", label: "inv.opt.quality", hint: "inv.opt.qualityHint" },
 ];
 
 /** "Emballages & cartons" → "emballages-cartons". */
@@ -73,6 +75,7 @@ function toKey(label: string): string {
  * moved would strand them.
  */
 export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeModalProps) {
+  const { t } = useI18n();
   const editing = Boolean(type);
   const [draft, setDraft] = useState<InventoryTypeDraft>({
     key: type?.key ?? "",
@@ -116,14 +119,14 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
   }
 
   async function handleSubmit() {
-    if (!draft.label.trim()) return setError("Le nom de l'inventaire est obligatoire.");
-    if (!draft.singular.trim()) return setError("Indiquez le nom au singulier — il sert dans les messages de l'écran.");
+    if (!draft.label.trim()) return setError(t("inv.err.name"));
+    if (!draft.singular.trim()) return setError(t("inv.singularRequired"));
     if (!isValidUnit(draft.defaultUnit)) {
-      return setError("Choisissez une unité de mesure par défaut (kg, litre, pièce…). Un nombre n'est pas une unité.");
+      return setError(t("inv.err.defaultUnit"));
     }
     const key = draft.key.trim() || toKey(draft.label);
     if (!editing && !/^[a-z0-9-]+$/.test(key)) {
-      return setError('La clé ne peut contenir que des minuscules, des chiffres et des tirets (ex. "emballages").');
+      return setError(t("inv.err.key"));
     }
 
     setError(null);
@@ -138,56 +141,56 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
         defaultUnit: draft.defaultUnit.trim(),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
       setSaving(false);
     }
   }
 
   return (
     <Modal
-      title={editing ? `Modifier l'inventaire — ${type!.label}` : "Nouvel inventaire"}
+      title={editing ? t("inv.editTitle", { label: type!.label }) : t("inv.newTitle")}
       subtitle={editing ? type!.key : undefined}
       onClose={onClose}
       width={640}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
-            Annuler
+            {t("action.cancel")}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? "Enregistrement…" : editing ? "Enregistrer" : "Créer l'inventaire"}
+            {saving ? t("action.saving") : editing ? t("action.save") : t("inv.create")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
         <div className="form-row">
-          <Field label="Nom (onglet)">
+          <Field label={t("inv.tabName")}>
             <input
               className="input"
               value={draft.label}
               onChange={(e) => onLabelChange(e.target.value)}
-              placeholder="Ex. Emballages"
+              placeholder={t("inv.ph.tabName")}
               autoFocus
             />
           </Field>
-          <Field label="Au singulier" hint="Utilisé dans les phrases de l'écran : « Aucun emballage enregistré »">
+          <Field label={t("inv.singular")} hint={t("inv.singularHint")}>
             <input
               className="input"
               value={draft.singular}
               onChange={(e) => set("singular", e.target.value)}
-              placeholder="Ex. emballage"
+              placeholder={t("inv.ph.singular")}
             />
           </Field>
         </div>
 
         <div className="form-row">
-          <Field label="Unité par défaut" hint="Proposée à chaque nouvel article de cet inventaire">
-            <UnitSelect value={draft.defaultUnit} onChange={(unit) => set("defaultUnit", unit)} ariaLabel="Unité par défaut" />
+          <Field label={t("inv.defaultUnit")} hint={t("inv.defaultUnitHint")}>
+            <UnitSelect value={draft.defaultUnit} onChange={(unit) => set("defaultUnit", unit)} ariaLabel={t("inv.defaultUnit")} />
           </Field>
           <Field
-            label="Clé technique"
-            hint={editing ? "Définitive — tout ce que contient cet inventaire y renvoie." : "Générée à partir du nom. Définitive une fois créée."}
+            label={t("inv.key")}
+            hint={t(editing ? "inv.deleteWarning" : "inv.keyHint")}
           >
             <input
               className="input"
@@ -202,19 +205,19 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
           </Field>
         </div>
 
-        <Field label="Description" hint="Une phrase expliquant ce que contient cet inventaire — affichée sous l'onglet">
+        <Field label={t("inv.description")} hint={t("inv.descriptionHint")}>
           <textarea
             className="input"
             rows={2}
             value={draft.description}
             onChange={(e) => set("description", e.target.value)}
-            placeholder="Ex. Cartons et emballages de conditionnement. Pas de péremption, pas de lots."
+            placeholder={t("inv.ph.description")}
           />
         </Field>
 
         <div>
           <p className="field-label" style={{ marginBottom: 8 }}>
-            Ce que cet inventaire suit
+            {t("inv.tracks")}
           </p>
           <div className="inventory-option-grid">
             {OPTIONS.map((option) => (
@@ -225,8 +228,8 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
                   onChange={(e) => set(option.field, e.target.checked)}
                 />
                 <span>
-                  {option.label}
-                  <span className="checkbox-hint">{option.hint}</span>
+                  {t(option.label)}
+                  <span className="checkbox-hint">{t(option.hint)}</span>
                 </span>
               </label>
             ))}
@@ -234,7 +237,7 @@ export function InventoryTypeModal({ type, onClose, onSubmit }: InventoryTypeMod
         </div>
 
         <Banner tone="info">
-          Le coût unitaire et la valeur du stock sont suivis pour tous les inventaires — il n'y a pas d'option à activer pour cela.
+          {t("inv.costAlwaysTracked")}
         </Banner>
 
         {error ? <p className="form-error">{error}</p> : null}

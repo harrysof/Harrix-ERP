@@ -4,6 +4,7 @@ import { CreateItemDto } from './dto/create-item.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
 import { ReceiveStockDto } from './dto/receive-stock.dto.js';
 import { LogUsageDto } from './dto/log-usage.dto.js';
+import { t } from '../i18n/messages/index.js';
 import { getAverageUnitCost, getBatchesWithRemaining, getBatchUnitCost, getCostSources, getExpiryStatus, getFifoBatch, getItemQuantity, getItemValuation, getLatestSupplier, getQualityCounts, getRecommendedBatch, getStockStatus, getUnaccounted, isLowStock, QUALITY_CLASSES, roundMoney, type BatchLike, type MovementDetail } from './stock-math.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
@@ -44,7 +45,7 @@ export class StockService {
 
   async getItem(id: string) {
     const item = await this.prisma.item.findUnique({ where: { id }, include: { inventoryType: true } });
-    if (!item) throw new NotFoundException(`Article introuvable : ${id}`);
+    if (!item) throw new NotFoundException(t('stock.itemNotFound', { id }));
     const [movements, batches] = await Promise.all([
       this.prisma.movement.findMany({ where: { itemId: id }, include: { supplier: true } }),
       this.prisma.batch.findMany({ where: { itemId: id } }),
@@ -115,7 +116,7 @@ export class StockService {
    */
   async listBatches(itemId: string) {
     const item = await this.prisma.item.findUnique({ where: { id: itemId }, select: { unitCost: true } });
-    if (!item) throw new NotFoundException(`Article introuvable : ${itemId}`);
+    if (!item) throw new NotFoundException(t('stock.itemNotFound', { id: itemId }));
     const [batches, movements] = await Promise.all([
       this.prisma.batch.findMany({ where: { itemId } }),
       this.prisma.movement.findMany({ where: { itemId } }),
@@ -138,13 +139,13 @@ export class StockService {
 
   async createItem(dto: CreateItemDto) {
     const inventoryType = await this.prisma.inventoryType.findUnique({ where: { id: dto.inventoryTypeId } });
-    if (!inventoryType) throw new BadRequestException(`Type d'inventaire inconnu : ${dto.inventoryTypeId}`);
+    if (!inventoryType) throw new BadRequestException(t('stock.unknownInventoryType', { id: dto.inventoryTypeId }));
 
     try {
       return await this.prisma.item.create({ data: dto });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException(`Un article avec la référence "${dto.reference}" existe déjà.`);
+        throw new ConflictException(t('stock.referenceExists', { reference: dto.reference ?? '' }));
       }
       throw error;
     }
@@ -156,7 +157,7 @@ export class StockService {
       return await this.prisma.item.update({ where: { id }, data: dto });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException(`Un article avec la référence "${dto.reference}" existe déjà.`);
+        throw new ConflictException(t('stock.referenceExists', { reference: dto.reference ?? '' }));
       }
       throw error;
     }
@@ -180,20 +181,16 @@ export class StockService {
    */
   async deleteItem(id: string) {
     const item = await this.prisma.item.findUnique({ where: { id } });
-    if (!item) throw new NotFoundException(`Article introuvable : ${id}`);
+    if (!item) throw new NotFoundException(t('stock.itemNotFound', { id }));
 
     const movementCount = await this.prisma.movement.count({ where: { itemId: id } });
     if (movementCount > 0) {
-      throw new ConflictException(
-        `"${item.name}" a ${movementCount} mouvement(s) de stock et ne peut pas être supprimé — son historique serait orphelin. Archivez-le à la place.`,
-      );
+      throw new ConflictException(t('stock.itemHasMovements', { name: item.name, count: movementCount }));
     }
 
     const referenced = await this.findProductionReferences([id]);
     if (referenced.has(id)) {
-      throw new ConflictException(
-        `"${item.name}" est utilisé par au moins un lot de production et ne peut pas être supprimé. Archivez-le à la place.`,
-      );
+      throw new ConflictException(t('stock.itemUsedByProduction', { name: item.name }));
     }
 
     // Batches with no movements are the item's own scaffolding, not history.
@@ -217,17 +214,17 @@ export class StockService {
 
   async receive(itemId: string, dto: ReceiveStockDto) {
     const item = await this.prisma.item.findUnique({ where: { id: itemId }, include: { inventoryType: true } });
-    if (!item) throw new NotFoundException(`Article introuvable : ${itemId}`);
+    if (!item) throw new NotFoundException(t('stock.itemNotFound', { id: itemId }));
 
     if (item.inventoryType.hasBatches && !dto.batchNumber) {
-      throw new BadRequestException('Le numéro de lot est obligatoire pour ce type de produit.');
+      throw new BadRequestException(t('stock.lotNumberRequiredForType'));
     }
     if (item.inventoryType.hasExpiry && !dto.expiryDate) {
-      throw new BadRequestException('La date de péremption est obligatoire pour ce type de produit.');
+      throw new BadRequestException(t('stock.expiryRequiredForType'));
     }
     if (dto.supplierId) {
       const supplier = await this.prisma.supplier.findUnique({ where: { id: dto.supplierId } });
-      if (!supplier) throw new BadRequestException(`Fournisseur introuvable : ${dto.supplierId}`);
+      if (!supplier) throw new BadRequestException(t('stock.supplierNotFound', { id: dto.supplierId }));
     }
     const quality = validateQuality(dto.quality, item.inventoryType.hasQuality);
 
@@ -267,23 +264,23 @@ export class StockService {
 
   async logUsage(itemId: string, dto: LogUsageDto) {
     const item = await this.prisma.item.findUnique({ where: { id: itemId }, include: { inventoryType: true } });
-    if (!item) throw new NotFoundException(`Article introuvable : ${itemId}`);
+    if (!item) throw new NotFoundException(t('stock.itemNotFound', { id: itemId }));
 
     const movements = await this.prisma.movement.findMany({ where: { itemId } });
 
     if (item.inventoryType.hasBatches) {
-      if (!dto.batchId) throw new BadRequestException('Choisissez un lot.');
+      if (!dto.batchId) throw new BadRequestException(t('stock.chooseBatch'));
       const batches = await this.prisma.batch.findMany({ where: { itemId } });
       const withRemaining = getBatchesWithRemaining(batches, movements, itemId, new Date());
       const batch = withRemaining.find((b) => b.id === dto.batchId);
-      if (!batch) throw new BadRequestException(`Lot introuvable : ${dto.batchId}`);
+      if (!batch) throw new BadRequestException(t('stock.batchNotFound', { id: dto.batchId }));
       if (dto.quantity > batch.remaining) {
-        throw new BadRequestException(`Il n'y a que ${batch.remaining} ${item.unit} disponible dans ce lot.`);
+        throw new BadRequestException(t('stock.onlyAvailableInBatch', { available: batch.remaining, unit: item.unit }));
       }
     } else {
       const available = getItemQuantity(movements, itemId);
       if (dto.quantity > available) {
-        throw new BadRequestException(`Il n'y a que ${available} ${item.unit} disponible.`);
+        throw new BadRequestException(t('stock.onlyAvailable', { available, unit: item.unit }));
       }
     }
 
@@ -367,10 +364,10 @@ function isUniqueConstraintError(error: unknown): boolean {
 function validateQuality(quality: string | undefined, hasQuality: boolean): string | null {
   if (!quality) return null;
   if (!hasQuality) {
-    throw new BadRequestException('Ce type de produit ne classifie pas la qualité de production.');
+    throw new BadRequestException(t('stock.typeHasNoQuality'));
   }
   if (!QUALITY_CLASSES.includes(quality as (typeof QUALITY_CLASSES)[number])) {
-    throw new BadRequestException(`Classe de qualité inconnue : ${quality} (attendue : ${QUALITY_CLASSES.join(', ')})`);
+    throw new BadRequestException(t('stock.unknownQualityClass', { quality, expected: QUALITY_CLASSES.join(', ') }));
   }
   return quality;
 }

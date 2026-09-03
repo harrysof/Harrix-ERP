@@ -15,6 +15,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { DISCOUNT_TYPES, SHIPMENT_STATUSES } from '../sales-math.js';
+import { t } from '../../i18n/messages/index.js';
 
 export class OrderLineDto {
   @IsString()
@@ -105,7 +106,7 @@ export class CreateOrderDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  @Max(1, { message: () => t('common.taxRateFraction') })
   taxRate?: number;
 
   @IsOptional()
@@ -161,7 +162,7 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  @Max(1, { message: () => t('common.taxRateFraction') })
   taxRate?: number;
 
   @IsOptional()

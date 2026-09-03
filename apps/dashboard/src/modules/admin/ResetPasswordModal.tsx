@@ -5,11 +5,13 @@ import { Field } from "../../components/ui/Field";
 import { Banner } from "../../components/ui/Banner";
 import { ApiError } from "../../lib/api";
 import { resetUserPassword, type ApiUser } from "../../lib/authApi";
+import { useI18n } from "../../state/LanguageContext";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 /** The gérant setting a new password for someone who forgot theirs. */
 export function ResetPasswordModal({ user, onClose }: { user: ApiUser; onClose: () => void }) {
+  const { t } = useI18n();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -18,14 +20,14 @@ export function ResetPasswordModal({ user, onClose }: { user: ApiUser; onClose: 
   async function handleSave() {
     setError(null);
     if (password.length < MIN_PASSWORD_LENGTH) {
-      return setError(`Le mot de passe doit faire au moins ${MIN_PASSWORD_LENGTH} caractères.`);
+      return setError(t("adm.err.password", { count: MIN_PASSWORD_LENGTH }));
     }
     setSaving(true);
     try {
       await resetUserPassword(user.id, password);
       setDone(true);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Réinitialisation impossible.");
+      setError(e instanceof ApiError ? e.message : t("adm.resetFailed"));
     } finally {
       setSaving(false);
     }
@@ -33,18 +35,18 @@ export function ResetPasswordModal({ user, onClose }: { user: ApiUser; onClose: 
 
   return (
     <Modal
-      title={`Mot de passe — ${user.fullName}`}
+      title={t("adm.resetModalTitle", { name: user.fullName })}
       onClose={onClose}
       footer={
         done ? (
           <Button variant="primary" onClick={onClose}>
-            Fermer
+            {t("action.close")}
           </Button>
         ) : (
           <>
-            <Button onClick={onClose}>Annuler</Button>
+            <Button onClick={onClose}>{t("action.cancel")}</Button>
             <Button variant="primary" onClick={handleSave} disabled={saving}>
-              {saving ? "Enregistrement…" : "Réinitialiser"}
+              {saving ? t("action.saving") : t("adm.reset")}
             </Button>
           </>
         )
@@ -52,18 +54,17 @@ export function ResetPasswordModal({ user, onClose }: { user: ApiUser; onClose: 
     >
       {done ? (
         <Banner tone="info">
-          Le mot de passe de {user.fullName} est maintenant : <strong>{password}</strong>
+          {t("adm.newPasswordIs", { name: user.fullName })}{" "}
+          <strong>{password}</strong>
           <br />
-          Communiquez-le-lui directement. Il ne sera plus affiché.
+          {t("adm.tellThemDirectly")}
         </Banner>
       ) : (
         <div className="form-stack">
-          <Field label="Nouveau mot de passe" hint={`Au moins ${MIN_PASSWORD_LENGTH} caractères.`}>
+          <Field label={t("adm.newPassword")} hint={t("adm.newPasswordHint", { count: MIN_PASSWORD_LENGTH })}>
             <input className="input" type="text" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus />
           </Field>
-          <Banner tone="warn">
-            Cette action ne demande pas l'ancien mot de passe. Elle est enregistrée dans le journal d'activité.
-          </Banner>
+          <Banner tone="warn">{t("adm.resetNote")}</Banner>
           {error ? <p className="form-error">{error}</p> : null}
         </div>
       )}

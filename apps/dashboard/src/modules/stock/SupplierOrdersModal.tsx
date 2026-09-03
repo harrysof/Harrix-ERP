@@ -4,6 +4,7 @@ import { Pill } from "../../components/ui/Pill";
 import { Button } from "../../components/ui/Button";
 import { formatDate, formatQuantity } from "../../lib/format";
 import { ApiError } from "../../lib/api";
+import { useI18n } from "../../state/LanguageContext";
 import type { ApiSupplierOrder, ReceiveOrderInput, SupplierOrderInput } from "../../lib/supplierOrdersApi";
 import { createSupplierOrder, fetchSupplierOrders, receiveSupplierOrder } from "../../lib/supplierOrdersApi";
 import type { Supplier } from "../../lib/suppliersApi";
@@ -21,16 +22,18 @@ interface SupplierOrdersModalProps {
 type View = { kind: "list" } | { kind: "create" } | { kind: "receive"; order: ApiSupplierOrder };
 
 export function SupplierOrdersModal({ suppliers, items, onClose, onStockChanged }: SupplierOrdersModalProps) {
+  const { t, tn } = useI18n();
   const [orders, setOrders] = useState<ApiSupplierOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: "list" });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(() => {
     setError(null);
     return fetchSupplierOrders()
       .then(setOrders)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les commandes."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("so.loadFailed")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -63,32 +66,32 @@ export function SupplierOrdersModal({ suppliers, items, onClose, onStockChanged 
 
   return (
     <Modal
-      title="Commandes fournisseurs"
-      subtitle={`${openCount} commande${openCount > 1 ? "s" : ""} en cours`}
+      title={t("so.title")}
+      subtitle={tn("so.openCount", openCount)}
       width={760}
       onClose={onClose}
-      footer={<Button onClick={onClose}>Fermer</Button>}
+      footer={<Button onClick={onClose}>{t("action.close")}</Button>}
     >
       {error ? <p className="form-error">{error}</p> : null}
 
       <div className="toolbar" style={{ marginBottom: 12 }}>
         <p className="field-hint" style={{ margin: 0 }}>
-          Réceptionner une commande fait entrer le stock en inventaire (mouvements IN).
+          {t("so.receiveExplains")}
         </p>
         <Button variant="primary" onClick={() => setView({ kind: "create" })} disabled={suppliers.length === 0}>
-          + Nouvelle commande
+          {t("so.new")}
         </Button>
       </div>
 
       {suppliers.length === 0 ? (
-        <p className="form-error">Aucun fournisseur enregistré — ajoutez-en un dans l'onglet Fournisseurs.</p>
+        <p className="form-error">{t("so.noSupplier")}</p>
       ) : null}
 
       {loading ? (
-        <p className="loading-text">Chargement des commandes…</p>
+        <p className="loading-text">{t("so.loading")}</p>
       ) : orders.length === 0 ? (
         <p className="field-hint" style={{ margin: 0 }}>
-          Aucune commande fournisseur pour le moment.
+          {t("so.none")}
         </p>
       ) : (
         <div className="order-list">
@@ -97,20 +100,20 @@ export function SupplierOrdersModal({ suppliers, items, onClose, onStockChanged 
               <div className="order-card-head">
                 <div>
                   <strong>{order.supplier.name}</strong>
-                  <span className="field-hint"> · commande du {formatDate(order.orderDate)}</span>
+                  <span className="field-hint"> {t("so.orderedOn", { date: formatDate(order.orderDate) })}</span>
                   {order.notes ? <p className="order-notes">{order.notes}</p> : null}
                 </div>
-                <Pill tone={order.status === "open" ? "warn" : "ok"}>{order.status === "open" ? "En cours" : "Reçue"}</Pill>
+                <Pill tone={order.status === "open" ? "warn" : "ok"}>{t(order.status === "open" ? "so.pending" : "so.received")}</Pill>
               </div>
 
               <div className="table-scroll">
                 <table className="stock-table order-table">
                   <thead>
                     <tr>
-                      <th>Article</th>
-                      <th>Référence</th>
-                      <th>Quantité</th>
-                      {order.lines.some((l) => l.batchNumber) ? <th>Lot</th> : null}
+                      <th>{t("field.item")}</th>
+                      <th>{t("field.reference")}</th>
+                      <th>{t("field.quantity")}</th>
+                      {order.lines.some((l) => l.batchNumber) ? <th>{t("field.batch")}</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -129,10 +132,10 @@ export function SupplierOrdersModal({ suppliers, items, onClose, onStockChanged 
               <div className="order-card-foot">
                 {order.status === "open" ? (
                   <Button variant="primary" onClick={() => setView({ kind: "receive", order })}>
-                    Réceptionner la livraison
+                    {t("so.receive")}
                   </Button>
                 ) : (
-                  <span className="field-hint">Réceptionnée le {formatDate(order.receivedDate ?? order.orderDate)}</span>
+                  <span className="field-hint">{t("so.receivedOn", { date: formatDate(order.receivedDate ?? order.orderDate) })}</span>
                 )}
               </div>
             </div>

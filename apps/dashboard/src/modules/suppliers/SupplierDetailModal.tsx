@@ -16,6 +16,7 @@ import {
   type SupplierDetail,
 } from "../../lib/purchasingApi";
 import type { Supplier } from "../../lib/suppliersApi";
+import { useI18n } from "../../state/LanguageContext";
 
 type Tab = "info" | "items" | "orders" | "receipts";
 
@@ -25,6 +26,7 @@ type Tab = "info" | "items" | "orders" | "receipts";
  * outstanding commitments — all from one call.
  */
 export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier; onClose: () => void }) {
+  const { t } = useI18n();
   const [detail, setDetail] = useState<SupplierDetail | null>(null);
   const [tab, setTab] = useState<Tab>("info");
   const [error, setError] = useState<string | null>(null);
@@ -32,54 +34,70 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
   useEffect(() => {
     fetchSupplierDetail(supplier.id)
       .then(setDetail)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger la fiche fournisseur."));
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("supplier.loadFailed")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplier.id]);
 
   return (
-    <Modal title={supplier.name} onClose={onClose} width={900} footer={<Button onClick={onClose}>Fermer</Button>}>
+    <Modal title={supplier.name} onClose={onClose} width={900} footer={<Button onClick={onClose}>{t("action.close")}</Button>}>
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       {!detail ? (
-        <p className="loading-text">Chargement…</p>
+        <p className="loading-text">{t("state.loading")}</p>
       ) : (
         <div className="form-stack">
           <div className="stat-grid">
-            <StatCard label="Bons de commande" value={detail.summary.purchaseOrderCount} hint={`${detail.summary.openPurchaseOrderCount} en cours`} />
-            <StatCard label="Total acheté" value={formatCurrency(detail.summary.totalPurchased)} hint="Hors bons annulés" />
             <StatCard
-              label="Engagements"
+              label={t("po.tabOrders")}
+              value={detail.summary.purchaseOrderCount}
+              hint={t("supplier.openOrders", { count: detail.summary.openPurchaseOrderCount })}
+            />
+            <StatCard
+              label={t("supplier.totalPurchased")}
+              value={formatCurrency(detail.summary.totalPurchased)}
+              hint={t("po.kpi.totalHint")}
+            />
+            <StatCard
+              label={t("po.commitments")}
               value={formatCurrency(detail.summary.outstandingCommitment)}
-              hint="Commandé, pas encore livré"
+              hint={t("po.kpi.ordered")}
               tone={detail.summary.outstandingCommitment > 0 ? "warn" : "neutral"}
             />
             <StatCard
-              label="Montant dû"
+              label={t("supplier.due")}
               value={formatCurrency(detail.summary.amountOwed)}
-              hint="Restant à payer à ce fournisseur"
+              hint={t("supplier.dueHint")}
               tone={detail.summary.amountOwed > 0 ? "warn" : "neutral"}
             />
             <StatCard
-              label="Dernier achat"
+              label={t("supplier.lastPurchase")}
               value={detail.summary.lastPurchaseDate ? formatDate(detail.summary.lastPurchaseDate) : "—"}
             />
           </div>
 
           <div className="tab-strip">
-            <TabButton active={tab === "info"} onClick={() => setTab("info")} label="Informations" />
-            <TabButton active={tab === "items"} onClick={() => setTab("items")} label="Matières fournies" count={detail.suppliedItems.length} />
-            <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label="Bons de commande" count={detail.purchaseOrders.length} />
-            <TabButton active={tab === "receipts"} onClick={() => setTab("receipts")} label="Réceptions" count={detail.receipts.length} />
+            <TabButton active={tab === "info"} onClick={() => setTab("info")} label={t("supplier.tabInfo")} />
+            <TabButton active={tab === "items"} onClick={() => setTab("items")} label={t("supplier.materials")} count={detail.suppliedItems.length} />
+            <TabButton active={tab === "orders"} onClick={() => setTab("orders")} label={t("po.tabOrders")} count={detail.purchaseOrders.length} />
+            <TabButton active={tab === "receipts"} onClick={() => setTab("receipts")} label={t("po.receipts")} count={detail.receipts.length} />
           </div>
 
           {tab === "info" ? (
             <div className="batch-meta">
-              <Meta label="Contact" value={supplier.contactName ?? "—"} />
-              <Meta label="Téléphone" value={supplier.phone ?? "—"} />
-              <Meta label="Email" value={supplier.email ?? "—"} />
-              <Meta label="Adresse" value={supplier.address ?? "—"} />
-              <Meta label="Immatriculation" value={supplier.registration ?? "—"} />
-              <Meta label="Statut" value={<Pill tone={supplier.archived ? "neutral" : "ok"}>{supplier.archived ? "Archivé" : "Actif"}</Pill>} />
-              <Meta label="Créé le" value={formatDate(supplier.createdAt)} />
+              <Meta label={t("po.col.contact")} value={supplier.contactName ?? "—"} />
+              <Meta label={t("field.phone")} value={supplier.phone ?? "—"} />
+              <Meta label={t("field.email")} value={supplier.email ?? "—"} />
+              <Meta label={t("field.address")} value={supplier.address ?? "—"} />
+              <Meta label={t("supplier.registration")} value={supplier.registration ?? "—"} />
+              <Meta
+                label={t("field.status")}
+                value={
+                  <Pill tone={supplier.archived ? "neutral" : "ok"}>
+                    {t(supplier.archived ? "state.archived" : "state.active")}
+                  </Pill>
+                }
+              />
+              <Meta label={t("supplier.createdOn")} value={formatDate(supplier.createdAt)} />
             </div>
           ) : null}
 
@@ -88,18 +106,18 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
           {tab === "items" ? (
             detail.suppliedItems.length === 0 ? (
               <EmptyState
-                title="Aucune matière connue"
-                description="Les matières apparaissent ici dès qu'un bon de commande ou une réception les mentionne."
+                title={t("supplier.noMaterials")}
+                description={t("supplier.materialsAppear")}
               />
             ) : (
               <div className="table-scroll">
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>Article</th>
-                      <th>Référence</th>
-                      <th className="num">Dernier coût</th>
-                      <th>Dernière fois</th>
+                      <th>{t("field.item")}</th>
+                      <th>{t("field.reference")}</th>
+                      <th className="num">{t("supplier.lastCost")}</th>
+                      <th>{t("supplier.lastTime")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -121,18 +139,18 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
 
           {tab === "orders" ? (
             detail.purchaseOrders.length === 0 ? (
-              <EmptyState title="Aucun bon de commande" />
+              <EmptyState title={t("po.none")} />
             ) : (
               <div className="table-scroll">
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>N°</th>
-                      <th>Date</th>
-                      <th className="num">Lignes</th>
-                      <th className="num">Total</th>
-                      <th>Statut</th>
-                      <th>Paiement</th>
+                      <th>{t("field.number")}</th>
+                      <th>{t("field.date")}</th>
+                      <th className="num">{t("po.col.lines")}</th>
+                      <th className="num">{t("field.total")}</th>
+                      <th>{t("field.status")}</th>
+                      <th>{t("field.payment")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -143,10 +161,10 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
                         <td className="tabular num">{po.lines.length}</td>
                         <td className="tabular num">{formatCurrency(po.totals.total)}</td>
                         <td>
-                          <Pill tone={PO_STATUS_TONES[po.status]}>{PO_STATUS_LABELS[po.status]}</Pill>
+                          <Pill tone={PO_STATUS_TONES[po.status]}>{t(PO_STATUS_LABELS[po.status])}</Pill>
                         </td>
                         <td>
-                          <Pill tone={PO_PAYMENT_TONES[po.paymentStatus]}>{PO_PAYMENT_LABELS[po.paymentStatus]}</Pill>
+                          <Pill tone={PO_PAYMENT_TONES[po.paymentStatus]}>{t(PO_PAYMENT_LABELS[po.paymentStatus])}</Pill>
                         </td>
                       </tr>
                     ))}
@@ -158,19 +176,19 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
 
           {tab === "receipts" ? (
             <>
-              <h4 className="section-title">Réceptions sur bons de commande</h4>
+              <h4 className="section-title">{t("supplier.receiptsOnOrders")}</h4>
               {detail.receipts.length === 0 ? (
-                <p className="muted">Aucune réception enregistrée sur un bon de commande.</p>
+                <p className="muted">{t("supplier.noReceiptsOnOrders")}</p>
               ) : (
                 <div className="table-scroll">
                   <table className="stock-table">
                     <thead>
                       <tr>
-                        <th>N°</th>
-                        <th>Date</th>
-                        <th>Bon de commande</th>
-                        <th>Bon de livraison</th>
-                        <th className="num">Quantité</th>
+                        <th>{t("field.number")}</th>
+                        <th>{t("field.date")}</th>
+                        <th>{t("po.label")}</th>
+                        <th>{t("po.deliveryNote")}</th>
+                        <th className="num">{t("field.quantity")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -189,22 +207,22 @@ export function SupplierDetailModal({ supplier, onClose }: { supplier: Supplier;
               )}
 
               <h4 className="section-title" style={{ marginTop: 18 }}>
-                Historique complet des entrées
+                {t("supplier.allEntries")}
               </h4>
               <p className="field-hint" style={{ marginBottom: 8 }}>
-                Toutes les entrées de stock attribuées à ce fournisseur, y compris celles saisies directement dans l'onglet Stock.
+                {t("supplier.allEntriesHint")}
               </p>
               {detail.movements.length === 0 ? (
-                <p className="muted">Aucune entrée de stock.</p>
+                <p className="muted">{t("supplier.noEntries")}</p>
               ) : (
                 <div className="table-scroll">
                   <table className="stock-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Article</th>
-                        <th>Lot</th>
-                        <th className="num">Quantité</th>
+                        <th>{t("field.date")}</th>
+                        <th>{t("field.item")}</th>
+                        <th>{t("field.batch")}</th>
+                        <th className="num">{t("field.quantity")}</th>
                       </tr>
                     </thead>
                     <tbody>

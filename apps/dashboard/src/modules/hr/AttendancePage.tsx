@@ -7,7 +7,7 @@ import { Avatar } from "../../components/ui/Avatar";
 import { StatCard } from "../../components/ui/StatCard";
 import { Modal } from "../../components/ui/Modal";
 import { ApiError } from "../../lib/api";
-import { formatDate, formatNumber } from "../../lib/format";
+import { formatDate, formatMonthYear, formatNumber } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import {
   ABSENCE_TYPES,
@@ -25,6 +25,7 @@ import {
   type ApiOvertimeEntry,
   type MonthlySummary,
 } from "../../lib/hrApi";
+import { useI18n } from "../../state/LanguageContext";
 
 type EntryTab = "hours" | "absence" | "overtime";
 type ReasonModalState = { kind: "absence" | "overtime"; employeeId: string; employeeName: string } | null;
@@ -43,12 +44,8 @@ function monthRange(month: string): { from: string; to: string } {
   return { from, to };
 }
 
-function monthLabel(month: string): string {
-  const [year, m] = month.split("-").map(Number);
-  return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(new Date(Date.UTC(year, m - 1, 1)));
-}
-
 export function AttendancePage() {
+  const { t } = useI18n();
   const [employees, setEmployees] = useState<ApiEmployee[]>([]);
   const [month, setMonth] = useState(currentMonth());
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
@@ -87,7 +84,7 @@ export function AttendancePage() {
         setEmployees(nextEmployees);
         setSummary(nextSummary);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger la présence."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("att.loadFailed")))
       .finally(() => setLoading(false));
   }, [month]);
 
@@ -116,7 +113,7 @@ export function AttendancePage() {
       setEntryHours("8");
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSavingEntry(false);
     }
@@ -130,7 +127,7 @@ export function AttendancePage() {
       setAbsReason("");
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSavingAbsence(false);
     }
@@ -151,7 +148,7 @@ export function AttendancePage() {
       setOtReason("");
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSavingOvertime(false);
     }
@@ -162,7 +159,7 @@ export function AttendancePage() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <div className="toolbar">
-        <Field label="Mois">
+        <Field label={t("att.monthLabel")}>
           <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ maxWidth: 200 }} />
         </Field>
         <div className="toolbar-actions">
@@ -182,30 +179,30 @@ export function AttendancePage() {
         <section id="hr-entry-panel" className="card-section">
           <div className="tab-strip">
             <button type="button" className={`tab-strip-item ${entryTab === "hours" ? "tab-strip-item-active" : ""}`} onClick={() => setEntryTab("hours")}>
-              Heures travaillées
+              {t("att.workedHours")}
             </button>
             <button
               type="button"
               className={`tab-strip-item ${entryTab === "absence" ? "tab-strip-item-active" : ""}`}
               onClick={() => setEntryTab("absence")}
             >
-              Absence
+              {t("att.absence")}
             </button>
             <button
               type="button"
               className={`tab-strip-item ${entryTab === "overtime" ? "tab-strip-item-active" : ""}`}
               onClick={() => setEntryTab("overtime")}
             >
-              Heures supplémentaires
+              {t("att.overtimeSection")}
             </button>
           </div>
 
           {entryTab === "hours" ? (
             <>
               <div className="form-row">
-                <Field label="Employé">
+                <Field label={t("field.employee")}>
                   <select className="input" value={entryEmployeeId} onChange={(e) => setEntryEmployeeId(e.target.value)}>
-                    <option value="">— Choisir —</option>
+                    <option value="">{t("att.choose")}</option>
                     {employees.map((e) => (
                       <option key={e.id} value={e.id}>
                         {e.fullName}
@@ -213,16 +210,16 @@ export function AttendancePage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Date">
+                <Field label={t("field.date")}>
                   <input className="input" type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
                 </Field>
-                <Field label="Heures">
+                <Field label={t("att.hours")}>
                   <input className="input" type="number" min={0} max={24} value={entryHours} onChange={(e) => setEntryHours(e.target.value)} />
                 </Field>
               </div>
               <div>
                 <Button variant="primary" onClick={submitTimeEntry} disabled={!entryEmployeeId || savingEntry}>
-                  {savingEntry ? "Enregistrement…" : "Ajouter l'entrée"}
+                  {savingEntry ? t("action.saving") : t("att.addEntry")}
                 </Button>
               </div>
             </>
@@ -231,9 +228,9 @@ export function AttendancePage() {
           {entryTab === "absence" ? (
             <>
               <div className="form-row">
-                <Field label="Employé">
+                <Field label={t("field.employee")}>
                   <select className="input" value={absEmployeeId} onChange={(e) => setAbsEmployeeId(e.target.value)}>
-                    <option value="">— Choisir —</option>
+                    <option value="">{t("att.choose")}</option>
                     {employees.map((e) => (
                       <option key={e.id} value={e.id}>
                         {e.fullName}
@@ -241,30 +238,30 @@ export function AttendancePage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Type">
+                <Field label={t("field.type")}>
                   <select className="input" value={absType} onChange={(e) => setAbsType(e.target.value as AbsenceType)}>
-                    {ABSENCE_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {ABSENCE_TYPE_LABELS[t]}
+                    {ABSENCE_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {t(ABSENCE_TYPE_LABELS[type])}
                       </option>
                     ))}
                   </select>
                 </Field>
               </div>
               <div className="form-row">
-                <Field label="Du">
+                <Field label={t("field.from")}>
                   <input className="input" type="date" value={absStart} onChange={(e) => setAbsStart(e.target.value)} />
                 </Field>
-                <Field label="Au">
+                <Field label={t("field.to")}>
                   <input className="input" type="date" value={absEnd} onChange={(e) => setAbsEnd(e.target.value)} />
                 </Field>
-                <Field label="Raison (optionnel)">
+                <Field label={t("att.reasonOptional")}>
                   <input className="input" value={absReason} onChange={(e) => setAbsReason(e.target.value)} />
                 </Field>
               </div>
               <div>
                 <Button variant="primary" onClick={submitAbsence} disabled={!absEmployeeId || savingAbsence}>
-                  {savingAbsence ? "Enregistrement…" : "Enregistrer l'absence"}
+                  {savingAbsence ? t("action.saving") : t("att.saveAbsence")}
                 </Button>
               </div>
             </>
@@ -273,9 +270,9 @@ export function AttendancePage() {
           {entryTab === "overtime" ? (
             <>
               <div className="form-row">
-                <Field label="Employé">
+                <Field label={t("field.employee")}>
                   <select className="input" value={otEmployeeId} onChange={(e) => setOtEmployeeId(e.target.value)}>
-                    <option value="">— Choisir —</option>
+                    <option value="">{t("att.choose")}</option>
                     {employees.map((e) => (
                       <option key={e.id} value={e.id}>
                         {e.fullName}
@@ -283,24 +280,24 @@ export function AttendancePage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Du">
+                <Field label={t("field.from")}>
                   <input className="input" type="date" value={otStart} onChange={(e) => setOtStart(e.target.value)} />
                 </Field>
-                <Field label="Au">
+                <Field label={t("field.to")}>
                   <input className="input" type="date" value={otEnd} onChange={(e) => setOtEnd(e.target.value)} />
                 </Field>
               </div>
               <div className="form-row">
-                <Field label="Heures">
+                <Field label={t("att.hours")}>
                   <input className="input" type="number" min={0} max={400} value={otHours} onChange={(e) => setOtHours(e.target.value)} />
                 </Field>
-                <Field label="Raison (optionnel)">
+                <Field label={t("att.reasonOptional")}>
                   <input className="input" value={otReason} onChange={(e) => setOtReason(e.target.value)} />
                 </Field>
               </div>
               <div>
                 <Button variant="primary" onClick={submitOvertime} disabled={!otEmployeeId || savingOvertime}>
-                  {savingOvertime ? "Enregistrement…" : "Ajouter les heures supplémentaires"}
+                  {savingOvertime ? t("action.saving") : t("att.addOvertime")}
                 </Button>
               </div>
             </>
@@ -311,33 +308,38 @@ export function AttendancePage() {
       <section>
         <div className="inventory-heading">
           <h2 className="section-title" style={{ marginBottom: 0 }}>
-            Résumé du mois
+            {t("att.monthSummary")}
           </h2>
           <p className="inventory-description">
-            Heures prévues = heures/jour définies sur la fiche de chaque employé × jours de {monthLabel(month)}.
+            {t("att.expectedFormula", { month: formatMonthYear(month) })}
           </p>
         </div>
 
         {loading || !summary ? (
-          <p className="loading-text">Chargement…</p>
+          <p className="loading-text">{t("state.loading")}</p>
         ) : summary.rows.length === 0 ? (
-          <p className="muted">Aucun employé actif.</p>
+          <p className="muted">{t("att.noActiveEmployee")}</p>
         ) : (
           <div className="page-stack" style={{ gap: 14 }}>
             <div className="stat-grid">
-              <StatCard icon={Users} label="Employés" value={summary.rows.length} />
-              <StatCard icon={Clock} label="Heures travaillées" value={formatNumber(totals?.worked ?? 0)} hint={monthLabel(month)} />
+              <StatCard icon={Users} label={t("att.employees")} value={summary.rows.length} />
+              <StatCard
+                icon={Clock}
+                label={t("att.workedHours")}
+                value={formatNumber(totals?.worked ?? 0)}
+                hint={formatMonthYear(month)}
+              />
               <StatCard
                 icon={TrendingUp}
-                label="Heures supplémentaires"
+                label={t("att.overtimeSection")}
                 value={formatNumber(totals?.overtime ?? 0)}
-                hint={monthLabel(month)}
+                hint={formatMonthYear(month)}
                 tone={totals && totals.overtime > 0 ? "warn" : "neutral"}
               />
               <StatCard
                 icon={CalendarOff}
-                label="Absences injustifiées"
-                value={`${totals?.unjustified ?? 0} j`}
+                label={t("att.unjustifiedAbsences")}
+                value={t("att.daysSuffix", { count: totals?.unjustified ?? 0 })}
                 tone={totals && totals.unjustified > 0 ? "danger" : "ok"}
               />
             </div>
@@ -347,12 +349,12 @@ export function AttendancePage() {
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>Employé</th>
-                      <th className="num">Heures prévues</th>
-                      <th className="num">Heures travaillées</th>
-                      <th className="num">Heures supp.</th>
-                      <th className="num">Maladie (j)</th>
-                      <th className="num">Absence injustifiée (j)</th>
+                      <th>{t("field.employee")}</th>
+                      <th className="num">{t("att.col.expectedHours")}</th>
+                      <th className="num">{t("att.col.workedHours")}</th>
+                      <th className="num">{t("att.col.overtime")}</th>
+                      <th className="num">{t("att.col.sickDays")}</th>
+                      <th className="num">{t("att.col.unjustifiedDays")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -430,6 +432,7 @@ function ReasonModal({
   month: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [absences, setAbsences] = useState<ApiAbsence[] | null>(null);
   const [overtime, setOvertime] = useState<ApiOvertimeEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -439,37 +442,37 @@ function ReasonModal({
     if (kind === "absence") {
       fetchAbsences({ employeeId, from, to })
         .then((rows) => setAbsences(rows.filter((a) => a.type === "INJUSTIFIEE")))
-        .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger le détail."));
+        .catch((e) => setError(e instanceof ApiError ? e.message : t("error.loadDetail")));
     } else {
       fetchOvertimeEntries({ employeeId, from, to })
         .then(setOvertime)
-        .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger le détail."));
+        .catch((e) => setError(e instanceof ApiError ? e.message : t("error.loadDetail")));
     }
   }, [kind, employeeId, month]);
 
   return (
     <Modal
-      title={kind === "absence" ? "Absences injustifiées" : "Heures supplémentaires"}
-      subtitle={`${employeeName} — ${monthLabel(month)}`}
+      title={t(kind === "absence" ? "att.unjustifiedSection" : "att.overtimeSection")}
+      subtitle={`${employeeName} — ${formatMonthYear(month)}`}
       onClose={onClose}
       width={560}
-      footer={<Button onClick={onClose}>Fermer</Button>}
+      footer={<Button onClick={onClose}>{t("action.close")}</Button>}
     >
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       {kind === "absence" ? (
         !absences ? (
-          <p className="loading-text">Chargement…</p>
+          <p className="loading-text">{t("state.loading")}</p>
         ) : absences.length === 0 ? (
-          <p className="muted">Aucune absence injustifiée ce mois-ci.</p>
+          <p className="muted">{t("att.noUnjustified")}</p>
         ) : (
           <div className="table-scroll">
             <table className="stock-table">
               <thead>
                 <tr>
-                  <th>Du</th>
-                  <th>Au</th>
-                  <th>Raison</th>
+                  <th>{t("field.from")}</th>
+                  <th>{t("field.to")}</th>
+                  <th>{t("field.reason")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -485,18 +488,18 @@ function ReasonModal({
           </div>
         )
       ) : !overtime ? (
-        <p className="loading-text">Chargement…</p>
+        <p className="loading-text">{t("state.loading")}</p>
       ) : overtime.length === 0 ? (
-        <p className="muted">Aucune heure supplémentaire ce mois-ci.</p>
+        <p className="muted">{t("att.noOvertime")}</p>
       ) : (
         <div className="table-scroll">
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Du</th>
-                <th>Au</th>
-                <th className="num">Heures</th>
-                <th>Raison</th>
+                <th>{t("field.from")}</th>
+                <th>{t("field.to")}</th>
+                <th className="num">{t("att.hours")}</th>
+                <th>{t("field.reason")}</th>
               </tr>
             </thead>
             <tbody>

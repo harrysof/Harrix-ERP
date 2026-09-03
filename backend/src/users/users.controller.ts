@@ -5,6 +5,7 @@ import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto.js';
 import { RequirePermissions } from '../auth/require-permission.decorator.js';
 import { PERMISSIONS, PERMISSION_GROUPS } from '../auth/permissions.js';
 import { CurrentUser, type AuthenticatedUser } from '../auth/current-user.js';
+import { t } from '../i18n/messages/index.js';
 
 /**
  * The gérant's administration screen. Every route needs users:manage — the
@@ -19,7 +20,10 @@ export class UsersController {
   /** The permission vocabulary, grouped, so the UI doesn't hardcode it. */
   @Get('permissions')
   listPermissions() {
-    return PERMISSION_GROUPS;
+    return PERMISSION_GROUPS.map((group) => ({
+      label: t(group.labelKey),
+      permissions: group.permissions.map((p) => ({ key: p.key, label: t(p.labelKey) })),
+    }));
   }
 
   @Get('roles')

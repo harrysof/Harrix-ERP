@@ -9,8 +9,24 @@ import { fetchBatches } from "../../lib/stockApi";
 import { formatDate, formatQuantity } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import { ApiError } from "../../lib/api";
+import { useI18n } from "../../state/LanguageContext";
+import type { TranslationKey } from "../../lib/i18n";
 
-const REASONS = ["Vente", "Production", "Maintenance", "Casse", "Périmé", "Ajustement d'inventaire", "Autre"];
+/**
+ * The reason written to the movement ledger stays the French word, whatever
+ * the operator's language: it is stored on every past movement and read back
+ * by the item fiche, the dashboard and the audit log. Only its label here
+ * follows the interface language.
+ */
+const REASONS: Array<{ value: string; key: TranslationKey }> = [
+  { value: "Vente", key: "reason.sale" },
+  { value: "Production", key: "reason.production" },
+  { value: "Maintenance", key: "reason.maintenance" },
+  { value: "Casse", key: "reason.breakage" },
+  { value: "Périmé", key: "reason.expired" },
+  { value: "Ajustement d'inventaire", key: "reason.adjustment" },
+  { value: "Autre", key: "reason.other" },
+];
 
 interface LogUsageModalProps {
   itemId: string;
@@ -34,6 +50,7 @@ interface LogUsageModalProps {
 }
 
 export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, itemMachine, inventoryType, onClose, onSubmit }: LogUsageModalProps) {
+  const { t } = useI18n();
   const [batches, setBatches] = useState<ApiBatch[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -41,12 +58,15 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, itemMa
     if (!inventoryType.hasBatches) return;
     fetchBatches(itemId)
       .then((all) => setBatches(all.filter((b) => b.remaining > 0)))
-      .catch((e) => setLoadError(e instanceof ApiError ? e.message : "Impossible de charger les lots."));
+      .catch((e) => setLoadError(e instanceof ApiError ? e.message : t("usage.loadLotsFailed")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemId, inventoryType.hasBatches]);
 
   const [quantity, setQuantity] = useState("");
   const [date, setDate] = useState(todayIso());
-  const [reason, setReason] = useState(inventoryType.hasMachineInfo ? "Maintenance" : inventoryType.hasQuality ? "Vente" : REASONS[0]);
+  const [reason, setReason] = useState(
+    inventoryType.hasMachineInfo ? "Maintenance" : inventoryType.hasQuality ? "Vente" : REASONS[0].value,
+  );
   const [customReason, setCustomReason] = useState("");
   const [machine, setMachine] = useState(itemMachine);
   const [maintenanceRef, setMaintenanceRef] = useState("");
@@ -67,15 +87,19 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, itemMa
   async function handleSubmit() {
     const quantityValue = Number(quantity);
     if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
-      setError("La quantité doit être un nombre supérieur à zéro.");
+      setError(t("receive.err.quantity"));
       return;
     }
     if (inventoryType.hasBatches && !selectedBatch) {
-      setError("Choisissez un lot.");
+      setError(t("usage.err.chooseLot"));
       return;
     }
     if (quantityValue > cap) {
-      setError(`Il n'y a que ${formatQuantity(cap, itemUnit)} disponible${inventoryType.hasBatches ? " dans ce lot" : ""}.`);
+      setError(
+        t(inventoryType.hasBatches ? "usage.err.tooMuchBatch" : "usage.err.tooMuch", {
+          quantity: formatQuantity(cap, itemUnit),
+        }),
+      );
       return;
     }
     setError(null);
@@ -94,14 +118,18 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, itemMa
         quality: inventoryType.hasQuality ? quality || null : null,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
       setSubmitting(false);
     }
   }
 
   if (loadError) {
     return (
-      <Modal title={`Sortie — ${itemName}`} onClose={onClose} footer={<Button onClick={onClose}>Fermer</Button>}>
+      <Modal
+        title={t("usage.modalTitle", { item: itemName })}
+        onClose={onClose}
+        footer={<Button onClick={onClose}>{t("action.close")}</Button>}
+      >
         <p className="form-error">{loadError}</p>
       </Modal>
     );
@@ -109,87 +137,95 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, itemMa
 
   if (inventoryType.hasBatches && batches === null) {
     return (
-      <Modal title={`Sortie — ${itemName}`} onClose={onClose}>
-        <p className="loading-text">Chargement des lots…</p>
+      <Modal title={t("usage.modalTitle", { item: itemName })} onClose={onClose}>
+        <p className="loading-text">{t("usage.loadingLots")}</p>
       </Modal>
     );
   }
 
   if (inventoryType.hasBatches && batches?.length === 0) {
     return (
-      <Modal title={`Sortie — ${itemName}`} onClose={onClose} footer={<Button onClick={onClose}>Fermer</Button>}>
-        <p className="form-error">Aucun lot disponible pour cet article — il n'y a rien à sortir.</p>
+      <Modal
+        title={t("usage.modalTitle", { item: itemName })}
+        onClose={onClose}
+        footer={<Button onClick={onClose}>{t("action.close")}</Button>}
+      >
+        <p className="form-error">{t("usage.noLots")}</p>
       </Modal>
     );
   }
 
   return (
     <Modal
-      title={`Sortie — ${itemName}`}
+      title={t("usage.modalTitle", { item: itemName })}
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
-            Annuler
+            {t("action.cancel")}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Enregistrement…" : "Enregistrer la sortie"}
+            {submitting ? t("action.saving") : t("usage.title")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
         {inventoryType.hasBatches ? (
-          <Field label="Lot à utiliser" hint="Priorité au lot qui expire le plus tôt (FEFO) ; à défaut, le plus ancien (FIFO)">
+          <Field label={t("usage.lotToUse")} hint={t("usage.lotHint")}>
             <select className="input" value={batchId ?? ""} onChange={(e) => setBatchId(e.target.value)}>
               {batches!.map((b, i) => (
                 <option key={b.id} value={b.id}>
-                  {b.batchNumber} — reçu le {formatDate(b.receivedDate)} · {formatQuantity(b.remaining, itemUnit)} restant
-                  {i === 0 ? " (prioritaire)" : ""}
+                  {t("usage.batchOption", {
+                    batch: b.batchNumber,
+                    date: formatDate(b.receivedDate),
+                    remaining: formatQuantity(b.remaining, itemUnit),
+                  })}
+                  {i === 0 ? t("usage.batchPriority") : ""}
                 </option>
               ))}
             </select>
           </Field>
         ) : (
           <p className="field-hint" style={{ margin: 0 }}>
-            Disponible : {formatQuantity(itemQuantity, itemUnit)}
+            {t("usage.available", { quantity: formatQuantity(itemQuantity, itemUnit) })}
           </p>
         )}
 
-        {selectedBatch?.status === "expired" ? <Pill tone="danger">Ce lot est périmé</Pill> : null}
-        {selectedBatch?.status === "warning" ? <Pill tone="warn">Ce lot expire bientôt</Pill> : null}
+        {selectedBatch?.status === "expired" ? <Pill tone="danger">{t("usage.lotExpired")}</Pill> : null}
+        {selectedBatch?.status === "warning" ? <Pill tone="warn">{t("usage.lotExpiringSoon")}</Pill> : null}
 
         <div className="form-row">
-          <Field label={`Quantité utilisée (${itemUnit})`}>
+          <Field label={t("usage.quantityLabel", { unit: itemUnit })}>
             <input className="input" type="number" min={0} step="any" value={quantity} onChange={(e) => setQuantity(e.target.value)} autoFocus />
           </Field>
-          <Field label="Date">
+          <Field label={t("field.date")}>
             <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
 
-        <Field label="Raison">
+        <Field label={t("field.reason")}>
           <select className="input" value={reason} onChange={(e) => setReason(e.target.value)}>
             {REASONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
+              <option key={r.value} value={r.value}>
+                {t(r.key)}
               </option>
             ))}
           </select>
         </Field>
         {reason === "Autre" ? (
-          <Field label="Préciser">
+          <Field label={t("usage.specify")}>
             <input className="input" value={customReason} onChange={(e) => setCustomReason(e.target.value)} />
           </Field>
         ) : null}
 
         {inventoryType.hasQuality ? (
-          <Field label="Classe de qualité" hint="Si ces sorties concernent une classe précise (1er choix, 2ème choix, rebut)">
+          <Field label={t("quality.classLabel")} hint={t("usage.qualityHint")}>
             <select className="input" value={quality} onChange={(e) => setQuality(e.target.value)}>
-              <option value="">— Non classé —</option>
-              <option value="1er">1er choix</option>
-              <option value="2ème">2ème choix</option>
-              <option value="rebut">Rebut</option>
+              <option value="">{t("receive.unclassified")}</option>
+              <option value="1er">{t("quality.first")}</option>
+              <option value="2ème">{t("quality.second")}</option>
+              <option value="rebut">{t("quality.reject")}</option>
             </select>
           </Field>
         ) : null}
@@ -197,21 +233,21 @@ export function LogUsageModal({ itemId, itemName, itemUnit, itemQuantity, itemMa
         {inventoryType.hasMachineInfo ? (
           <>
             <p className="detail-type" style={{ margin: 0 }}>
-              Détails maintenance
+              {t("usage.maintenanceSection")}
             </p>
-            <Field label="Machine">
-              <input className="input" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder="Machine concernée" />
+            <Field label={t("field.machine")}>
+              <input className="input" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder={t("usage.machineConcerned")} />
             </Field>
             <div className="form-row">
-              <Field label="Référence maintenance" hint="Ex. MT-2026-021">
+              <Field label={t("usage.maintenanceRef")} hint={t("usage.ph.maintenanceRef")}>
                 <input className="input" value={maintenanceRef} onChange={(e) => setMaintenanceRef(e.target.value)} />
               </Field>
-              <Field label="Employé / intervenant">
+              <Field label={t("usage.operator")}>
                 <input className="input" value={employee} onChange={(e) => setEmployee(e.target.value)} />
               </Field>
             </div>
-            <Field label="Notes">
-              <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Panne constatée, pièce remplacée…" />
+            <Field label={t("field.notes")}>
+              <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("usage.ph.notes")} />
             </Field>
           </>
         ) : null}

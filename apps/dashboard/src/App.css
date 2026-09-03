@@ -313,10 +313,27 @@
   max-width: 1100px;
 }
 
+/* A section heading inside a card or modal: a small accent tick, then the
+   label. Cheap to render, and it gives every block a visible start. */
 .section-title {
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   margin-bottom: 12px;
-  color: var(--ink);
+  color: var(--ink-soft);
+}
+
+.section-title::before {
+  content: "";
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex: none;
 }
 
 /* ---------- stat cards ---------- */
@@ -327,16 +344,67 @@
   gap: 14px;
 }
 
+/* A stat card carries one figure and the sentence that qualifies it. The
+   tone (ok / warn / danger) is spoken by a coloured rail down the leading
+   edge and a faint wash behind it, so a grid of cards is scannable by colour
+   before a single label is read. */
 .stat-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  padding: 16px 18px 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   text-align: start;
   box-shadow: var(--shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+/* The top-light gradient that stops these reading as flat rectangles. */
+.stat-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--card-glow);
+  pointer-events: none;
+}
+
+/* The tone rail. Neutral cards get the accent, so every card has an edge. */
+.stat-card::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.55;
+  transition: opacity 0.16s ease, width 0.16s ease;
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+  width: 4px;
+}
+
+.stat-card-ok::before { background: var(--ok); }
+.stat-card-warn::before { background: var(--warn); }
+.stat-card-danger::before { background: var(--danger); }
+
+.stat-card-ok { background: color-mix(in srgb, var(--ok-soft) calc(var(--tint-strength) * 45%), var(--surface)); }
+.stat-card-warn { background: color-mix(in srgb, var(--warn-soft) calc(var(--tint-strength) * 45%), var(--surface)); }
+.stat-card-danger { background: color-mix(in srgb, var(--danger-soft) calc(var(--tint-strength) * 45%), var(--surface)); }
+
+/* Every card lifts on hover, not only the clickable ones — the movement is
+   what tells the eye the grid is made of discrete objects. */
+.stat-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .stat-card-icon {
@@ -367,20 +435,26 @@
 }
 
 .stat-card-label {
-  font-size: 13px;
-  color: var(--ink-soft);
-  font-weight: 500;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .stat-card-value {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: var(--font-num);
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 .stat-card-hint {
   font-size: 12px;
+  line-height: 1.45;
   color: var(--ink-faint);
 }
 
@@ -398,13 +472,15 @@
 
 .stat-card-clickable {
   cursor: pointer;
-  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
 }
 
 .stat-card-clickable:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  border-color: var(--accent);
+  background: var(--card-hover-bg);
+}
+
+.stat-card-clickable:active {
+  transform: translateY(0);
 }
 
 .stat-card-clickable:focus-visible {
@@ -483,16 +559,52 @@
   text-align: end;
 }
 
+.dash-card .alert-list-row {
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 10px 0;
+}
+
+.dash-card .alert-list-row > :first-child {
+  font-weight: 500;
+}
+
+.dash-card .alert-list-type {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+.dash-card .alert-list-qty {
+  grid-row: 1;
+  grid-column: 2;
+  font-family: var(--font-num);
+  font-weight: 600;
+}
+
+.dash-card .alert-list-row > .pill {
+  grid-row: 2;
+  grid-column: 2;
+  justify-self: end;
+}
+
 /* ---------- banners ---------- */
 
+/* Flow content, not a flex row: a banner is a sentence, and flex turned every
+   <strong> inside one into its own item with an 8px gap in front of it —
+   which is what was splitting "Le résultat est une estimation" mid-phrase.
+   The one banner that wanted spacing between two clauses gets it from
+   .banner-sep below. */
 .banner {
   border-radius: var(--radius-sm);
+  border-inline-start: 3px solid currentColor;
   padding: 10px 14px;
   font-size: 13.5px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+  line-height: 1.55;
+}
+
+.banner strong {
+  font-weight: 700;
 }
 
 .banner-warn {
@@ -517,6 +629,8 @@
 }
 
 .banner-sep {
+  display: inline-block;
+  margin-inline: 6px;
   opacity: 0.5;
 }
 
@@ -754,14 +868,14 @@ textarea.input {
 .stock-table th,
 .history-table th {
   text-align: start;
-  font-size: 11.5px;
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--ink-faint);
-  font-weight: 600;
-  padding: 10px 14px;
+  font-weight: 700;
+  padding: 11px 14px;
   background: var(--surface-sunk);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
   white-space: nowrap;
 }
 
@@ -773,14 +887,46 @@ textarea.input {
   vertical-align: middle;
 }
 
+/* Figures in a table stay on IBM Plex Mono: what matters in a column is that
+   the digits line up, not that they look like a headline. */
+.stock-table td.tabular,
+.history-table td.tabular {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
 .stock-table tr:last-child td,
 .history-table tr:last-child td {
   border-bottom: none;
 }
 
+.stock-table tbody tr,
+.history-table tbody tr {
+  transition: background 0.1s ease, box-shadow 0.1s ease;
+}
+
 .stock-table tbody tr:hover,
 .history-table tbody tr:hover {
   background: var(--surface-sunk);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Totals rows: the summary of the column above, so they sit apart from it. */
+.stock-table tfoot td,
+.history-table tfoot td {
+  padding: 10px 14px;
+  background: var(--surface-sunk);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.stock-table tfoot tr:last-child td {
+  color: var(--accent-strong);
 }
 
 .row-actions {
@@ -905,32 +1051,56 @@ textarea.input {
 .detail-stack {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
+/* The identity band at the top of a fiche: photo, what the record is, and the
+   handful of facts that never change. Tinted with the accent so it reads as
+   the header of the document rather than the first of many sections. */
 .detail-head {
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 65%, var(--surface)), var(--surface) 62%);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.detail-head::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--accent);
 }
 
 .detail-photo-img,
 .detail-photo-none {
-  width: 84px;
-  height: 60px;
+  width: 96px;
+  height: 96px;
+  flex: none;
   object-fit: cover;
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .detail-photo-none {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-sunk);
-  color: var(--ink-soft);
+  background: linear-gradient(140deg, var(--accent-soft), var(--surface-sunk));
+  color: var(--accent-strong);
+  font-family: var(--font-num);
   font-weight: 700;
-  font-size: 16px;
+  font-size: 28px;
+  letter-spacing: 0.02em;
 }
 
 .detail-head-info {
@@ -938,6 +1108,7 @@ textarea.input {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  flex: 1;
 }
 
 .detail-type {
@@ -957,31 +1128,81 @@ textarea.input {
 
 .detail-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
   gap: 12px;
 }
 
 .detail-stats .stat-card {
-  padding: 12px 14px;
+  padding: 13px 15px 13px 17px;
+  border-radius: var(--radius);
+}
+
+.detail-stats .stat-card-value {
+  font-size: 22px;
 }
 
 .detail-stats .stat-card-hint {
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
+/* Each block of a fiche is its own card: the modal becomes a stack of
+   readable panels instead of one undifferentiated wall of text. */
 .detail-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.detail-section:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .detail-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--ink-soft);
+}
+
+.detail-section-title::before {
+  content: "";
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex: none;
+}
+
+/* Tables inside a fiche section sit flush in their card. */
+.detail-section .table-scroll {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  max-height: 340px;
+}
+
+.detail-section .stock-table,
+.detail-section .history-table {
+  border: none;
+}
+
+.detail-section .stock-table thead th,
+.detail-section .history-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .recommended-lot {
@@ -1005,10 +1226,11 @@ textarea.input {
 }
 
 .recommended-lot-value {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 13px;
+  font-family: var(--font-num);
+  font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  color: var(--ink);
 }
 
 .detail-lots td {
@@ -1042,34 +1264,52 @@ textarea.input {
 
 /* ---------- pills ---------- */
 
+/* A status pill carries a dot so the state survives a greyscale print and is
+   readable to someone who reads shape before colour. */
 .pill {
   display: inline-flex;
   align-items: center;
-  padding: 3px 9px;
-  border-radius: 20px;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
   font-size: 11.5px;
   font-weight: 600;
+  line-height: 1.5;
   white-space: nowrap;
+}
+
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
 }
 
 .pill-ok {
   background: var(--ok-soft);
   color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
 }
 
 .pill-warn {
   background: var(--warn-soft);
   color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 28%, transparent);
 }
 
 .pill-danger {
   background: var(--danger-soft);
   color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
 }
 
 .pill-neutral {
   background: var(--surface-sunk);
   color: var(--ink-soft);
+  border-color: var(--border-strong);
 }
 
 /* ---------- empty state ---------- */
@@ -1107,34 +1347,55 @@ textarea.input {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 20, 26, 0.5);
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
   z-index: 100;
+  animation: overlay-in 0.14s ease-out;
 }
 
 .modal-panel {
-  background: var(--surface);
-  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
   width: 100%;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  max-height: 88vh;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: modal-in 0.18s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
+@keyframes overlay-in {
+  from { opacity: 0; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+}
+
+/* The header stays put while a long fiche scrolls under it — on a detail
+   modal the title is the only thing saying which record you are reading. */
 .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
+  gap: 16px;
+  padding: 16px 22px;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
 .modal-header h3 {
-  font-size: 15.5px;
+  font-size: 16.5px;
+  font-weight: 700;
 }
 
 .modal-close {
@@ -1159,13 +1420,15 @@ textarea.input {
 }
 
 .modal-body {
-  padding: 20px;
+  padding: 20px 22px 24px;
   overflow-y: auto;
+  background: var(--bg);
 }
 
 .modal-footer {
-  padding: 14px 20px;
+  padding: 14px 22px;
   border-top: 1px solid var(--border);
+  background: var(--surface);
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1293,8 +1556,9 @@ textarea.input {
 }
 
 .reconciliation-figure .value {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 20px;
+  font-family: var(--font-num);
+  letter-spacing: -0.02em;
+  font-size: 22px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1335,9 +1599,11 @@ textarea.input {
   gap: 6px;
   padding: 2px 10px;
   border-radius: 999px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  font-size: 13px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--border-strong);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
   white-space: nowrap;
 }
 
@@ -1382,6 +1648,13 @@ textarea.input {
   color: var(--ink);
 }
 
+.detail-facts div {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+}
+
 .history-maintenance {
   margin-top: 3px;
   font-size: 12.5px;
@@ -1407,24 +1680,36 @@ textarea.input {
 
 .quality-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
-  margin-top: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 12px;
+  margin-top: 2px;
 }
 
+/* --line / --surface-2 never existed: these cards rendered borderless and
+   transparent, which is most of why the classification block looked unfinished. */
 .quality-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  gap: 7px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunk);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.quality-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .quality-card-value {
-  font-size: 20px;
-  font-weight: 700;
+  font-family: var(--font-num);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1474,8 +1759,9 @@ textarea.input {
 }
 
 .variance-term-value {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 20px;
+  font-family: var(--font-num);
+  letter-spacing: -0.02em;
+  font-size: 22px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -1522,24 +1808,36 @@ textarea.input {
 .detail-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 24px;
-  margin: 8px 0 0;
+  gap: 8px;
+  margin: 10px 0 0;
 }
 
+/* Each fact is a chip on the identity band, so they stay legible whatever
+   order or number of them a record happens to have. */
 .detail-meta div {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  font-size: 13px;
+  gap: 7px;
+  font-size: 12.5px;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
 }
 
 .detail-meta dt {
   color: var(--ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .detail-meta dd {
   margin: 0;
+  font-family: var(--font-num);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -1556,10 +1854,18 @@ textarea.input {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 15px 17px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.order-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .filter-bar .field {
@@ -1573,41 +1879,60 @@ textarea.input {
   background: var(--danger-soft);
 }
 
+/* The identity strip of a lot, an employee or an order: the facts that frame
+   everything below it, split into cells so no two run together. */
 .batch-meta {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-sunk);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
 }
 
 .batch-meta-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.batch-meta-item:hover {
+  background: var(--card-hover-bg);
+  border-color: var(--border-strong);
 }
 
 .batch-meta-label {
-  font-size: 11px;
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.07em;
   color: var(--ink-faint);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .batch-meta-value {
-  font-size: 13px;
+  font-family: var(--font-num);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
 .batch-notes {
   margin: 0;
-  padding: 12px 14px;
-  border-inline-start: 3px solid var(--border-strong);
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
   color: var(--ink-soft);
   font-size: 13px;
+  line-height: 1.55;
 }
 
 .rate-row {
@@ -1619,23 +1944,33 @@ textarea.input {
 .rate-item {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 10px 12px;
+  gap: 4px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.rate-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .rate-item-label {
-  font-size: 11px;
+  font-size: 10.5px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.07em;
   color: var(--ink-faint);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .rate-item-value {
-  font-size: 17px;
-  font-weight: 700;
+  font-family: var(--font-num);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1680,15 +2015,28 @@ textarea.input {
 }
 
 .login-card {
+  position: relative;
   width: min(400px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 32px;
+  padding: 34px 32px 30px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+/* A hairline of accent across the top of the card, the one bit of colour on
+   an otherwise deliberately plain screen. */
+.login-card::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
 }
 
 .login-brand {
@@ -1712,8 +2060,11 @@ textarea.input {
 }
 
 .login-subtitle {
-  margin: 2px 0 0;
-  font-size: 12.5px;
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--ink-faint);
 }
 
@@ -1976,10 +2327,12 @@ button.topbar-user:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-soft) 40%, var(--surface)), var(--surface) 70%);
+  box-shadow: var(--shadow-sm);
 }
 
 .totals-row {
@@ -2000,9 +2353,12 @@ button.topbar-user:hover {
 .totals-row-strong {
   margin-top: 6px;
   padding-top: 10px;
-  border-top: 1px solid var(--border);
-  font-size: 16px;
-  font-weight: 700;
+  border-top: 1px solid var(--border-strong);
+  font-family: var(--font-num);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -2049,14 +2405,30 @@ button.topbar-user:hover {
 }
 
 /* Invoice header and the two address columns. */
+/* The masthead of a purchase order or a customer invoice: the document code
+   large enough to read across a desk, its status opposite. */
 .invoice-head {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   justify-content: space-between;
   align-items: flex-start;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 60%, var(--surface)), var(--surface) 62%);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.invoice-head::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--accent);
 }
 
 .invoice-label {
@@ -2069,9 +2441,11 @@ button.topbar-user:hover {
 }
 
 .invoice-code {
-  margin: 2px 0;
-  font-size: 22px;
-  font-weight: 700;
+  margin: 3px 0;
+  font-family: var(--font-num);
+  font-size: 25px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
@@ -2090,12 +2464,19 @@ button.topbar-user:hover {
 }
 
 .invoice-block {
-  padding: 12px 14px;
+  padding: 13px 15px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--surface-sunk);
   font-size: 13px;
+  line-height: 1.55;
   color: var(--ink-soft);
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.invoice-block:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 .invoice-block p {
@@ -2180,6 +2561,26 @@ button.topbar-user:hover {
   }
   .variance-operator {
     padding-top: 0;
+  }
+  /* The identity band stacks rather than squeezing the photo and the facts
+     into two unreadable columns. */
+  .detail-head {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .detail-photo-img,
+  .detail-photo-none {
+    width: 100%;
+    height: 140px;
+  }
+  .modal-overlay {
+    padding: 0;
+  }
+  .modal-panel {
+    max-height: 100vh;
+    height: 100vh;
+    border-radius: 0;
+    border: none;
   }
 }
 
@@ -2301,8 +2702,32 @@ button.topbar-user:hover {
 .detail-field {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
   font-size: 13px;
+  color: var(--ink);
+  transition: border-color 0.14s ease, background 0.14s ease;
+}
+
+.detail-field:hover {
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+/* The label half of a read-only field, whatever element the module used. */
+.detail-field > :first-child {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.detail-field > :last-child {
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -2454,4 +2879,719 @@ button.topbar-user:hover {
 
 [dir="rtl"] .num {
   text-align: end;
+}
+
+
+/* =========================================================================
+   TABLEAU DE BORD
+   The dashboard is the only screen built out of charts, so its pieces live
+   together here rather than being scattered through the sections above.
+   ========================================================================= */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* A refetch shouldn't blank the page — the previous month stays on screen,
+   half a shade back, until the new one lands. */
+.dashboard-busy .dashboard-grid,
+.dashboard-busy .kpi-row {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+/* ---------- month filter ---------- */
+
+.dashboard-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-toolbar-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-month {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-transform: capitalize;
+}
+
+.dashboard-month-hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.month-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.month-picker-step {
+  border-color: var(--border);
+  background: var(--surface-sunk);
+}
+
+.month-picker-selects {
+  display: flex;
+  gap: 6px;
+}
+
+.month-picker-select {
+  min-width: 130px;
+  text-transform: capitalize;
+}
+
+.month-picker-year {
+  min-width: 92px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.month-picker-today {
+  font-size: 12.5px;
+}
+
+/* ---------- headline KPIs ---------- */
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.kpi {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  overflow: hidden;
+  /* The figure is sized against the card, not the viewport: "184 500,00 DZD"
+     at a fixed 34px overflows a narrow column and gets clipped, and a vw-based
+     clamp would shrink it on a wide screen with narrow cards. */
+  container-type: inline-size;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.kpi:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.kpi::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 3px;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
+.kpi-ok::before { background: var(--ok); }
+.kpi-danger::before { background: var(--danger); }
+
+/* The one hero figure on the page — the month's bottom line. */
+.kpi-hero {
+  background: linear-gradient(140deg, color-mix(in srgb, var(--accent-soft) 55%, var(--surface)), var(--surface) 65%);
+}
+
+.kpi-hero .kpi-value {
+  font-size: clamp(21px, 10.5cqi, 34px);
+}
+
+.kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.kpi-ok .kpi-icon { background: var(--ok-soft); color: var(--ok); }
+.kpi-danger .kpi-icon { background: var(--danger-soft); color: var(--danger); }
+
+.kpi-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.kpi-value {
+  font-family: var(--font-num);
+  font-size: clamp(19px, 8.6cqi, 27px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kpi-ok .kpi-value { color: var(--ok); }
+.kpi-danger .kpi-value { color: var(--danger); }
+
+.kpi-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.kpi-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-faint);
+}
+
+/* A delta is coloured by direction × whether up is good, never by direction
+   alone: charges rising is not a green fact. */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.delta-good { background: var(--ok-soft); color: var(--ok); }
+.delta-bad { background: var(--danger-soft); color: var(--danger); }
+.delta-none { background: var(--surface-sunk); color: var(--ink-faint); }
+
+.delta-period {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+/* ---------- cards ---------- */
+
+.dashboard-grid {
+  columns: 340px 3;
+  column-gap: 16px;
+}
+
+.dashboard-grid > * {
+  /* Multi-column will happily slice a card across the fold otherwise. */
+  break-inside: avoid;
+  margin-bottom: 16px;
+}
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  /* Multi-column ignores margin-collapse but not overflow: keep the card a
+     self-contained block so it never straddles two columns. */
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.dash-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.dash-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.dash-card-title::before {
+  content: "";
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex: none;
+}
+
+.dash-card-hint {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+.dash-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+/* A heading inside a card body, above a second chart or list. */
+.chart-subtitle {
+  margin: 4px 0 -4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.chart-caption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+.chart-empty {
+  padding: 14px 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+/* ---------- charts ---------- */
+
+.chart-frame {
+  position: relative;
+  width: 100%;
+}
+
+.chart-frame svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.chart-baseline {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.chart-axis-text {
+  fill: var(--chart-axis);
+  font-family: var(--font-num);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-band-highlight {
+  fill: var(--accent-soft);
+  opacity: 0.55;
+}
+
+.chart-band {
+  transition: opacity 0.12s ease;
+}
+
+/* The legend is the identity channel that isn't colour — always present when
+   a chart carries two or more series. */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.chart-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.chart-legend-label {
+  font-weight: 500;
+}
+
+.chart-legend-value {
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  min-width: 190px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.chart-tooltip-title {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  padding: 2px 0;
+}
+
+.chart-tooltip-label {
+  flex: 1;
+}
+
+.chart-tooltip-value {
+  font-family: var(--font-num);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.chart-tooltip-row-strong {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ---------- ranked bars ---------- */
+
+.rank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rank;
+}
+
+.rank-row-button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.rank-row-button:disabled {
+  cursor: default;
+}
+
+.rank-row-button:hover:not(:disabled),
+.rank-row-button:focus-visible {
+  background: var(--surface-sunk);
+}
+
+.rank-row-index {
+  flex: none;
+  width: 18px;
+  padding-top: 1px;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+.rank-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rank-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rank-row-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The value is written at the tip of every bar, so the bar is a shape for the
+   eye rather than the only way to read the number. */
+.rank-row-value {
+  flex: none;
+  font-family: var(--font-num);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.rank-row-track {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--chart-track);
+  overflow: hidden;
+}
+
+.rank-row-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--chart-1);
+  transition: inline-size 0.25s ease;
+}
+
+.rank-row-meta {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- composition (one stacked bar) ---------- */
+
+.composition {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.composition-bar {
+  display: flex;
+  /* A 2px gap in the surface colour separates the segments — never a stroke,
+     which would add ink that isn't data. */
+  gap: 2px;
+  height: 18px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--chart-track);
+}
+
+.composition-segment {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+}
+
+/* ---------- meter ---------- */
+
+.meter {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--chart-track);
+  overflow: hidden;
+}
+
+.meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--chart-1);
+  transition: inline-size 0.3s ease;
+}
+
+.meter-ok .meter-fill { background: var(--ok); }
+.meter-warn .meter-fill { background: var(--warn); }
+
+/* ---------- mini stats inside a card ---------- */
+
+.mini-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.mini-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  transition: border-color 0.14s ease;
+}
+
+.mini-stat:hover {
+  border-color: var(--border-strong);
+}
+
+.mini-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.mini-stat-value {
+  font-family: var(--font-num);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.mini-stat-ok .mini-stat-value { color: var(--ok); }
+.mini-stat-warn .mini-stat-value { color: var(--warn); }
+
+.mini-stat-hint {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* ---------- one-off rows ---------- */
+
+.highlight-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+}
+
+.highlight-row-label {
+  grid-column: 1 / -1;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.highlight-row-value {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.zakat-headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.zakat-headline-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.zakat-headline-value {
+  font-family: var(--font-num);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .dashboard-toolbar {
+    position: static;
+    align-items: stretch;
+  }
+  .month-picker {
+    justify-content: space-between;
+  }
+  .month-picker-select {
+    min-width: 0;
+    flex: 1;
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -3,6 +3,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Field } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import type { Supplier, SupplierInput } from "../../lib/suppliersApi";
+import { useI18n } from "../../state/LanguageContext";
 
 export function SupplierModal({
   supplier,
@@ -13,6 +14,7 @@ export function SupplierModal({
   onClose: () => void;
   onSubmit: (input: SupplierInput) => Promise<void> | void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(supplier?.name ?? "");
   const [contactName, setContactName] = useState(supplier?.contactName ?? "");
   const [phone, setPhone] = useState(supplier?.phone ?? "");
@@ -25,7 +27,7 @@ export function SupplierModal({
 
   async function handleSubmit() {
     if (!name.trim()) {
-      setError("Le nom est obligatoire.");
+      setError(t("supplier.err.name"));
       return;
     }
     setError(null);
@@ -41,49 +43,49 @@ export function SupplierModal({
         notes: notes.trim() || undefined,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
       setSubmitting(false);
     }
   }
 
   return (
     <Modal
-      title={supplier ? `Modifier — ${supplier.name}` : "Nouveau fournisseur"}
+      title={supplier ? t("supplier.editTitle", { name: supplier.name }) : t("supplier.newTitle")}
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
-            Annuler
+            {t("action.cancel")}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Enregistrement…" : supplier ? "Enregistrer" : "Ajouter le fournisseur"}
+            {submitting ? t("action.saving") : supplier ? t("action.save") : t("supplier.add")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
-        <Field label="Nom">
+        <Field label={t("field.name")}>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </Field>
         <div className="form-row">
-          <Field label="Personne à contacter">
+          <Field label={t("supplier.contactPerson")}>
             <input className="input" value={contactName} onChange={(e) => setContactName(e.target.value)} />
           </Field>
-          <Field label="Téléphone">
+          <Field label={t("field.phone")}>
             <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </Field>
         </div>
-        <Field label="Email">
+        <Field label={t("field.email")}>
           <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <Field label="Adresse">
+        <Field label={t("field.address")}>
           <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
         </Field>
-        <Field label="Immatriculation" hint="Registre de commerce, NIF, NIS…">
+        <Field label={t("supplier.registration")} hint={t("supplier.notesHint")}>
           <input className="input" value={registration} onChange={(e) => setRegistration(e.target.value)} />
         </Field>
 
-        <Field label="Notes">
+        <Field label={t("field.notes")}>
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
         {error ? <p className="form-error">{error}</p> : null}

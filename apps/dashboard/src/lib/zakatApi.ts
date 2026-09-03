@@ -1,22 +1,23 @@
 import { api } from "./api";
+import type { TranslationKey } from "./i18n";
 
 /** Typed client for /api/zakat. */
 
 export const ZAKAT_METHODOLOGIES = ["LUNAR", "SOLAR"] as const;
 export type ZakatMethodology = (typeof ZAKAT_METHODOLOGIES)[number];
 
-export const ZAKAT_METHODOLOGY_LABELS: Record<ZakatMethodology, string> = {
-  LUNAR: "Année lunaire (hégirienne) — hawl standard",
-  SOLAR: "Année solaire (grégorienne) — méthode alternative",
+export const ZAKAT_METHODOLOGY_LABELS: Record<ZakatMethodology, TranslationKey> = {
+  LUNAR: "zk.methodology.LUNAR",
+  SOLAR: "zk.methodology.SOLAR",
 };
 
 export const ZAKAT_PAYMENT_STATUSES = ["NOT_PAID", "PARTIALLY_PAID", "PAID"] as const;
 export type ZakatPaymentStatus = (typeof ZAKAT_PAYMENT_STATUSES)[number];
 
-export const ZAKAT_PAYMENT_STATUS_LABELS: Record<ZakatPaymentStatus, string> = {
-  NOT_PAID: "Non payée",
-  PARTIALLY_PAID: "Partiellement payée",
-  PAID: "Payée",
+export const ZAKAT_PAYMENT_STATUS_LABELS: Record<ZakatPaymentStatus, TranslationKey> = {
+  NOT_PAID: "zk.payment.NOT_PAID",
+  PARTIALLY_PAID: "zk.payment.PARTIALLY_PAID",
+  PAID: "zk.payment.PAID",
 };
 
 export const GOLD_NISAB_GRAMS = 85;

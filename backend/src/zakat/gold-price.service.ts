@@ -1,5 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { t } from '../i18n/messages/index.js';
 
 /**
  * The nisab depends on the current gold price, which nobody wants to look
@@ -47,9 +48,7 @@ export class GoldPriceService {
       // last known price rather than blocking every Zakat screen on it,
       // but say so, so the gérant knows to check or type one manually.
       if (fallback) return present(fallback, true);
-      throw new ServiceUnavailableException(
-        "Impossible de récupérer le prix de l'or automatiquement, et aucune valeur n'est en cache. Saisissez-le manuellement.",
-      );
+      throw new ServiceUnavailableException(t('zakat.goldPriceUnavailable'));
     }
   }
 }

@@ -15,6 +15,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { DISCOUNT_TYPES, PO_STATUSES } from '../purchasing-math.js';
+import { t } from '../../i18n/messages/index.js';
 
 export class PurchaseOrderLineDto {
   @IsString()
@@ -142,7 +143,7 @@ export class CreatePurchaseOrderDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  @Max(1, { message: () => t('common.taxRateFraction') })
   taxRate?: number;
 
   @IsOptional()
@@ -199,7 +200,7 @@ export class UpdatePurchaseOrderDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Max(1, { message: 'Le taux de taxe se saisit en fraction (0,19 pour 19 %), pas en pourcentage brut.' })
+  @Max(1, { message: () => t('common.taxRateFraction') })
   taxRate?: number;
 
   @IsOptional()

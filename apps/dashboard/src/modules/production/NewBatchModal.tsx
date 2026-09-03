@@ -3,6 +3,8 @@ import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Banner } from "../../components/ui/Banner";
+import { Rich } from "../../components/ui/Rich";
+import { useI18n } from "../../state/LanguageContext";
 import type { ApiItem } from "../../lib/stockApi";
 import { createBatch, type CreateBatchInput } from "../../lib/productionApi";
 import { todayIso } from "../../lib/date";
@@ -28,12 +30,13 @@ interface NewBatchModalProps {
  * failure can no longer leave stock half-moved (PROJECT_CONTEXT.md §8.3).
  */
 export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCreated }: NewBatchModalProps) {
+  const { t, tn } = useI18n();
   const [date, setDate] = useState(todayIso());
   const [productItemId, setProductItemId] = useState("");
   const [machine, setMachine] = useState("");
   const [supervisor, setSupervisor] = useState("");
   const [operator, setOperator] = useState("");
-  const [shift, setShift] = useState(SHIFTS[0]);
+  const [shift, setShift] = useState(SHIFTS[0].value);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [expectedQuantity, setExpectedQuantity] = useState("");
@@ -68,12 +71,12 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
   async function handleSubmit() {
     setError(null);
 
-    if (!productItemId) return setError("Choisissez le produit fabriqué.");
-    if (!machine.trim()) return setError("Indiquez la machine ou la ligne de production.");
-    if (expected <= 0) return setError("Indiquez la quantité attendue annoncée par la machine.");
+    if (!productItemId) return setError(t("prod.err.product"));
+    if (!machine.trim()) return setError(t("prod.err.machineLine"));
+    if (expected <= 0) return setError(t("prod.err.expectedAnnounced"));
     for (const line of materials) {
       if (line.itemId && line.quantity <= 0) {
-        return setError(`Indiquez une quantité pour « ${line.itemName} », ou retirez cette ligne.`);
+        return setError(t("prod.err.lineQuantity", { item: line.itemName }));
       }
     }
 
@@ -109,7 +112,7 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
       onCreated();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
     } finally {
       setSaving(false);
     }
@@ -117,29 +120,29 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
 
   return (
     <Modal
-      title="Nouveau lot de production"
+      title={t("prod.newBatchTitle")}
       onClose={onClose}
       width={860}
       footer={
         <>
-          <Button onClick={onClose}>Annuler</Button>
+          <Button onClick={onClose}>{t("action.cancel")}</Button>
           <Button variant="primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? "Enregistrement…" : "Enregistrer le lot"}
+            {saving ? t("action.saving") : t("prod.saveBatch")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
         <div className="form-row">
-          <Field label="Date">
+          <Field label={t("field.date")}>
             <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
           <Field
-            label="Produit fabriqué"
-            hint={finishedGoodsItems.length === 0 ? "Ajoutez d'abord un produit fini dans l'onglet Stock" : undefined}
+            label={t("prod.productMade")}
+            hint={finishedGoodsItems.length === 0 ? t("prod.addFinishedGoodHint") : undefined}
           >
             <select className="input" value={productItemId} onChange={(e) => setProductItemId(e.target.value)}>
-              <option value="">— Choisir —</option>
+              <option value="">{t("prod.choose")}</option>
               {finishedGoodsItems.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -147,44 +150,44 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
               ))}
             </select>
           </Field>
-          <Field label="Quantité attendue" hint="Annoncée par le compteur de la machine">
+          <Field label={t("prod.expectedShort")} hint={t("prod.expectedShortHint")}>
             <input className="input" type="number" min={0} value={expectedQuantity} onChange={(e) => setExpectedQuantity(e.target.value)} />
           </Field>
         </div>
 
         <div className="form-row">
-          <Field label="Machine / ligne">
-            <input className="input" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder="Ex. Ligne 2" />
+          <Field label={t("prod.machineLine")}>
+            <input className="input" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder={t("prod.ph.machine")} />
           </Field>
-          <Field label="Équipe">
+          <Field label={t("prod.shift")}>
             <select className="input" value={shift} onChange={(e) => setShift(e.target.value)}>
               {SHIFTS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+                <option key={s.value} value={s.value}>
+                  {t(s.key)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Début">
+          <Field label={t("prod.start")}>
             <input className="input" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
           </Field>
-          <Field label="Fin">
+          <Field label={t("prod.end")}>
             <input className="input" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
           </Field>
         </div>
 
         <div className="form-row">
-          <Field label="Superviseur">
-            <input className="input" value={supervisor} onChange={(e) => setSupervisor(e.target.value)} placeholder="Responsable du lot" />
+          <Field label={t("prod.supervisor")}>
+            <input className="input" value={supervisor} onChange={(e) => setSupervisor(e.target.value)} placeholder={t("prod.ph.supervisor")} />
           </Field>
-          <Field label="Opérateur">
-            <input className="input" value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="Ouvrier à la machine" />
+          <Field label={t("prod.operator")}>
+            <input className="input" value={operator} onChange={(e) => setOperator(e.target.value)} placeholder={t("prod.ph.operator")} />
           </Field>
         </div>
 
         <div>
           <p className="field-label" style={{ marginBottom: 8 }}>
-            Matières consommées
+            {t("prod.materials")}
           </p>
           {materials.map((line, i) => (
             <MaterialLineEditor
@@ -196,27 +199,25 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
             />
           ))}
           <Button variant="ghost" onClick={() => setMaterials((prev) => [...prev, emptyMaterialLine()])} style={{ marginTop: 8 }}>
-            + Ajouter une matière
+            {t("prod.addMaterial")}
           </Button>
 
           {materialCost > 0 || missingCosts.length > 0 ? (
             <div className="detail-stats" style={{ marginTop: 12 }}>
               <div className="stat-card">
-                <span className="stat-card-label">Coût matières du lot</span>
+                <span className="stat-card-label">{t("prod.materialsCost")}</span>
                 <span className="stat-card-value">{formatCurrency(materialCost)}</span>
                 <span className="stat-card-hint">
                   {missingCosts.length > 0
-                    ? `${missingCosts.length} matière(s) sans coût connu — non comptée(s)`
-                    : "Somme des matières consommées, au coût du stock"}
+                    ? t("prod.missingCosts", { count: tn("prod.materialCount", missingCosts.length) })
+                    : t("prod.materialCostSum")}
                 </span>
               </div>
               <div className="stat-card">
-                <span className="stat-card-label">Coût matières / unité</span>
+                <span className="stat-card-label">{t("prod.unitMaterialCost")}</span>
                 <span className="stat-card-value">{unitMaterialCost !== null ? formatCurrency(unitMaterialCost) : "—"}</span>
                 <span className="stat-card-hint">
-                  {unitMaterialCost !== null
-                    ? "Réparti sur les unités vendables (1er + 2ème choix)"
-                    : "Disponible une fois la sortie déclarée"}
+                  {t(unitMaterialCost !== null ? "prod.spreadOverSellable" : "prod.availableAfterOutput")}
                 </span>
               </div>
             </div>
@@ -226,23 +227,21 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
         <label className="checkbox-row">
           <input type="checkbox" checked={declareNow} onChange={(e) => setDeclareNow(e.target.checked)} />
           <span>
-            Déclarer la sortie maintenant
-            <span className="checkbox-hint">
-              Décochez pour ouvrir le lot sans le clôturer — la sortie pourra être déclarée plus tard depuis sa fiche.
-            </span>
+            {t("prod.declareNow")}
+            <span className="checkbox-hint">{t("prod.declareNowHint")}</span>
           </span>
         </label>
 
         {declareNow ? (
           <>
             <div className="output-grid">
-              <Field label="1er choix">
+              <Field label={t("quality.first")}>
                 <input className="input" type="number" min={0} value={firstChoice} onChange={(e) => setFirstChoice(e.target.value)} />
               </Field>
-              <Field label="2ème choix">
+              <Field label={t("quality.second")}>
                 <input className="input" type="number" min={0} value={secondChoice} onChange={(e) => setSecondChoice(e.target.value)} />
               </Field>
-              <Field label="Rebut">
+              <Field label={t("quality.reject")}>
                 <input className="input" type="number" min={0} value={waste} onChange={(e) => setWaste(e.target.value)} />
               </Field>
             </div>
@@ -257,34 +256,34 @@ export function NewBatchModal({ materialItems, finishedGoodsItems, onClose, onCr
 
             {unknown !== 0 && expected > 0 ? (
               <Field
-                label="Note sur l'écart (facultatif)"
-                hint="Sans note, le lot sera marqué « Investigation requise » jusqu'à ce que l'écart soit expliqué."
+                label={t("prod.varianceNote")}
+                hint={t("prod.varianceNoteHint")}
               >
                 <input
                   className="input"
                   value={varianceNote}
                   onChange={(e) => setVarianceNote(e.target.value)}
-                  placeholder="Ex. compteur machine recalibré"
+                  placeholder={t("prod.ph.varianceNote")}
                 />
               </Field>
             ) : null}
           </>
         ) : null}
 
-        <Field label="Notes">
-          <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observations sur le lot" />
+        <Field label={t("field.notes")}>
+          <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("prod.ph.notes")} />
         </Field>
 
         <Banner tone="info">
-          Les matières sont déduites du stock et les produits finis (1er + 2ème choix) y sont ajoutés en une seule opération côté serveur. Le
-          rebut est enregistré mais n'entre jamais dans le stock vendable. Le coût des matières consommées suit le produit fini : il devient
-          son coût matières estimé dans l'onglet Stock.
+          {t("prod.stockEffect")}
         </Banner>
 
         {materialCost > 0 ? (
           <Banner tone="warn">
-            Ce coût ne comprend que les <strong>matières premières</strong>. Main-d'œuvre, énergie, amortissement des machines et frais
-            généraux n'y sont pas — le coût de revient réel du lot est plus élevé.
+            <Rich
+              text={t("prod.rawMaterialsOnly")}
+              parts={{ lead: <strong>{t("prod.rawMaterialsOnlyLead")}</strong> }}
+            />
           </Banner>
         ) : null}
 

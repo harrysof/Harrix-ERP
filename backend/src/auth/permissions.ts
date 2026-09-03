@@ -1,3 +1,5 @@
+import type { MessageKey } from '../i18n/messages/index.js';
+
 /**
  * The permission vocabulary. Pure data and pure functions — no Nest, no
  * Prisma — so it can be unit tested and imported anywhere.
@@ -45,64 +47,69 @@ export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
 
-/** Grouped for the user-management screen, so the gérant sees why each exists. */
-export const PERMISSION_GROUPS: Array<{ label: string; permissions: Array<{ key: Permission; label: string }> }> = [
+/**
+ * Grouped for the user-management screen, so the gérant sees why each
+ * exists. Labels are message keys, not text — this file has no Nest
+ * request in scope to translate them with, so users.controller.ts resolves
+ * them with `t()` at request time, in the caller's language.
+ */
+export const PERMISSION_GROUPS: Array<{ labelKey: MessageKey; permissions: Array<{ key: Permission; labelKey: MessageKey }> }> = [
   {
-    label: 'Stock',
+    labelKey: 'perm.group.stock',
     permissions: [
-      { key: PERMISSIONS.STOCK_READ, label: 'Consulter le stock' },
-      { key: PERMISSIONS.STOCK_WRITE, label: 'Réceptions et sorties' },
-      { key: PERMISSIONS.STOCK_MANAGE, label: 'Créer, modifier, supprimer des articles' },
+      { key: PERMISSIONS.STOCK_READ, labelKey: 'perm.stock.read' },
+      { key: PERMISSIONS.STOCK_WRITE, labelKey: 'perm.stock.write' },
+      { key: PERMISSIONS.STOCK_MANAGE, labelKey: 'perm.stock.manage' },
     ],
   },
   {
-    label: 'Production',
+    labelKey: 'perm.group.production',
     permissions: [
-      { key: PERMISSIONS.PRODUCTION_READ, label: 'Consulter les lots et les pertes' },
-      { key: PERMISSIONS.PRODUCTION_WRITE, label: 'Créer des lots, déclarer les sorties' },
+      { key: PERMISSIONS.PRODUCTION_READ, labelKey: 'perm.production.read' },
+      { key: PERMISSIONS.PRODUCTION_WRITE, labelKey: 'perm.production.write' },
     ],
   },
   {
-    label: 'Fournisseurs',
+    labelKey: 'perm.group.suppliers',
     permissions: [
-      { key: PERMISSIONS.SUPPLIERS_READ, label: 'Consulter les fournisseurs' },
-      { key: PERMISSIONS.SUPPLIERS_WRITE, label: 'Créer et modifier les fournisseurs' },
+      { key: PERMISSIONS.SUPPLIERS_READ, labelKey: 'perm.suppliers.read' },
+      { key: PERMISSIONS.SUPPLIERS_WRITE, labelKey: 'perm.suppliers.write' },
     ],
   },
   {
-    label: 'Achats',
+    labelKey: 'perm.group.purchasing',
     permissions: [
-      { key: PERMISSIONS.PURCHASING_READ, label: 'Consulter les bons de commande' },
-      { key: PERMISSIONS.PURCHASING_WRITE, label: 'Créer des bons de commande et enregistrer les réceptions' },
-      { key: PERMISSIONS.PURCHASING_APPROVE, label: 'Approuver et annuler les bons de commande' },
+      { key: PERMISSIONS.PURCHASING_READ, labelKey: 'perm.purchasing.read' },
+      { key: PERMISSIONS.PURCHASING_WRITE, labelKey: 'perm.purchasing.write' },
+      { key: PERMISSIONS.PURCHASING_APPROVE, labelKey: 'perm.purchasing.approve' },
     ],
   },
   {
-    label: 'Commandes & clients',
+    labelKey: 'perm.group.orders',
     permissions: [
-      { key: PERMISSIONS.ORDERS_READ, label: 'Consulter les commandes' },
-      { key: PERMISSIONS.ORDERS_WRITE, label: 'Créer et expédier des commandes' },
+      { key: PERMISSIONS.ORDERS_READ, labelKey: 'perm.orders.read' },
+      { key: PERMISSIONS.ORDERS_WRITE, labelKey: 'perm.orders.write' },
     ],
   },
   {
-    label: 'Ressources humaines',
+    labelKey: 'perm.group.hr',
     permissions: [
-      { key: PERMISSIONS.HR_READ, label: 'Consulter les employés et les salaires' },
-      { key: PERMISSIONS.HR_WRITE, label: 'Modifier les employés, heures et absences' },
+      { key: PERMISSIONS.HR_READ, labelKey: 'perm.hr.read' },
+      { key: PERMISSIONS.HR_WRITE, labelKey: 'perm.hr.write' },
     ],
   },
   {
-    label: 'Administration',
+    labelKey: 'perm.group.admin',
     permissions: [
-      { key: PERMISSIONS.USERS_MANAGE, label: 'Créer et désactiver des utilisateurs' },
-      { key: PERMISSIONS.AUDIT_READ, label: "Consulter le journal d'activité" },
+      { key: PERMISSIONS.USERS_MANAGE, labelKey: 'perm.users.manage' },
+      { key: PERMISSIONS.AUDIT_READ, labelKey: 'perm.audit.read' },
     ],
   },
   {
-    label: 'Finance',
+    labelKey: 'perm.group.finance',
     permissions: [
-      { key: PERMISSIONS.FINANCE_READ, label: 'Utiliser le calculateur de marge, les coûts d’usine et le module Zakat' },
-      { key: PERMISSIONS.FINANCE_WRITE, label: "Ajouter des coûts d'usine et enregistrer des calculs de Zakat" },
+      { key: PERMISSIONS.FINANCE_READ, labelKey: 'perm.finance.read' },
+      { key: PERMISSIONS.FINANCE_WRITE, labelKey: 'perm.finance.write' },
     ],
   },
 ];

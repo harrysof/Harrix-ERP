@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateInventoryTypeDto, UpdateInventoryTypeDto } from './dto/inventory-type.dto.js';
+import { t } from '../i18n/messages/index.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 
@@ -22,9 +23,7 @@ export class SettingsService {
    */
   async createInventoryType(dto: CreateInventoryTypeDto) {
     if (dto.hasExpiry && !dto.hasBatches) {
-      throw new BadRequestException(
-        'Une péremption se suit par lot : activez aussi le suivi par lot, sinon la date ne se rattacherait à rien.',
-      );
+      throw new BadRequestException(t('settings.expiryNeedsBatches'));
     }
 
     const last = await this.prisma.inventoryType.findFirst({ orderBy: { sortOrder: 'desc' }, select: { sortOrder: true } });
@@ -52,7 +51,7 @@ export class SettingsService {
       });
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException(`Un type d'inventaire avec la clé "${dto.key}" existe déjà.`);
+        throw new ConflictException(t('settings.typeKeyExists', { key: dto.key }));
       }
       throw error;
     }
@@ -60,14 +59,12 @@ export class SettingsService {
 
   async updateInventoryType(id: string, dto: UpdateInventoryTypeDto) {
     const type = await this.prisma.inventoryType.findUnique({ where: { id } });
-    if (!type) throw new NotFoundException(`Type d'inventaire introuvable : ${id}`);
+    if (!type) throw new NotFoundException(t('settings.typeNotFound', { id }));
 
     const hasBatches = dto.hasBatches ?? type.hasBatches;
     const hasExpiry = dto.hasExpiry ?? type.hasExpiry;
     if (hasExpiry && !hasBatches) {
-      throw new BadRequestException(
-        'Une péremption se suit par lot : gardez le suivi par lot activé, sinon la date ne se rattacherait à rien.',
-      );
+      throw new BadRequestException(t('settings.expiryNeedsBatchesKept'));
     }
 
     // Turning batch tracking OFF for an inventory that already has lots would
@@ -76,9 +73,7 @@ export class SettingsService {
     if (type.hasBatches && !hasBatches) {
       const lots = await this.prisma.batch.count({ where: { item: { inventoryTypeId: id } } });
       if (lots > 0) {
-        throw new ConflictException(
-          `Ce type a déjà ${lots} lot(s) enregistré(s) — le suivi par lot ne peut plus être désactivé sans rendre ce stock invisible.`,
-        );
+        throw new ConflictException(t('settings.batchTrackingHasLots', { count: lots }));
       }
     }
 
@@ -92,13 +87,11 @@ export class SettingsService {
    */
   async deleteInventoryType(id: string) {
     const type = await this.prisma.inventoryType.findUnique({ where: { id } });
-    if (!type) throw new NotFoundException(`Type d'inventaire introuvable : ${id}`);
+    if (!type) throw new NotFoundException(t('settings.typeNotFound', { id }));
 
     const items = await this.prisma.item.count({ where: { inventoryTypeId: id } });
     if (items > 0) {
-      throw new ConflictException(
-        `"${type.label}" contient ${items} article(s) et ne peut pas être supprimé. Supprimez ou archivez d'abord ses articles.`,
-      );
+      throw new ConflictException(t('settings.typeHasItems', { label: type.label, count: items }));
     }
 
     await this.prisma.inventoryType.delete({ where: { id } });

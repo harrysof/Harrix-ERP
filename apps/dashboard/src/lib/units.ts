@@ -1,3 +1,5 @@
+import type { TranslationKey } from "./i18n";
+
 /**
  * The units of measure an article can be counted in.
  *
@@ -12,19 +14,19 @@
  * that is only digits — see `isValidUnit`.
  */
 export interface UnitGroup {
-  label: string;
+  labelKey: TranslationKey;
   units: string[];
 }
 
 export const UNIT_GROUPS: UnitGroup[] = [
   {
-    label: "Comptage",
+    labelKey: "unit.group.counting",
     units: ["pièce", "paire", "lot", "boîte", "carton", "palette", "rouleau", "sachet", "bidon", "fût"],
   },
-  { label: "Masse", units: ["kg", "g", "tonne"] },
-  { label: "Volume", units: ["litre", "ml", "m³"] },
-  { label: "Longueur", units: ["m", "cm", "mm"] },
-  { label: "Surface", units: ["m²", "dm²"] },
+  { labelKey: "unit.group.mass", units: ["kg", "g", "tonne"] },
+  { labelKey: "unit.group.volume", units: ["litre", "ml", "m³"] },
+  { labelKey: "unit.group.length", units: ["m", "cm", "mm"] },
+  { labelKey: "unit.group.area", units: ["m²", "dm²"] },
 ];
 
 /** The sentinel value of the "Autre…" option — never stored on an article. */

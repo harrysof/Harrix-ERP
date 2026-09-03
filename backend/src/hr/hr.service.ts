@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { t } from '../i18n/messages/index.js';
 import { CreateEmployeeDto, UpdateEmployeeDto } from './dto/employee.dto.js';
 import { CreateTimeEntryDto } from './dto/time-entry.dto.js';
 import { CreateAbsenceDto } from './dto/absence.dto.js';
@@ -52,7 +53,7 @@ export class HrService {
         overtimeEntries: { orderBy: { startDate: 'desc' }, take: 60 },
       },
     });
-    if (!employee) throw new NotFoundException(`Employé introuvable : ${id}`);
+    if (!employee) throw new NotFoundException(t('hr.employeeNotFound', { id }));
     return decorate(employee);
   }
 
@@ -139,13 +140,13 @@ export class HrService {
 
   private assertContractConsistent(contractType: string | undefined, contractEndDate: string | undefined) {
     if (contractType === 'CDD' && !contractEndDate) {
-      throw new BadRequestException('Un CDD doit avoir une date de fin de contrat.');
+      throw new BadRequestException(t('hr.cddNeedsEndDate'));
     }
   }
 
   private async requireEmployee(id: string) {
     const employee = await this.prisma.employee.findUnique({ where: { id } });
-    if (!employee) throw new NotFoundException(`Employé introuvable : ${id}`);
+    if (!employee) throw new NotFoundException(t('hr.employeeNotFound', { id }));
     return employee;
   }
 
@@ -179,7 +180,7 @@ export class HrService {
 
   async deleteTimeEntry(id: string) {
     const entry = await this.prisma.timeEntry.findUnique({ where: { id } });
-    if (!entry) throw new NotFoundException(`Entrée introuvable : ${id}`);
+    if (!entry) throw new NotFoundException(t('hr.entryNotFound', { id }));
     await this.prisma.timeEntry.delete({ where: { id } });
     return { id, deleted: true };
   }
@@ -204,7 +205,7 @@ export class HrService {
     await this.requireEmployee(dto.employeeId);
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
-    if (end < start) throw new BadRequestException('La date de fin ne peut pas précéder la date de début.');
+    if (end < start) throw new BadRequestException(t('common.endBeforeStart'));
 
     return this.prisma.absence.create({
       data: {
@@ -220,7 +221,7 @@ export class HrService {
 
   async deleteAbsence(id: string) {
     const absence = await this.prisma.absence.findUnique({ where: { id } });
-    if (!absence) throw new NotFoundException(`Absence introuvable : ${id}`);
+    if (!absence) throw new NotFoundException(t('hr.absenceNotFound', { id }));
     await this.prisma.absence.delete({ where: { id } });
     return { id, deleted: true };
   }
@@ -243,7 +244,7 @@ export class HrService {
     await this.requireEmployee(dto.employeeId);
     const start = new Date(dto.startDate);
     const end = new Date(dto.endDate);
-    if (end < start) throw new BadRequestException('La date de fin ne peut pas précéder la date de début.');
+    if (end < start) throw new BadRequestException(t('common.endBeforeStart'));
 
     return this.prisma.overtimeEntry.create({
       data: {
@@ -259,7 +260,7 @@ export class HrService {
 
   async deleteOvertimeEntry(id: string) {
     const entry = await this.prisma.overtimeEntry.findUnique({ where: { id } });
-    if (!entry) throw new NotFoundException(`Entrée introuvable : ${id}`);
+    if (!entry) throw new NotFoundException(t('hr.entryNotFound', { id }));
     await this.prisma.overtimeEntry.delete({ where: { id } });
     return { id, deleted: true };
   }
@@ -272,7 +273,7 @@ export class HrService {
    * see payroll-math.ts for why nothing here is ever stored.
    */
   async getMonthlySummary(month: string) {
-    if (!/^\d{4}-\d{2}$/.test(month)) throw new BadRequestException('Mois invalide (format AAAA-MM attendu).');
+    if (!/^\d{4}-\d{2}$/.test(month)) throw new BadRequestException(t('common.invalidMonth'));
     const [year, m] = month.split('-').map(Number);
     const start = new Date(Date.UTC(year, m - 1, 1));
     const end = new Date(Date.UTC(year, m, 1));

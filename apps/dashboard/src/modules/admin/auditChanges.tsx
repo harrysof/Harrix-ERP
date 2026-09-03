@@ -4,6 +4,8 @@ import { CONTRACT_TYPE_LABELS, MARITAL_STATUS_LABELS, ABSENCE_TYPE_LABELS } from
 import { STATUS_LABELS as PRODUCTION_STATUS_LABELS } from "../../lib/productionApi";
 import { PO_STATUS_LABELS } from "../../lib/purchasingApi";
 import { SHIPMENT_LABELS, PAYMENT_LABELS } from "../../lib/salesApi";
+import { useI18n } from "../../state/LanguageContext";
+import type { TranslationKey } from "../../lib/i18n";
 
 /**
  * The audit log stores exactly what was submitted to the API — see backend
@@ -13,129 +15,129 @@ import { SHIPMENT_LABELS, PAYMENT_LABELS } from "../../lib/salesApi";
  * camelCase names; this dictionary is what turns them into something the
  * gérant can actually read.
  */
-const FIELD_LABELS: Record<string, string> = {
+const FIELD_LABELS: Record<string, TranslationKey> = {
   // identity / people
-  fullName: "Nom complet",
-  login: "Identifiant",
-  phone: "Téléphone",
-  email: "Email",
-  address: "Adresse",
-  contactName: "Contact",
-  registration: "Registre de commerce / NIF",
-  roleId: "Rôle",
+  fullName: "audit.field.fullName",
+  login: "audit.field.login",
+  phone: "audit.field.phone",
+  email: "audit.field.email",
+  address: "audit.field.address",
+  contactName: "audit.field.contactName",
+  registration: "audit.field.registration",
+  roleId: "audit.field.roleId",
 
   // HR
-  position: "Poste",
-  hireDate: "Date d'embauche",
-  birthDate: "Date de naissance",
-  nin: "NIN",
-  cnasNumber: "N° CNAS",
-  contractType: "Type de contrat",
-  contractEndDate: "Fin de contrat",
-  maritalStatus: "Situation familiale",
-  dependentChildren: "Enfants à charge",
-  salary: "Salaire",
-  bankRib: "RIB bancaire",
-  emergencyContactName: "Contact d'urgence",
-  emergencyContactPhone: "Téléphone d'urgence",
-  employeeId: "Employé",
-  startDate: "Date de début",
-  endDate: "Date de fin",
-  reason: "Motif",
-  hoursWorked: "Heures travaillées",
-  source: "Source",
+  position: "audit.field.position",
+  hireDate: "audit.field.hireDate",
+  birthDate: "audit.field.birthDate",
+  nin: "audit.field.nin",
+  cnasNumber: "audit.field.cnasNumber",
+  contractType: "audit.field.contractType",
+  contractEndDate: "audit.field.contractEndDate",
+  maritalStatus: "audit.field.maritalStatus",
+  dependentChildren: "audit.field.dependentChildren",
+  salary: "audit.field.salary",
+  bankRib: "audit.field.bankRib",
+  emergencyContactName: "audit.field.emergencyContactName",
+  emergencyContactPhone: "audit.field.emergencyContactPhone",
+  employeeId: "audit.field.employeeId",
+  startDate: "audit.field.startDate",
+  endDate: "audit.field.endDate",
+  reason: "audit.field.reason",
+  hoursWorked: "audit.field.hoursWorked",
+  source: "audit.field.source",
 
   // stock / articles
-  name: "Nom",
-  reference: "Référence",
-  unit: "Unité",
-  reorderThreshold: "Seuil de réapprovisionnement",
-  photoUrl: "Photo",
-  color: "Couleur",
-  size: "Taille",
-  description: "Description",
-  compatibility: "Compatibilité",
-  manufacturer: "Fabricant",
-  location: "Emplacement",
-  criticality: "Criticité",
-  gender: "Genre",
-  price: "Prix de vente",
-  unitCost: "Coût unitaire",
-  itemId: "Article",
-  batchId: "Lot",
-  batchNumber: "N° de lot",
-  stockBatchId: "Lot de stock",
-  expiryDate: "Date de péremption",
-  maintenanceRef: "Réf. maintenance",
-  employee: "Employé",
-  quality: "Qualité",
-  quantity: "Quantité",
+  name: "audit.field.name",
+  reference: "audit.field.reference",
+  unit: "audit.field.unit",
+  reorderThreshold: "audit.field.reorderThreshold",
+  photoUrl: "audit.field.photoUrl",
+  color: "audit.field.color",
+  size: "audit.field.size",
+  description: "audit.field.description",
+  compatibility: "audit.field.compatibility",
+  manufacturer: "audit.field.manufacturer",
+  location: "audit.field.location",
+  criticality: "audit.field.criticality",
+  gender: "audit.field.gender",
+  price: "audit.field.price",
+  unitCost: "audit.field.unitCost",
+  itemId: "audit.field.itemId",
+  batchId: "audit.field.batchId",
+  batchNumber: "audit.field.batchNumber",
+  stockBatchId: "audit.field.stockBatchId",
+  expiryDate: "audit.field.expiryDate",
+  maintenanceRef: "audit.field.maintenanceRef",
+  employee: "audit.field.employee",
+  quality: "audit.field.quality",
+  quantity: "audit.field.quantity",
 
   // production
-  productItemId: "Produit",
-  machine: "Machine",
-  shift: "Équipe",
-  supervisor: "Responsable",
-  operator: "Opérateur",
-  startTime: "Heure de début",
-  endTime: "Heure de fin",
-  firstChoice: "1er choix",
-  secondChoice: "2ème choix",
-  waste: "Rebut",
-  expectedQuantity: "Quantité attendue",
-  varianceNote: "Note sur l'écart",
-  creditStock: "Créditer le stock",
+  productItemId: "audit.field.productItemId",
+  machine: "audit.field.machine",
+  shift: "audit.field.shift",
+  supervisor: "audit.field.supervisor",
+  operator: "audit.field.operator",
+  startTime: "audit.field.startTime",
+  endTime: "audit.field.endTime",
+  firstChoice: "audit.field.firstChoice",
+  secondChoice: "audit.field.secondChoice",
+  waste: "audit.field.waste",
+  expectedQuantity: "audit.field.expectedQuantity",
+  varianceNote: "audit.field.varianceNote",
+  creditStock: "audit.field.creditStock",
 
   // purchasing / suppliers
-  supplierId: "Fournisseur",
-  orderDate: "Date de commande",
-  expectedDate: "Livraison prévue",
-  deliveryNote: "Bon de livraison",
-  allowOverDelivery: "Autoriser la sur-livraison",
-  purchaseOrderLineId: "Ligne de commande",
-  quantityOrdered: "Quantité commandée",
-  lineId: "Ligne",
+  supplierId: "audit.field.supplierId",
+  orderDate: "audit.field.orderDate",
+  expectedDate: "audit.field.expectedDate",
+  deliveryNote: "audit.field.deliveryNote",
+  allowOverDelivery: "audit.field.allowOverDelivery",
+  purchaseOrderLineId: "audit.field.purchaseOrderLineId",
+  quantityOrdered: "audit.field.quantityOrdered",
+  lineId: "audit.field.lineId",
 
   // sales
-  customerId: "Client",
-  code: "Code",
-  date: "Date",
-  status: "Statut",
-  shipmentStatus: "Statut d'expédition",
-  paymentStatus: "Statut de paiement",
-  shipping: "Livraison",
-  discount: "Remise",
-  discountType: "Type de remise",
-  tax: "Taxe",
-  taxRate: "Taux de taxe",
-  unitPrice: "Prix unitaire",
-  markPaid: "Marquer payé",
-  shipToName: "Destinataire",
-  shipToPhone: "Téléphone (livraison)",
-  shipToEmail: "Email (livraison)",
-  shipToAddress: "Adresse (livraison)",
-  shipToCity: "Ville (livraison)",
-  shipToProvince: "Wilaya (livraison)",
-  shipToCountry: "Pays (livraison)",
+  customerId: "audit.field.customerId",
+  code: "audit.field.code",
+  date: "audit.field.date",
+  status: "audit.field.status",
+  shipmentStatus: "audit.field.shipmentStatus",
+  paymentStatus: "audit.field.paymentStatus",
+  shipping: "audit.field.shipping",
+  discount: "audit.field.discount",
+  discountType: "audit.field.discountType",
+  tax: "audit.field.tax",
+  taxRate: "audit.field.taxRate",
+  unitPrice: "audit.field.unitPrice",
+  markPaid: "audit.field.markPaid",
+  shipToName: "audit.field.shipToName",
+  shipToPhone: "audit.field.shipToPhone",
+  shipToEmail: "audit.field.shipToEmail",
+  shipToAddress: "audit.field.shipToAddress",
+  shipToCity: "audit.field.shipToCity",
+  shipToProvince: "audit.field.shipToProvince",
+  shipToCountry: "audit.field.shipToCountry",
 
   // settings / roles / structural
-  key: "Clé",
-  label: "Libellé",
-  singular: "Singulier",
-  defaultUnit: "Unité par défaut",
-  sortOrder: "Ordre d'affichage",
-  permissions: "Permissions",
-  notes: "Notes",
-  lines: "Lignes",
-  consumptions: "Consommations",
-  output: "Sortie déclarée",
-  inventoryTypeId: "Type d'inventaire",
-  type: "Type",
+  key: "audit.field.key",
+  label: "audit.field.label",
+  singular: "audit.field.singular",
+  defaultUnit: "audit.field.defaultUnit",
+  sortOrder: "audit.field.sortOrder",
+  permissions: "audit.field.permissions",
+  notes: "audit.field.notes",
+  lines: "audit.field.lines",
+  consumptions: "audit.field.consumptions",
+  output: "audit.field.output",
+  inventoryTypeId: "audit.field.inventoryTypeId",
+  type: "audit.field.type",
 
   // auth (always redacted to "***" server-side, kept so the label still reads well)
-  password: "Mot de passe",
-  currentPassword: "Mot de passe actuel",
-  newPassword: "Nouveau mot de passe",
+  password: "audit.field.password",
+  currentPassword: "audit.field.currentPassword",
+  newPassword: "audit.field.newPassword",
 };
 
 const MONEY_FIELDS = new Set(["salary", "unitCost", "price", "shipping", "discount", "tax", "unitPrice"]);
@@ -147,25 +149,36 @@ const DATE_FIELDS = new Set(["startDate", "endDate", "hireDate", "birthDate", "c
  * are unambiguous; "status" and "type" are shared by more than one entity, so
  * those two need the audit entry's `entity` to pick the right dictionary.
  */
-const DISCOUNT_TYPE_LABELS: Record<string, string> = { FIXED: "Montant fixe", PERCENT: "Pourcentage" };
+const DISCOUNT_TYPE_LABELS: Record<string, TranslationKey> = {
+  FIXED: "audit.discount.FIXED",
+  PERCENT: "audit.discount.PERCENT",
+};
 
-function translateEnumValue(key: string, value: string, entity: string): string {
+/** The translator, threaded through the render helpers below (they are plain
+ *  functions, not components, so they cannot call the hook themselves). */
+type T = (key: TranslationKey, vars?: Record<string, string | number>) => string;
+
+function translateEnumValue(key: string, value: string, entity: string, t: T): string {
+  const at = (map: Record<string, TranslationKey>): string => {
+    const found = map[value];
+    return found ? t(found) : value;
+  };
   switch (key) {
     case "discountType":
-      return DISCOUNT_TYPE_LABELS[value] ?? value;
+      return at(DISCOUNT_TYPE_LABELS);
     case "contractType":
-      return CONTRACT_TYPE_LABELS[value as keyof typeof CONTRACT_TYPE_LABELS] ?? value;
+      return at(CONTRACT_TYPE_LABELS);
     case "maritalStatus":
-      return MARITAL_STATUS_LABELS[value as keyof typeof MARITAL_STATUS_LABELS] ?? value;
+      return at(MARITAL_STATUS_LABELS);
     case "shipmentStatus":
-      return SHIPMENT_LABELS[value as keyof typeof SHIPMENT_LABELS] ?? value;
+      return at(SHIPMENT_LABELS);
     case "paymentStatus":
-      return PAYMENT_LABELS[value as keyof typeof PAYMENT_LABELS] ?? value;
+      return at(PAYMENT_LABELS);
     case "type":
-      return entity === "hr/absences" ? (ABSENCE_TYPE_LABELS[value as keyof typeof ABSENCE_TYPE_LABELS] ?? value) : value;
+      return entity === "hr/absences" ? at(ABSENCE_TYPE_LABELS) : value;
     case "status":
-      if (entity === "production/batches") return PRODUCTION_STATUS_LABELS[value as keyof typeof PRODUCTION_STATUS_LABELS] ?? value;
-      if (entity === "purchasing/orders") return PO_STATUS_LABELS[value as keyof typeof PO_STATUS_LABELS] ?? value;
+      if (entity === "production/batches") return at(PRODUCTION_STATUS_LABELS);
+      if (entity === "purchasing/orders") return at(PO_STATUS_LABELS);
       return value;
     default:
       return value;
@@ -178,14 +191,15 @@ function humanize(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-function fieldLabel(key: string): string {
-  return FIELD_LABELS[key] ?? humanize(key);
+function fieldLabel(key: string, t: T): string {
+  const label = FIELD_LABELS[key];
+  return label ? t(label) : humanize(key);
 }
 
-function renderValue(key: string, value: unknown, entity: string, siblings?: Record<string, unknown>): ReactNode {
+function renderValue(key: string, value: unknown, entity: string, t: T, siblings?: Record<string, unknown>): ReactNode {
   if (value === null || value === undefined || value === "") return <span className="muted">—</span>;
 
-  if (typeof value === "boolean") return value ? "Oui" : "Non";
+  if (typeof value === "boolean") return t(value ? "state.yes" : "state.no");
 
   if (Array.isArray(value)) {
     if (value.length === 0) return <span className="muted">—</span>;
@@ -193,13 +207,13 @@ function renderValue(key: string, value: unknown, entity: string, siblings?: Rec
     return (
       <ol className="audit-sublist">
         {value.map((item, i) => (
-          <li key={i}>{renderObject(item as Record<string, unknown>, entity)}</li>
+          <li key={i}>{renderObject(item as Record<string, unknown>, entity, t)}</li>
         ))}
       </ol>
     );
   }
 
-  if (typeof value === "object") return renderObject(value as Record<string, unknown>, entity);
+  if (typeof value === "object") return renderObject(value as Record<string, unknown>, entity, t);
 
   if (typeof value === "number") {
     // discount is a DZD amount for FIXED (the default) but a fraction when the
@@ -219,21 +233,21 @@ function renderValue(key: string, value: unknown, entity: string, siblings?: Rec
         return value;
       }
     }
-    return translateEnumValue(key, value, entity);
+    return translateEnumValue(key, value, entity, t);
   }
 
   return String(value);
 }
 
-function renderObject(obj: Record<string, unknown>, entity: string): ReactNode {
+function renderObject(obj: Record<string, unknown>, entity: string, t: T): ReactNode {
   const entries = Object.entries(obj);
   if (entries.length === 0) return <span className="muted">—</span>;
   return (
     <div className="audit-fields">
       {entries.map(([key, value]) => (
         <div key={key} className="audit-field">
-          <span className="audit-field-label">{fieldLabel(key)}</span>
-          <span className="audit-field-value">{renderValue(key, value, entity, obj)}</span>
+          <span className="audit-field-label">{fieldLabel(key, t)}</span>
+          <span className="audit-field-value">{renderValue(key, value, entity, t, obj)}</span>
         </div>
       ))}
     </div>
@@ -247,7 +261,8 @@ function renderObject(obj: Record<string, unknown>, entity: string): ReactNode {
  * string if it isn't the shape the interceptor produces — better a visible
  * oddity than a silent crash.
  */
-export function renderAuditChanges(changes: string, entity: string): ReactNode {
+export function AuditChanges({ changes, entity }: { changes: string; entity: string }): ReactNode {
+  const { t } = useI18n();
   let parsed: unknown;
   try {
     parsed = JSON.parse(changes);
@@ -263,10 +278,11 @@ export function renderAuditChanges(changes: string, entity: string): ReactNode {
 
   return (
     <div className="audit-details">
-      {renderObject(submitted, entity)}
+      {renderObject(submitted, entity, t)}
       {resultId ? (
         <p className="audit-result">
-          Identifiant : <span className="tabular">{resultId}</span>
+          {t("adm.identifier")}
+          <span className="tabular">{resultId}</span>
         </p>
       ) : null}
     </div>

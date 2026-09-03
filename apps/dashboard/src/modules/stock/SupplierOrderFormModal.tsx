@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { todayIso } from "../../lib/date";
 import { formatCurrency } from "../../lib/format";
 import { Banner } from "../../components/ui/Banner";
+import { useI18n } from "../../state/LanguageContext";
 import type { Supplier } from "../../lib/suppliersApi";
 import type { ApiItem } from "../../lib/stockApi";
 import type { SupplierOrderInput } from "../../lib/supplierOrdersApi";
@@ -25,6 +26,7 @@ interface LineDraft {
 }
 
 export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: SupplierOrderFormModalProps) {
+  const { t } = useI18n();
   const [supplierId, setSupplierId] = useState("");
   const [orderDate, setOrderDate] = useState(todayIso());
   const [notes, setNotes] = useState("");
@@ -67,11 +69,11 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
 
   async function handleSubmit() {
     if (!supplierId) {
-      setError("Le fournisseur est obligatoire.");
+      setError(t("so.err.supplier"));
       return;
     }
     if (!orderDate) {
-      setError("La date de commande est obligatoire.");
+      setError(t("so.err.date"));
       return;
     }
     const parsed = lines
@@ -85,7 +87,7 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
         };
       });
     if (parsed.length === 0) {
-      setError("Ajoutez au moins une ligne avec une quantité supérieure à zéro.");
+      setError(t("so.err.lines"));
       return;
     }
     setError(null);
@@ -93,31 +95,31 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
     try {
       await onSubmit({ supplierId, orderDate, notes: notes.trim() || undefined, lines: parsed });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
       setSubmitting(false);
     }
   }
 
   return (
     <Modal
-      title="Nouvelle commande fournisseur"
+      title={t("so.newTitle")}
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
-            Annuler
+            {t("action.cancel")}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Enregistrement…" : "Enregistrer la commande"}
+            {submitting ? t("action.saving") : t("so.save")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
         <div className="form-row">
-          <Field label="Fournisseur">
+          <Field label={t("field.supplier")}>
             <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-              <option value="">— Choisir —</option>
+              <option value="">{t("so.choose")}</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -125,21 +127,21 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
               ))}
             </select>
           </Field>
-          <Field label="Date de commande">
+          <Field label={t("so.orderDate")}>
             <input className="input" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
           </Field>
         </div>
 
-        <Field label="Notes" hint="Facultatif — ex. délai, numéro de bon de commande">
+        <Field label={t("field.notes")} hint={t("so.notesHint")}>
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
 
         <div className="order-lines-editor">
-          <p className="order-lines-title">Lignes de commande</p>
+          <p className="order-lines-title">{t("so.lines")}</p>
           {lines.map((line) => (
             <div key={line.id} className="order-line-editor">
               <select className="input" value={line.itemId} onChange={(e) => onItemChange(line, e.target.value)}>
-                <option value="">— Choisir un article —</option>
+                <option value="">{t("so.chooseItem")}</option>
                 {items.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name} ({i.reference})
@@ -151,7 +153,7 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
                 type="number"
                 min={0}
                 step="any"
-                placeholder="Qté"
+                placeholder={t("so.qtyShort")}
                 value={line.quantity}
                 onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
               />
@@ -160,25 +162,24 @@ export function SupplierOrderFormModal({ suppliers, items, onClose, onSubmit }: 
                 type="number"
                 min={0}
                 step="any"
-                placeholder="Prix / u."
-                title="Prix unitaire convenu (DZD). Laissez vide pour utiliser le coût standard de l'article."
+                placeholder={t("so.priceShort")}
+                title={t("so.priceHint")}
                 value={line.unitCost}
                 onChange={(e) => updateLine(line.id, { unitCost: e.target.value })}
               />
               <Button variant="ghost" onClick={() => removeLine(line.id)}>
-                Suppr.
+                {t("so.removeShort")}
               </Button>
             </div>
           ))}
           <Button variant="secondary" onClick={addLine}>
-            + Ajouter une ligne
+            {t("so.addLine")}
           </Button>
-          {orderTotal > 0 ? <p className="order-lines-total">Total commande : {formatCurrency(orderTotal)}</p> : null}
+          {orderTotal > 0 ? <p className="order-lines-total">{t("so.orderTotal", { value: formatCurrency(orderTotal) })}</p> : null}
         </div>
 
         <Banner tone="info">
-          Le prix unitaire saisi ici suit la marchandise : à la réception, il entre dans la valeur du stock et met à jour le coût moyen de
-          l'article. Laissé vide, c'est le coût standard de l'article qui s'applique.
+          {t("so.priceFollowsGoods")}
         </Banner>
 
         {error ? <p className="form-error">{error}</p> : null}

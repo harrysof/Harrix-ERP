@@ -21,6 +21,7 @@ import {
   type PoFilters,
 } from "../../lib/purchasingApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
 import { PurchaseOrderModal } from "./PurchaseOrderModal";
 import { PurchaseOrderDetailModal } from "./PurchaseOrderDetailModal";
 import { SupplierModal } from "../suppliers/SupplierModal";
@@ -41,6 +42,7 @@ type SupplierModalState =
  */
 export function PurchasingPage() {
   const { can } = useAuth();
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<ApiPurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -55,6 +57,7 @@ export function PurchasingPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [supplierModal, setSupplierModal] = useState<SupplierModalState>({ kind: "none" });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(() => {
     setLoading(true);
     return Promise.all([fetchPurchaseOrders(filters), fetchSuppliers(true), fetchItems()])
@@ -64,7 +67,7 @@ export function PurchasingPage() {
         setItems(nextItems);
         setError(null);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les achats."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("po.loadFailed")))
       .finally(() => setLoading(false));
   }, [filters]);
 
@@ -105,21 +108,31 @@ export function PurchasingPage() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <div className="stat-grid">
-        <StatCard label="Bons de commande" value={orders.length} hint="Sur la période filtrée" />
-        <StatCard label="En cours" value={open.length} hint="Ni reçus ni annulés" tone={open.length > 0 ? "warn" : "neutral"} />
-        <StatCard label="Engagements" value={formatCurrency(committed)} hint="Commandé, pas encore livré" />
+        <StatCard label={t("po.tabOrders")} value={orders.length} hint={t("po.kpi.orderedHint")} />
         <StatCard
-          label="Total achats"
-          value={formatCurrency(orders.filter((o) => o.status !== "CANCELLED").reduce((s, o) => s + o.totals.total, 0))}
-          hint="Hors bons annulés"
+          label={t("po.kpi.inProgress")}
+          value={open.length}
+          hint={t("po.kpi.inProgressHint")}
+          tone={open.length > 0 ? "warn" : "neutral"}
         />
-        <StatCard label="Montant dû" value={formatCurrency(owed)} hint="Restant à payer aux fournisseurs" tone={owed > 0 ? "warn" : "neutral"} />
+        <StatCard label={t("po.commitments")} value={formatCurrency(committed)} hint={t("po.kpi.ordered")} />
+        <StatCard
+          label={t("po.kpi.total")}
+          value={formatCurrency(orders.filter((o) => o.status !== "CANCELLED").reduce((s, o) => s + o.totals.total, 0))}
+          hint={t("po.kpi.totalHint")}
+        />
+        <StatCard
+          label={t("po.kpi.due")}
+          value={formatCurrency(owed)}
+          hint={t("po.kpi.dueHint")}
+          tone={owed > 0 ? "warn" : "neutral"}
+        />
       </div>
 
       <div className="toolbar">
         <div className="tab-strip">
           <button type="button" className={`tab-strip-item ${tab === "orders" ? "tab-strip-item-active" : ""}`} onClick={() => setTab("orders")}>
-            Achats
+            {t("po.tabPurchases")}
             {orders.length > 0 ? <span className="tab-strip-badge">{orders.length}</span> : null}
           </button>
           <button
@@ -127,7 +140,7 @@ export function PurchasingPage() {
             className={`tab-strip-item ${tab === "suppliers" ? "tab-strip-item-active" : ""}`}
             onClick={() => setTab("suppliers")}
           >
-            Fournisseurs
+            {t("po.tabSuppliers")}
             {activeSuppliers.length > 0 ? <span className="tab-strip-badge">{activeSuppliers.length}</span> : null}
           </button>
         </div>
@@ -135,27 +148,27 @@ export function PurchasingPage() {
           {tab === "orders"
             ? can("purchasing:write") && (
                 <Button variant="primary" onClick={() => setCreating(true)} disabled={activeSuppliers.length === 0}>
-                  + Nouveau bon de commande
+                  {t("po.new")}
                 </Button>
               )
             : (
                 <Button variant="primary" onClick={() => setSupplierModal({ kind: "add" })}>
-                  + Nouveau fournisseur
+                  {t("po.newSupplier")}
                 </Button>
               )}
         </div>
       </div>
 
       {tab === "orders" && activeSuppliers.length === 0 && !loading ? (
-        <Banner tone="info">Ajoutez d'abord un fournisseur dans l'onglet Fournisseurs.</Banner>
+        <Banner tone="info">{t("po.supplierFirst")}</Banner>
       ) : null}
 
       {tab === "orders" ? (
         <>
           <div className="filter-bar">
-            <Field label="Fournisseur">
+            <Field label={t("field.supplier")}>
               <select className="input" value={filters.supplierId ?? ""} onChange={(e) => set({ supplierId: e.target.value })}>
-                <option value="">Tous</option>
+                <option value="">{t("state.all")}</option>
                 {activeSuppliers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -163,60 +176,60 @@ export function PurchasingPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Statut">
+            <Field label={t("field.status")}>
               <select className="input" value={filters.status ?? ""} onChange={(e) => set({ status: e.target.value })}>
-                <option value="">Tous</option>
+                <option value="">{t("state.all")}</option>
                 {PO_STATUS_ORDER.map((s) => (
                   <option key={s} value={s}>
-                    {PO_STATUS_LABELS[s]}
+                    {t(PO_STATUS_LABELS[s])}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Paiement">
+            <Field label={t("field.payment")}>
               <select className="input" value={filters.paymentStatus ?? ""} onChange={(e) => set({ paymentStatus: e.target.value })}>
-                <option value="">Tous</option>
+                <option value="">{t("state.all")}</option>
                 {PO_PAYMENT_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {PO_PAYMENT_LABELS[s]}
+                    {t(PO_PAYMENT_LABELS[s])}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Du">
+            <Field label={t("field.from")}>
               <input className="input" type="date" value={filters.from ?? ""} onChange={(e) => set({ from: e.target.value })} />
             </Field>
-            <Field label="Au">
+            <Field label={t("field.to")}>
               <input className="input" type="date" value={filters.to ?? ""} onChange={(e) => set({ to: e.target.value })} />
             </Field>
             {hasFilters ? (
               <Button variant="ghost" onClick={() => setFilters({})}>
-                Réinitialiser
+                {t("action.reset")}
               </Button>
             ) : null}
           </div>
 
           {loading ? (
-            <p className="loading-text">Chargement des achats…</p>
+            <p className="loading-text">{t("po.loadingOrders")}</p>
           ) : orders.length === 0 ? (
             <EmptyState
-              title={hasFilters ? "Aucun bon de commande ne correspond" : "Aucun bon de commande"}
-              description={hasFilters ? "Élargissez la période ou réinitialisez les filtres." : "Créez un bon de commande pour suivre vos achats."}
+              title={hasFilters ? t("po.noMatch") : t("po.none")}
+              description={hasFilters ? t("po.widenPeriod") : t("po.createFirst")}
             />
           ) : (
             <div className="table-scroll">
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>N°</th>
-                    <th>Date</th>
-                    <th>Fournisseur</th>
-                    <th>Livraison prévue</th>
-                    <th className="num">Lignes</th>
-                    <th className="num">Reçu</th>
-                    <th className="num">Total</th>
-                    <th>Statut</th>
-                    <th>Paiement</th>
+                    <th>{t("field.number")}</th>
+                    <th>{t("field.date")}</th>
+                    <th>{t("field.supplier")}</th>
+                    <th>{t("po.col.expected")}</th>
+                    <th className="num">{t("po.col.lines")}</th>
+                    <th className="num">{t("po.col.receivedQty")}</th>
+                    <th className="num">{t("field.total")}</th>
+                    <th>{t("field.status")}</th>
+                    <th>{t("field.payment")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -239,7 +252,7 @@ export function PurchasingPage() {
                         <td>{order.supplier.name}</td>
                         <td className="tabular">
                           {order.expectedDate ? formatDate(order.expectedDate) : <span className="muted">—</span>}
-                          {late ? <span className="muted"> · en retard</span> : null}
+                          {late ? <span className="muted">{t("po.lateSuffix")}</span> : null}
                         </td>
                         <td className="tabular num">{order.lines.length}</td>
                         <td className="tabular num">
@@ -247,10 +260,10 @@ export function PurchasingPage() {
                         </td>
                         <td className="tabular num">{formatCurrency(order.totals.total)}</td>
                         <td>
-                          <Pill tone={PO_STATUS_TONES[order.status]}>{PO_STATUS_LABELS[order.status]}</Pill>
+                          <Pill tone={PO_STATUS_TONES[order.status]}>{t(PO_STATUS_LABELS[order.status])}</Pill>
                         </td>
                         <td>
-                          <Pill tone={PO_PAYMENT_TONES[order.paymentStatus]}>{PO_PAYMENT_LABELS[order.paymentStatus]}</Pill>
+                          <Pill tone={PO_PAYMENT_TONES[order.paymentStatus]}>{t(PO_PAYMENT_LABELS[order.paymentStatus])}</Pill>
                         </td>
                       </tr>
                     );
@@ -265,26 +278,26 @@ export function PurchasingPage() {
           <div className="toolbar">
             <input
               className="input toolbar-search"
-              placeholder="Rechercher un fournisseur…"
+              placeholder={t("po.searchSupplier")}
               value={supplierSearch}
               onChange={(e) => setSupplierSearch(e.target.value)}
             />
             <label className="checkbox-row">
               <input type="checkbox" checked={showArchivedSuppliers} onChange={(e) => setShowArchivedSuppliers(e.target.checked)} />
-              <span>Afficher les archivés</span>
+              <span>{t("action.showArchived")}</span>
             </label>
           </div>
 
           {loading ? (
-            <p className="loading-text">Chargement des fournisseurs…</p>
+            <p className="loading-text">{t("po.loadingSuppliers")}</p>
           ) : visibleSuppliers.length === 0 ? (
             <EmptyState
-              title={supplierSearch ? "Aucun fournisseur ne correspond à la recherche" : "Aucun fournisseur enregistré"}
-              description={!supplierSearch ? "Ajoutez vos fournisseurs de matières premières et de pièces détachées." : undefined}
+              title={supplierSearch ? t("po.noSupplierMatch") : t("po.noSuppliers")}
+              description={!supplierSearch ? t("po.addSuppliersDesc") : undefined}
               action={
                 !supplierSearch ? (
                   <Button variant="primary" onClick={() => setSupplierModal({ kind: "add" })}>
-                    + Nouveau fournisseur
+                    {t("po.newSupplier")}
                   </Button>
                 ) : undefined
               }
@@ -294,11 +307,11 @@ export function PurchasingPage() {
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>Nom</th>
-                    <th>Contact</th>
-                    <th>Téléphone</th>
-                    <th>Statut</th>
-                    <th aria-label="Actions" />
+                    <th>{t("field.name")}</th>
+                    <th>{t("po.col.contact")}</th>
+                    <th>{t("field.phone")}</th>
+                    <th>{t("field.status")}</th>
+                    <th aria-label={t("field.actions")} />
                   </tr>
                 </thead>
                 <tbody>
@@ -316,20 +329,20 @@ export function PurchasingPage() {
                       <td>{s.contactName ?? "—"}</td>
                       <td className="tabular">{s.phone ?? "—"}</td>
                       <td>
-                        <Pill tone={s.archived ? "neutral" : "ok"}>{s.archived ? "Archivé" : "Actif"}</Pill>
+                        <Pill tone={s.archived ? "neutral" : "ok"}>{t(s.archived ? "state.archived" : "state.active")}</Pill>
                       </td>
                       <td>
                         <div className="row-actions">
                           {can("purchasing:read") ? (
                             <Button variant="ghost" onClick={() => setSupplierModal({ kind: "detail", supplier: s })}>
-                              Fiche
+                              {t("sales.file")}
                             </Button>
                           ) : null}
                           <Button variant="secondary" onClick={() => setSupplierModal({ kind: "edit", supplier: s })}>
-                            Modifier
+                            {t("action.edit")}
                           </Button>
                           <Button variant="ghost" onClick={() => toggleSupplierArchive(s)}>
-                            {s.archived ? "Désarchiver" : "Archiver"}
+                            {t(s.archived ? "action.unarchive" : "action.archive")}
                           </Button>
                         </div>
                       </td>

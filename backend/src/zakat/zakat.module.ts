@@ -6,5 +6,8 @@ import { GoldPriceService } from './gold-price.service.js';
 @Module({
   controllers: [ZakatController],
   providers: [ZakatService, GoldPriceService],
+  // Exported so the tableau de bord shows the same Zakat position this
+  // module computes, rather than a second implementation of it.
+  exports: [ZakatService],
 })
 export class ZakatModule {}

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { t } from '../i18n/messages/index.js';
 import { getItemQuantity, getItemValuation } from '../stock/stock-math.js';
 import { orderTotals } from '../sales/sales-math.js';
 import { GoldPriceService } from './gold-price.service.js';
@@ -180,7 +181,7 @@ export class ZakatService {
 
   private async requireCalculation(id: string) {
     const row = await this.prisma.zakatCalculation.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException(`Calcul de Zakat introuvable : ${id}`);
+    if (!row) throw new NotFoundException(t('zakat.calculationNotFound', { id }));
     return row;
   }
 }

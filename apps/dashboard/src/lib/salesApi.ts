@@ -1,4 +1,5 @@
 import { api } from "./api";
+import type { TranslationKey } from "./i18n";
 import type { ApiItem } from "./stockApi";
 
 /** Typed client for /api/sales — §15–19: orders, order details, customers. */
@@ -6,17 +7,22 @@ import type { ApiItem } from "./stockApi";
 export type ShipmentStatus = "PENDING" | "SHIPPED" | "CANCELLED";
 export type PaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "CANCELLED";
 
-export const SHIPMENT_LABELS: Record<ShipmentStatus, string> = {
-  PENDING: "En attente",
-  SHIPPED: "Expédié",
-  CANCELLED: "Annulé",
+/**
+ * Status labels are catalogue keys, not text: the same status is rendered on
+ * the list, the invoice and the customer fiche, and holding the French here
+ * would have pinned all three to one language.
+ */
+export const SHIPMENT_LABELS: Record<ShipmentStatus, TranslationKey> = {
+  PENDING: "shipment.PENDING",
+  SHIPPED: "shipment.SHIPPED",
+  CANCELLED: "shipment.CANCELLED",
 };
 
-export const PAYMENT_LABELS: Record<PaymentStatus, string> = {
-  PENDING: "En attente",
-  PARTIAL: "Partiellement payé",
-  PAID: "Payé",
-  CANCELLED: "Annulé",
+export const PAYMENT_LABELS: Record<PaymentStatus, TranslationKey> = {
+  PENDING: "payment.PENDING",
+  PARTIAL: "payment.PARTIAL",
+  PAID: "payment.PAID",
+  CANCELLED: "payment.CANCELLED",
 };
 
 export const SHIPMENT_TONES: Record<ShipmentStatus, "ok" | "warn" | "danger" | "neutral"> = {

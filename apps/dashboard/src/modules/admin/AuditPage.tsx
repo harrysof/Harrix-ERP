@@ -7,7 +7,8 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { ApiError } from "../../lib/api";
 import { fetchAudit, fetchAuditFilterOptions, type AuditEntry, type AuditFilters } from "../../lib/authApi";
 import { ACTION_LABELS, ACTION_TONES } from "../../lib/auditLabels";
-import { entityLabel, renderAuditChanges } from "./auditChanges";
+import { entityLabel, AuditChanges } from "./auditChanges";
+import { useI18n } from "../../state/LanguageContext";
 
 /**
  * "Log who did what, and when. When the numbers disagree, this is the only
@@ -22,6 +23,7 @@ export function AuditPage() {
   const [filters, setFilters] = useState<AuditFilters>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t, locale } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -31,7 +33,7 @@ export function AuditPage() {
         setEntries(next);
         setError(null);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger le journal."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("adm.loadJournalFailed")))
       .finally(() => setLoading(false));
   }, [filters]);
 
@@ -56,76 +58,78 @@ export function AuditPage() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <div className="filter-bar">
-        <Field label="Du">
+        <Field label={t("field.from")}>
           <input className="input" type="date" value={filters.from ?? ""} onChange={(e) => set({ from: e.target.value })} />
         </Field>
-        <Field label="Au">
+        <Field label={t("field.to")}>
           <input className="input" type="date" value={filters.to ?? ""} onChange={(e) => set({ to: e.target.value })} />
         </Field>
-        <Field label="Action">
+        <Field label={t("adm.col.action")}>
           <select className="input" value={filters.action ?? ""} onChange={(e) => set({ action: e.target.value })}>
-            <option value="">Toutes</option>
+            <option value="">{t("state.allFeminine")}</option>
             {options.actions.map((a) => (
               <option key={a} value={a}>
-                {ACTION_LABELS[a] ?? a}
+                {ACTION_LABELS[a] ? t(ACTION_LABELS[a]) : a}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Concerne">
+        <Field label={t("adm.col.concerns")}>
           <select className="input" value={filters.entity ?? ""} onChange={(e) => set({ entity: e.target.value })}>
-            <option value="">Tout</option>
+            <option value="">{t("adm.allNeuter")}</option>
             {options.entities.map((e) => (
               <option key={e} value={e}>
-                {entityLabel(e)}
+                {entityLabel(e, t)}
               </option>
             ))}
           </select>
         </Field>
         {hasFilters ? (
           <Button variant="ghost" onClick={() => setFilters({})}>
-            Réinitialiser
+            {t("action.reset")}
           </Button>
         ) : null}
       </div>
 
       {loading ? (
-        <p className="loading-text">Chargement du journal…</p>
+        <p className="loading-text">{t("adm.loadingJournal")}</p>
       ) : entries.length === 0 ? (
-        <EmptyState title="Aucune activité" description={hasFilters ? "Aucune entrée ne correspond à ces filtres." : undefined} />
+        <EmptyState title={t("adm.noActivity")} description={hasFilters ? t("adm.noMatchingEntries") : undefined} />
       ) : (
         <div className="table-scroll">
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Date et heure</th>
-                <th>Qui</th>
-                <th>Action</th>
-                <th>Concerne</th>
-                <th>Détails</th>
+                <th>{t("adm.col.when")}</th>
+                <th>{t("adm.col.who")}</th>
+                <th>{t("adm.col.action")}</th>
+                <th>{t("adm.col.concerns")}</th>
+                <th>{t("adm.col.details")}</th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id} className={entry.action === "LOGIN_FAILED" ? "row-attention" : undefined}>
-                  <td className="tabular">{new Date(entry.createdAt).toLocaleString("fr-FR")}</td>
+                  <td className="tabular">{new Date(entry.createdAt).toLocaleString(locale)}</td>
                   <td>
                     {entry.user ? entry.user.fullName : <span className="muted">{entry.userLogin}</span>}
                     <span className="muted"> · {entry.userLogin}</span>
                   </td>
                   <td>
-                    <Pill tone={ACTION_TONES[entry.action] ?? "neutral"}>{ACTION_LABELS[entry.action] ?? entry.action}</Pill>
+                    <Pill tone={ACTION_TONES[entry.action] ?? "neutral"}>
+                      {ACTION_LABELS[entry.action] ? t(ACTION_LABELS[entry.action]) : entry.action}
+                    </Pill>
                   </td>
-                  <td>{entityLabel(entry.entity)}</td>
+                  <td>{entityLabel(entry.entity, t)}</td>
                   <td>
                     {entry.changes ? (
                       <button type="button" className="link-button" onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}>
-                        {expanded === entry.id ? "Masquer" : "Voir"}
+                        {t(expanded === entry.id ? "adm.hide" : "adm.show")}
                       </button>
                     ) : (
                       <span className="muted">—</span>
                     )}
-                    {expanded === entry.id && entry.changes ? renderAuditChanges(entry.changes, entry.entity) : null}
+                    {expanded === entry.id && entry.changes ? <AuditChanges changes={entry.changes} entity={entry.entity} /> : null}
                   </td>
                 </tr>
               ))}

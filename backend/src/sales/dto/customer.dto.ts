@@ -1,4 +1,5 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { t } from '../../i18n/messages/index.js';
 
 export class CreateCustomerDto {
   @IsOptional()
@@ -7,13 +8,13 @@ export class CreateCustomerDto {
   code?: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Le nom complet est obligatoire.' })
+  @IsNotEmpty({ message: () => t('common.fullNameRequired') })
   @MaxLength(150)
   fullName!: string;
 
   /** Optional: a walk-in customer may have no email. Validated only if given. */
   @IsOptional()
-  @IsEmail({}, { message: "L'adresse email n'est pas valide." })
+  @IsEmail({}, { message: () => t('common.emailInvalid') })
   email?: string;
 
   @IsOptional() @IsString() @MaxLength(40) phone?: string;
@@ -33,7 +34,7 @@ export class UpdateCustomerDto {
   fullName?: string;
 
   @IsOptional()
-  @IsEmail({}, { message: "L'adresse email n'est pas valide." })
+  @IsEmail({}, { message: () => t('common.emailInvalid') })
   email?: string;
 
   @IsOptional() @IsString() @MaxLength(40) phone?: string;

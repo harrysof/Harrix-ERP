@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CUSTOM_UNIT, UNIT_GROUPS, isKnownUnit } from "../../lib/units";
+import { useI18n } from "../../state/LanguageContext";
 
 interface UnitSelectProps {
   value: string;
@@ -16,14 +17,16 @@ interface UnitSelectProps {
  * value intact, rather than being silently reset to "pièce" — the article's
  * whole history is denominated in that unit.
  */
-export function UnitSelect({ value, onChange, ariaLabel = "Unité" }: UnitSelectProps) {
+export function UnitSelect({ value, onChange, ariaLabel }: UnitSelectProps) {
+  const { t } = useI18n();
+  const label = ariaLabel ?? t("field.unit");
   const [custom, setCustom] = useState(() => value !== "" && !isKnownUnit(value));
 
   return (
     <div className="unit-select">
       <select
         className="input"
-        aria-label={ariaLabel}
+        aria-label={label}
         value={custom ? CUSTOM_UNIT : value}
         onChange={(e) => {
           if (e.target.value === CUSTOM_UNIT) {
@@ -35,7 +38,7 @@ export function UnitSelect({ value, onChange, ariaLabel = "Unité" }: UnitSelect
         }}
       >
         {UNIT_GROUPS.map((group) => (
-          <optgroup key={group.label} label={group.label}>
+          <optgroup key={group.labelKey} label={t(group.labelKey)}>
             {group.units.map((unit) => (
               <option key={unit} value={unit}>
                 {unit}
@@ -43,7 +46,7 @@ export function UnitSelect({ value, onChange, ariaLabel = "Unité" }: UnitSelect
             ))}
           </optgroup>
         ))}
-        <option value={CUSTOM_UNIT}>Autre…</option>
+        <option value={CUSTOM_UNIT}>{t("unit.other")}</option>
       </select>
 
       {custom ? (
@@ -51,8 +54,8 @@ export function UnitSelect({ value, onChange, ariaLabel = "Unité" }: UnitSelect
           className="input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Ex. botte"
-          aria-label={`${ariaLabel} personnalisée`}
+          placeholder={t("unit.otherPlaceholder")}
+          aria-label={t("unit.customAria", { label })}
           autoFocus
         />
       ) : null}

@@ -28,6 +28,7 @@ import {
   type OrdersSummary,
 } from "../../lib/salesApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
 import { OrderModal } from "./OrderModal";
 import { OrderDetailModal } from "./OrderDetailModal";
 import { CustomerModal } from "./CustomerModal";
@@ -46,6 +47,7 @@ type Modal =
 /** §15–19: the sales module — order list, order details, and customers. */
 export function SalesPage() {
   const { can } = useAuth();
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [customers, setCustomers] = useState<ApiCustomer[]>([]);
@@ -58,6 +60,7 @@ export function SalesPage() {
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<Modal>({ kind: "none" });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(() => {
     setLoading(true);
     const orderFilters = { ...filters, includeArchived: showArchivedOrders };
@@ -69,7 +72,7 @@ export function SalesPage() {
         setProducts(items.filter((i) => i.inventoryType.key === "finished-goods"));
         setError(null);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les ventes."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("sales.loadFailed")))
       .finally(() => setLoading(false));
   }, [filters, showArchivedOrders]);
 
@@ -101,14 +104,24 @@ export function SalesPage() {
 
       {summary ? (
         <div className="stat-grid">
-          <StatCard icon={ClipboardList} label="Commandes" value={summary.orderCount} hint={`${summary.pendingShipment} en attente`} />
-          <StatCard icon={Truck} label="Expédiées" value={summary.shipped} tone="ok" />
-          <StatCard icon={Wallet} label="Chiffre d'affaires" value={formatCurrency(summary.revenue)} hint="Commandes payées uniquement" />
+          <StatCard
+            icon={ClipboardList}
+            label={t("sales.kpi.orders")}
+            value={summary.orderCount}
+            hint={t("sales.kpi.pending", { count: summary.pendingShipment })}
+          />
+          <StatCard icon={Truck} label={t("sales.kpi.shipped")} value={summary.shipped} tone="ok" />
+          <StatCard
+            icon={Wallet}
+            label={t("sales.kpi.revenue")}
+            value={formatCurrency(summary.revenue)}
+            hint={t("sales.kpi.revenueHint")}
+          />
           <StatCard
             icon={CircleAlert}
-            label="Impayé"
+            label={t("sales.kpi.outstanding")}
             value={formatCurrency(summary.outstanding)}
-            hint="Commandes non réglées"
+            hint={t("sales.kpi.outstandingHint")}
             tone={summary.outstanding > 0 ? "danger" : "ok"}
           />
         </div>
@@ -117,7 +130,7 @@ export function SalesPage() {
       <div className="toolbar">
         <div className="tab-strip">
           <button type="button" className={`tab-strip-item ${tab === "orders" ? "tab-strip-item-active" : ""}`} onClick={() => setTab("orders")}>
-            Commandes
+            {t("sales.tabOrders")}
             {orders.length > 0 ? <span className="tab-strip-badge">{orders.length}</span> : null}
           </button>
           <button
@@ -125,7 +138,7 @@ export function SalesPage() {
             className={`tab-strip-item ${tab === "customers" ? "tab-strip-item-active" : ""}`}
             onClick={() => setTab("customers")}
           >
-            Clients
+            {t("sales.tabCustomers")}
             {activeCustomers.length > 0 ? <span className="tab-strip-badge">{activeCustomers.length}</span> : null}
           </button>
         </div>
@@ -133,11 +146,11 @@ export function SalesPage() {
           <div className="toolbar-actions">
             {tab === "orders" ? (
               <Button variant="primary" onClick={() => setModal({ kind: "newOrder" })} disabled={activeCustomers.length === 0}>
-                + Nouvelle commande
+                {t("sales.newOrder")}
               </Button>
             ) : (
               <Button variant="primary" onClick={() => setModal({ kind: "newCustomer" })}>
-                + Nouveau client
+                {t("sales.newCustomer")}
               </Button>
             )}
           </div>
@@ -145,58 +158,58 @@ export function SalesPage() {
       </div>
 
       {tab === "orders" && activeCustomers.length === 0 && !loading ? (
-        <Banner tone="info">Créez d'abord un client — une commande doit être rattachée à quelqu'un.</Banner>
+        <Banner tone="info">{t("sales.customerFirst")}</Banner>
       ) : null}
 
       {tab === "orders" ? (
         <>
           <div className="filter-bar">
-            <Field label="Recherche" hint="N° de commande, nom ou email">
-              <input className="input" value={filters.search ?? ""} onChange={(e) => set({ search: e.target.value })} placeholder="CMD-2026-… " />
+            <Field label={t("sales.search")} hint={t("sales.searchHint")}>
+              <input className="input" value={filters.search ?? ""} onChange={(e) => set({ search: e.target.value })} placeholder={t("sales.searchPlaceholder")} />
             </Field>
-            <Field label="Expédition">
+            <Field label={t("sales.shipment")}>
               <select className="input" value={filters.shipmentStatus ?? ""} onChange={(e) => set({ shipmentStatus: e.target.value })}>
-                <option value="">Toutes</option>
+                <option value="">{t("state.allFeminine")}</option>
                 {SHIPMENT_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {SHIPMENT_LABELS[s]}
+                    {t(SHIPMENT_LABELS[s])}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Paiement">
+            <Field label={t("field.payment")}>
               <select className="input" value={filters.paymentStatus ?? ""} onChange={(e) => set({ paymentStatus: e.target.value })}>
-                <option value="">Tous</option>
+                <option value="">{t("state.all")}</option>
                 {PAYMENT_STATUSES.map((s) => (
                   <option key={s} value={s}>
-                    {PAYMENT_LABELS[s]}
+                    {t(PAYMENT_LABELS[s])}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Du">
+            <Field label={t("field.from")}>
               <input className="input" type="date" value={filters.from ?? ""} onChange={(e) => set({ from: e.target.value })} />
             </Field>
-            <Field label="Au">
+            <Field label={t("field.to")}>
               <input className="input" type="date" value={filters.to ?? ""} onChange={(e) => set({ to: e.target.value })} />
             </Field>
             <label className="checkbox-row">
               <input type="checkbox" checked={showArchivedOrders} onChange={(e) => setShowArchivedOrders(e.target.checked)} />
-              <span>Afficher les commandes archivées</span>
+              <span>{t("sales.showArchivedOrders")}</span>
             </label>
             {hasFilters ? (
               <Button variant="ghost" onClick={() => setFilters({})}>
-                Réinitialiser
+                {t("action.reset")}
               </Button>
             ) : null}
           </div>
 
           {loading ? (
-            <p className="loading-text">Chargement des commandes…</p>
+            <p className="loading-text">{t("sales.loadingOrders")}</p>
           ) : orders.length === 0 ? (
             <EmptyState
-              title={hasFilters ? "Aucune commande ne correspond" : "Aucune commande"}
-              description={hasFilters ? "Élargissez la recherche ou réinitialisez les filtres." : undefined}
+              title={hasFilters ? t("sales.noOrderMatch") : t("sales.noOrders")}
+              description={hasFilters ? t("sales.widenSearch") : undefined}
             />
           ) : (
             <div className="list-card">
@@ -204,14 +217,14 @@ export function SalesPage() {
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>N° commande</th>
-                      <th>Date</th>
-                      <th>Client</th>
-                      <th>Email</th>
-                      <th>Expédition</th>
-                      <th>Paiement</th>
-                      <th className="num">Total</th>
-                      <th aria-label="Actions" />
+                      <th>{t("sales.col.orderNumber")}</th>
+                      <th>{t("field.date")}</th>
+                      <th>{t("field.customer")}</th>
+                      <th>{t("field.email")}</th>
+                      <th>{t("sales.shipment")}</th>
+                      <th>{t("field.payment")}</th>
+                      <th className="num">{t("field.total")}</th>
+                      <th aria-label={t("field.actions")} />
                     </tr>
                   </thead>
                   <tbody>
@@ -231,7 +244,7 @@ export function SalesPage() {
                             {order.code}
                           </button>
                           {order.stockWarnings.length > 0 ? (
-                            <span className="muted" title="Stock insuffisant pour expédier maintenant">
+                            <span className="muted" title={t("sales.stockWarning")}>
                               {" "}
                               ⚠
                             </span>
@@ -246,10 +259,10 @@ export function SalesPage() {
                         </td>
                         <td>{order.customer.email ?? <span className="muted">—</span>}</td>
                         <td>
-                          <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>{SHIPMENT_LABELS[order.shipmentStatus]}</Pill>
+                          <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>{t(SHIPMENT_LABELS[order.shipmentStatus])}</Pill>
                         </td>
                         <td>
-                          <Pill tone={PAYMENT_TONES[order.paymentStatus]}>{PAYMENT_LABELS[order.paymentStatus]}</Pill>
+                          <Pill tone={PAYMENT_TONES[order.paymentStatus]}>{t(PAYMENT_LABELS[order.paymentStatus])}</Pill>
                         </td>
                         <td className="tabular num">{formatCurrency(order.totals.total)}</td>
                         <td>
@@ -257,7 +270,7 @@ export function SalesPage() {
                             <button
                               type="button"
                               className="icon-button"
-                              title="Voir"
+                              title={t("sales.view")}
                               onClick={() => setModal({ kind: "orderDetail", id: order.id })}
                             >
                               <Eye size={16} strokeWidth={2} />
@@ -266,7 +279,7 @@ export function SalesPage() {
                               <button
                                 type="button"
                                 className="icon-button"
-                                title="Modifier"
+                                title={t("action.edit")}
                                 onClick={() => setModal({ kind: "editOrder", order })}
                               >
                                 <Pencil size={16} strokeWidth={2} />
@@ -276,7 +289,7 @@ export function SalesPage() {
                               <button
                                 type="button"
                                 className="icon-button"
-                                title={order.archived ? "Désarchiver" : "Archiver"}
+                                title={t(order.archived ? "action.unarchive" : "action.archive")}
                                 onClick={() => toggleOrderArchive(order)}
                               >
                                 {order.archived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}
@@ -297,29 +310,29 @@ export function SalesPage() {
           <div className="toolbar">
             <label className="checkbox-row">
               <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-              <span>Afficher les clients archivés</span>
+              <span>{t("sales.showArchivedCustomers")}</span>
             </label>
           </div>
 
           {loading ? (
-            <p className="loading-text">Chargement des clients…</p>
+            <p className="loading-text">{t("sales.loadingCustomers")}</p>
           ) : visibleCustomers.length === 0 ? (
-            <EmptyState title="Aucun client" description="Ajoutez vos clients pour pouvoir créer des commandes." />
+            <EmptyState title={t("sales.noCustomers")} description={t("sales.noCustomersDesc")} />
           ) : (
             <div className="list-card">
               <div className="table-scroll">
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>Nom complet</th>
-                      <th>Email</th>
-                      <th>Téléphone</th>
-                      <th className="num">Commandes</th>
-                      <th className="num">Total acheté</th>
-                      <th className="num">Solde dû</th>
-                      <th>Statut</th>
-                      <th>Créé le</th>
-                      <th aria-label="Actions" />
+                      <th>{t("field.fullName")}</th>
+                      <th>{t("field.email")}</th>
+                      <th>{t("field.phone")}</th>
+                      <th className="num">{t("sales.col.orders")}</th>
+                      <th className="num">{t("sales.col.totalPurchased")}</th>
+                      <th className="num">{t("sales.col.balanceDue")}</th>
+                      <th>{t("field.status")}</th>
+                      <th>{t("sales.col.createdOn")}</th>
+                      <th aria-label={t("field.actions")} />
                     </tr>
                   </thead>
                   <tbody>
@@ -353,7 +366,7 @@ export function SalesPage() {
                           )}
                         </td>
                         <td>
-                          <Pill tone={customer.archived ? "neutral" : "ok"}>{customer.archived ? "Archivé" : "Actif"}</Pill>
+                          <Pill tone={customer.archived ? "neutral" : "ok"}>{t(customer.archived ? "state.archived" : "state.active")}</Pill>
                         </td>
                         <td className="tabular">{formatDate(customer.createdAt)}</td>
                         <td>
@@ -362,7 +375,7 @@ export function SalesPage() {
                               <button
                                 type="button"
                                 className="icon-button"
-                                title="Fiche"
+                                title={t("sales.file")}
                                 onClick={() => setModal({ kind: "customerDetail", customer })}
                               >
                                 <Eye size={16} strokeWidth={2} />
@@ -373,7 +386,7 @@ export function SalesPage() {
                                 <button
                                   type="button"
                                   className="icon-button"
-                                  title="Modifier"
+                                  title={t("action.edit")}
                                   onClick={() => setModal({ kind: "editCustomer", customer })}
                                 >
                                   <Pencil size={16} strokeWidth={2} />
@@ -381,7 +394,7 @@ export function SalesPage() {
                                 <button
                                   type="button"
                                   className="icon-button"
-                                  title={customer.archived ? "Désarchiver" : "Archiver"}
+                                  title={t(customer.archived ? "action.unarchive" : "action.archive")}
                                   onClick={() => toggleCustomerArchive(customer)}
                                 >
                                   {customer.archived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}

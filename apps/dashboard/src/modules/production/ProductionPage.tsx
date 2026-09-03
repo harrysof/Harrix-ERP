@@ -16,6 +16,7 @@ import { BatchMonitor } from "./BatchMonitor";
 import { BatchDetailModal } from "./BatchDetailModal";
 import { LossesPanel } from "./LossesPanel";
 import { NewBatchModal } from "./NewBatchModal";
+import { useI18n } from "../../state/LanguageContext";
 
 type Tab = "batches" | "losses";
 
@@ -31,6 +32,7 @@ const EMPTY_OPTIONS: FilterOptions = { machines: [], supervisors: [], operators:
  * exactly the batches listed next to them.
  */
 export function ProductionPage() {
+  const { t, tn } = useI18n();
   const [tab, setTab] = useState<Tab>("batches");
   const [filters, setFilters] = useState<BatchFilters>({});
 
@@ -44,6 +46,7 @@ export function ProductionPage() {
   const [creating, setCreating] = useState(false);
   const [openBatchId, setOpenBatchId] = useState<string | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
@@ -54,7 +57,7 @@ export function ProductionPage() {
         setSummary(nextSummary);
         setOptions(nextOptions);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger la production."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("prod.loadFailed")))
       .finally(() => setLoading(false));
   }, [filters]);
 
@@ -73,34 +76,33 @@ export function ProductionPage() {
 
       {investigations > 0 ? (
         <Banner tone="warn">
-          {investigations === 1 ? "1 lot présente un écart" : `${investigations} lots présentent un écart`} non expliqué entre la quantité
-          annoncée par la machine et la sortie comptabilisée. Ouvrez le lot pour enregistrer ce que la vérification a établi.
+          {t("prod.investigationBanner", { count: tn("prod.gapCount", investigations) })}
         </Banner>
       ) : null}
 
       <div className="toolbar">
         <div className="tab-strip">
           <button type="button" className={`tab-strip-item ${tab === "batches" ? "tab-strip-item-active" : ""}`} onClick={() => setTab("batches")}>
-            Lots de production
+            {t("prod.tabBatches")}
             {batches.length > 0 ? <span className="tab-strip-badge">{batches.length}</span> : null}
           </button>
           <button type="button" className={`tab-strip-item ${tab === "losses" ? "tab-strip-item-active" : ""}`} onClick={() => setTab("losses")}>
-            Pertes & rendement
+            {t("prod.tabLosses")}
           </button>
         </div>
         <div className="toolbar-actions">
           <Button variant="primary" onClick={() => setCreating(true)} disabled={finishedGoodsItems.length === 0}>
-            + Nouveau lot
+            {t("prod.newBatch")}
           </Button>
         </div>
       </div>
 
       {finishedGoodsItems.length === 0 && !loading ? (
-        <Banner tone="info">Ajoutez d'abord un produit fini dans l'onglet Stock — c'est ce qu'un lot de production fabrique.</Banner>
+        <Banner tone="info">{t("prod.needFinishedGood")}</Banner>
       ) : null}
 
       {loading ? (
-        <p className="loading-text">Chargement de la production…</p>
+        <p className="loading-text">{t("prod.loading")}</p>
       ) : tab === "batches" ? (
         <BatchMonitor
           batches={batches}

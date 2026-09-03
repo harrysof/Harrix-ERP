@@ -5,6 +5,7 @@ import { parsePermissions, serializePermissions, unknownPermissions } from '../a
 import type { CreateUserDto, UpdateUserDto, ResetPasswordDto } from './dto/create-user.dto.js';
 import type { CreateRoleDto, UpdateRoleDto } from './dto/role.dto.js';
 import type { AuthenticatedUser } from '../auth/current-user.js';
+import { t } from '../i18n/messages/index.js';
 
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
 
@@ -25,14 +26,14 @@ export class UsersService {
 
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
-    if (!user) throw new NotFoundException(`Utilisateur introuvable : ${id}`);
+    if (!user) throw new NotFoundException(t('users.userNotFound', { id }));
     return this.toPublic(user);
   }
 
   async create(dto: CreateUserDto) {
     const login = normalizeLogin(dto.login);
     const role = await this.prisma.role.findUnique({ where: { id: dto.roleId } });
-    if (!role) throw new BadRequestException(`Rôle inconnu : ${dto.roleId}`);
+    if (!role) throw new BadRequestException(t('users.unknownRole', { id: dto.roleId }));
 
     try {
       const user = await this.prisma.user.create({
@@ -47,7 +48,7 @@ export class UsersService {
       return this.toPublic(user);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException(`Un utilisateur avec l'identifiant "${login}" existe déjà.`);
+        throw new ConflictException(t('users.loginExists', { login }));
       }
       throw error;
     }
@@ -60,15 +61,15 @@ export class UsersService {
    */
   async update(id: string, dto: UpdateUserDto, actor: AuthenticatedUser) {
     const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
-    if (!user) throw new NotFoundException(`Utilisateur introuvable : ${id}`);
+    if (!user) throw new NotFoundException(t('users.userNotFound', { id }));
 
     if (dto.roleId && dto.roleId !== user.roleId) {
       const role = await this.prisma.role.findUnique({ where: { id: dto.roleId } });
-      if (!role) throw new BadRequestException(`Rôle inconnu : ${dto.roleId}`);
+      if (!role) throw new BadRequestException(t('users.unknownRole', { id: dto.roleId }));
       // Changing your own role could strip your own users:manage and lock the
       // factory out of its own administration.
       if (id === actor.id) {
-        throw new BadRequestException('Vous ne pouvez pas changer votre propre rôle. Demandez à un autre gérant.');
+        throw new BadRequestException(t('users.cannotChangeOwnRole'));
       }
     }
 
@@ -85,7 +86,7 @@ export class UsersService {
       return this.toPublic(updated);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException(`Un utilisateur avec cet identifiant existe déjà.`);
+        throw new ConflictException(t('users.loginExistsGeneric'));
       }
       throw error;
     }
@@ -99,11 +100,11 @@ export class UsersService {
    */
   async setActive(id: string, active: boolean, actor: AuthenticatedUser) {
     const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException(`Utilisateur introuvable : ${id}`);
+    if (!user) throw new NotFoundException(t('users.userNotFound', { id }));
 
     if (!active) {
       if (id === actor.id) {
-        throw new BadRequestException('Vous ne pouvez pas désactiver votre propre compte.');
+        throw new BadRequestException(t('users.cannotDeactivateSelf'));
       }
       await this.assertNotLastAdministrator(id);
     }
@@ -115,7 +116,7 @@ export class UsersService {
   /** The gérant setting a new password for someone who forgot theirs. */
   async resetPassword(id: string, dto: ResetPasswordDto) {
     const user = await this.prisma.user.findUnique({ where: { id } });
-    if (!user) throw new NotFoundException(`Utilisateur introuvable : ${id}`);
+    if (!user) throw new NotFoundException(t('users.userNotFound', { id }));
     await this.prisma.user.update({ where: { id }, data: { passwordHash: await hashPassword(dto.newPassword) } });
     return { id, passwordReset: true };
   }
@@ -153,21 +154,19 @@ export class UsersService {
       });
       return { ...role, permissions: parsePermissions(role.permissions) };
     } catch (error) {
-      if (isUniqueConstraintError(error)) throw new ConflictException(`Un rôle nommé "${dto.key}" existe déjà.`);
+      if (isUniqueConstraintError(error)) throw new ConflictException(t('users.roleKeyExists', { key: dto.key }));
       throw error;
     }
   }
 
   async updateRole(id: string, dto: UpdateRoleDto) {
     const role = await this.prisma.role.findUnique({ where: { id } });
-    if (!role) throw new NotFoundException(`Rôle introuvable : ${id}`);
+    if (!role) throw new NotFoundException(t('users.roleNotFound', { id }));
     if (dto.permissions) assertKnownPermissions(dto.permissions);
 
     // The protected role is the way back in when everything else is misconfigured.
     if (role.isProtected && dto.permissions) {
-      throw new BadRequestException(
-        `Les permissions du rôle "${role.label}" ne peuvent pas être modifiées — c'est le rôle qui garantit l'accès à l'administration.`,
-      );
+      throw new BadRequestException(t('users.protectedRolePermissionsLocked', { label: role.label }));
     }
 
     const updated = await this.prisma.role.update({
@@ -184,12 +183,10 @@ export class UsersService {
 
   async deleteRole(id: string) {
     const role = await this.prisma.role.findUnique({ where: { id }, include: { _count: { select: { users: true } } } });
-    if (!role) throw new NotFoundException(`Rôle introuvable : ${id}`);
-    if (role.isProtected) throw new BadRequestException(`Le rôle "${role.label}" ne peut pas être supprimé.`);
+    if (!role) throw new NotFoundException(t('users.roleNotFound', { id }));
+    if (role.isProtected) throw new BadRequestException(t('users.protectedRoleCannotDelete', { label: role.label }));
     if (role._count.users > 0) {
-      throw new ConflictException(
-        `${role._count.users} utilisateur(s) ont le rôle "${role.label}". Changez leur rôle avant de le supprimer.`,
-      );
+      throw new ConflictException(t('users.roleInUse', { count: role._count.users, label: role.label }));
     }
     await this.prisma.role.delete({ where: { id } });
     return { id, deleted: true };
@@ -210,9 +207,7 @@ export class UsersService {
     });
     const stillAdministrable = admins.some((u) => parsePermissions(u.role.permissions).includes('users:manage'));
     if (!stillAdministrable) {
-      throw new BadRequestException(
-        "C'est le dernier compte capable de gérer les utilisateurs. Donnez ce rôle à quelqu'un d'autre avant de le désactiver.",
-      );
+      throw new BadRequestException(t('users.lastAdministrator'));
     }
   }
 
@@ -246,7 +241,7 @@ function normalizeLogin(login: string): string {
 function assertKnownPermissions(permissions: string[]) {
   const unknown = unknownPermissions(permissions);
   if (unknown.length > 0) {
-    throw new BadRequestException(`Permission(s) inconnue(s) : ${unknown.join(', ')}`);
+    throw new BadRequestException(t('users.unknownPermissions', { names: unknown.join(', ') }));
   }
 }
 

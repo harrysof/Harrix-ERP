@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { ApiError } from "../../lib/api";
 import { createCustomer, updateCustomer, type ApiCustomer, type CustomerInput } from "../../lib/salesApi";
+import { useI18n } from "../../state/LanguageContext";
 
 /** §18: add / edit a customer, including the structured address §17 needs. */
 export function CustomerModal({
@@ -15,6 +16,7 @@ export function CustomerModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useI18n();
   const [form, setForm] = useState<CustomerInput>({
     fullName: customer?.fullName ?? "",
     email: customer?.email ?? "",
@@ -22,7 +24,7 @@ export function CustomerModal({
     address: customer?.address ?? "",
     city: customer?.city ?? "",
     province: customer?.province ?? "",
-    country: customer?.country ?? "Algérie",
+    country: customer?.country ?? t("customer.defaultCountry"),
     postalCode: customer?.postalCode ?? "",
     notes: customer?.notes ?? "",
   });
@@ -33,7 +35,7 @@ export function CustomerModal({
 
   async function handleSave() {
     setError(null);
-    if (!form.fullName.trim()) return setError("Le nom complet est obligatoire.");
+    if (!form.fullName.trim()) return setError(t("customer.err.fullName"));
 
     // Send only what was filled in — an empty string would fail email validation.
     const payload = Object.fromEntries(
@@ -47,7 +49,7 @@ export function CustomerModal({
       else await createCustomer(payload);
       onSaved();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSaving(false);
     }
@@ -55,48 +57,48 @@ export function CustomerModal({
 
   return (
     <Modal
-      title={customer ? `Modifier ${customer.fullName}` : "Nouveau client"}
+      title={customer ? t("customer.editTitle", { name: customer.fullName }) : t("customer.newTitle")}
       onClose={onClose}
       width={640}
       footer={
         <>
-          <Button onClick={onClose}>Annuler</Button>
+          <Button onClick={onClose}>{t("action.cancel")}</Button>
           <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Enregistrement…" : "Enregistrer"}
+            {saving ? t("action.saving") : t("action.save")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
-        <Field label="Nom complet">
+        <Field label={t("field.fullName")}>
           <input className="input" value={form.fullName} onChange={(e) => set({ fullName: e.target.value })} autoFocus />
         </Field>
         <div className="form-row">
-          <Field label="Email" hint="Facultatif">
+          <Field label={t("field.email")} hint={t("state.optional")}>
             <input className="input" type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} />
           </Field>
-          <Field label="Téléphone">
+          <Field label={t("field.phone")}>
             <input className="input" value={form.phone} onChange={(e) => set({ phone: e.target.value })} />
           </Field>
         </div>
-        <Field label="Adresse">
+        <Field label={t("field.address")}>
           <input className="input" value={form.address} onChange={(e) => set({ address: e.target.value })} />
         </Field>
         <div className="form-row">
-          <Field label="Ville">
+          <Field label={t("field.city")}>
             <input className="input" value={form.city} onChange={(e) => set({ city: e.target.value })} />
           </Field>
-          <Field label="Wilaya / province">
+          <Field label={t("customer.province")}>
             <input className="input" value={form.province} onChange={(e) => set({ province: e.target.value })} />
           </Field>
-          <Field label="Code postal">
+          <Field label={t("customer.postalCode")}>
             <input className="input" value={form.postalCode} onChange={(e) => set({ postalCode: e.target.value })} />
           </Field>
-          <Field label="Pays">
+          <Field label={t("customer.country")}>
             <input className="input" value={form.country} onChange={(e) => set({ country: e.target.value })} />
           </Field>
         </div>
-        <Field label="Notes">
+        <Field label={t("field.notes")}>
           <input className="input" value={form.notes} onChange={(e) => set({ notes: e.target.value })} />
         </Field>
         {error ? <p className="form-error">{error}</p> : null}

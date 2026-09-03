@@ -1,5 +1,6 @@
 import { IsIn, IsInt, IsISO8601, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { CONTRACT_TYPES, MARITAL_STATUSES } from '../payroll-math.js';
+import { t } from '../../i18n/messages/index.js';
 
 export class CreateEmployeeDto {
   @IsString()
@@ -40,7 +41,7 @@ export class CreateEmployeeDto {
   cnasNumber?: string;
 
   @IsOptional()
-  @IsIn(CONTRACT_TYPES, { message: 'Le type de contrat doit être CDI ou CDD.' })
+  @IsIn(CONTRACT_TYPES, { message: () => t('hr.contractTypeInvalid') })
   contractType?: string;
 
   /** Required when contractType is CDD — checked in the service, not here, since it depends on another field. */
@@ -49,7 +50,7 @@ export class CreateEmployeeDto {
   contractEndDate?: string;
 
   @IsOptional()
-  @IsIn(MARITAL_STATUSES, { message: 'Situation familiale invalide.' })
+  @IsIn(MARITAL_STATUSES, { message: () => t('hr.maritalStatusInvalid') })
   maritalStatus?: string;
 
   @IsOptional()
@@ -101,13 +102,13 @@ export class UpdateEmployeeDto {
   @IsOptional() @IsString() @MaxLength(30) cnasNumber?: string;
 
   @IsOptional()
-  @IsIn(CONTRACT_TYPES, { message: 'Le type de contrat doit être CDI ou CDD.' })
+  @IsIn(CONTRACT_TYPES, { message: () => t('hr.contractTypeInvalid') })
   contractType?: string;
 
   @IsOptional() @IsISO8601() contractEndDate?: string;
 
   @IsOptional()
-  @IsIn(MARITAL_STATUSES, { message: 'Situation familiale invalide.' })
+  @IsIn(MARITAL_STATUSES, { message: () => t('hr.maritalStatusInvalid') })
   maritalStatus?: string;
 
   @IsOptional() @IsInt() @Min(0) @Max(20) dependentChildren?: number;

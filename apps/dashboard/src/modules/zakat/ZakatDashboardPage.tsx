@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, Coins, Wallet, Scale, RefreshCw, HelpCircle } from "lucide-react";
 import { Banner } from "../../components/ui/Banner";
 import { Button } from "../../components/ui/Button";
+import { Rich } from "../../components/ui/Rich";
+import { useI18n } from "../../state/LanguageContext";
 import { StatCard } from "../../components/ui/StatCard";
 import { Pill } from "../../components/ui/Pill";
 import { ApiError } from "../../lib/api";
@@ -23,6 +25,7 @@ export function ZakatDashboardPage({ onNavigate }: { onNavigate: (tab: ZakatTab)
 
   const [live, setLive] = useState<ZakatLive | null>(null);
   const [pinned, setPinned] = useState<ApiZakatCalculation | null | undefined>(undefined);
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [refreshingGold, setRefreshingGold] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -34,7 +37,7 @@ export function ZakatDashboardPage({ onNavigate }: { onNavigate: (tab: ZakatTab)
         setLive(nextLive);
         setPinned(nextPinned);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger la Zakat."));
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("zk.loadFailed")));
   }, []);
 
   useEffect(() => {
@@ -47,13 +50,13 @@ export function ZakatDashboardPage({ onNavigate }: { onNavigate: (tab: ZakatTab)
       await refreshGoldPrice();
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Actualisation du prix de l'or impossible.");
+      setError(e instanceof ApiError ? e.message : t("zk.refreshGoldFailed"));
     } finally {
       setRefreshingGold(false);
     }
   }
 
-  if (!live || pinned === undefined) return <p className="loading-text">Chargement…</p>;
+  if (!live || pinned === undefined) return <p className="loading-text">{t("state.loading")}</p>;
 
   return (
     <div className="page-stack">
@@ -63,7 +66,7 @@ export function ZakatDashboardPage({ onNavigate }: { onNavigate: (tab: ZakatTab)
         <button
           type="button"
           className="icon-button"
-          title="À propos des dates hégiriennes"
+          title={t("zk.aboutHijriDates")}
           aria-expanded={showHelp}
           onClick={() => setShowHelp((v) => !v)}
         >
@@ -72,33 +75,43 @@ export function ZakatDashboardPage({ onNavigate }: { onNavigate: (tab: ZakatTab)
       </div>
       {showHelp ? (
         <Banner tone="warn">
-          Les dates hégiriennes affichées sur cette page sont des <strong>estimations par calcul arithmétique</strong>{" "}
-          (calendrier tabulaire), pas des dates confirmées par observation de la lune — elles peuvent différer d'un jour ou
-          deux du calendrier local. Vérifiez auprès d'un savant ou d'une institution de référence avant le paiement.
+          <Rich text={t("zk.hijriHelpFull")} parts={{ lead: <strong>{t("zk.hijriEstimateLead")}</strong> }} />
         </Banner>
       ) : null}
 
       <section>
         <div className="inventory-heading">
           <h2 className="section-title" style={{ marginBottom: 0 }}>
-            Estimation automatique
+            {t("zk.autoEstimate")}
           </h2>
           <p className="inventory-description">
-            Banque (ventes payées), produits finis, matières premières et créances sont recalculés en direct depuis Stock et
-            Ventes. Caisse et déductions ne sont pas suivies automatiquement (comptées à 0 ici) — affinez dans « Calcul de la
-            Zakat ».
+            {t("zk.autoRecomputed")}
           </p>
         </div>
 
         <div className="stat-grid">
-          <StatCard icon={Wallet} label="Banque (ventes payées)" value={formatCurrency(live.bank)} hint="Live" />
-          <StatCard icon={Wallet} label="Produits finis + matières" value={formatCurrency(live.finishedGoodsValue + live.rawMaterialsValue)} hint="Live — Stock" />
-          <StatCard icon={Wallet} label="Créances (expédié, non payé)" value={formatCurrency(live.receivablesValue)} hint="Live — Ventes" />
+          <StatCard icon={Wallet} label={t("zk.bankFromPaid")} value={formatCurrency(live.bank)} hint={t("zk.live")} />
+          <StatCard
+            icon={Wallet}
+            label={t("zk.finishedAndMaterials")}
+            value={formatCurrency(live.finishedGoodsValue + live.rawMaterialsValue)}
+            hint={t("zk.liveStock")}
+          />
+          <StatCard
+            icon={Wallet}
+            label={t("zk.receivablesShipped")}
+            value={formatCurrency(live.receivablesValue)}
+            hint={t("zk.liveSales")}
+          />
           <StatCard
             icon={Coins}
-            label="Prix de l'or"
+            label={t("zk.goldPrice")}
             value={formatCurrency(live.goldPrice.pricePerGram)}
-            hint={`${live.goldPrice.source} — ${formatDate(live.goldPrice.fetchedAt)}${live.goldPrice.stale ? " (en cache)" : ""}`}
+            hint={t("zk.goldSourceHint", {
+              source: live.goldPrice.source,
+              date: formatDate(live.goldPrice.fetchedAt),
+              stale: live.goldPrice.stale ? t("zk.goldCached") : "",
+            })}
             tone={live.goldPrice.stale ? "warn" : "neutral"}
           />
         </div>
@@ -107,59 +120,70 @@ export function ZakatDashboardPage({ onNavigate }: { onNavigate: (tab: ZakatTab)
           <div style={{ marginTop: 10 }}>
             <Button variant="ghost" onClick={handleRefreshGold} disabled={refreshingGold}>
               <RefreshCw size={14} strokeWidth={2} />
-              {refreshingGold ? "Actualisation…" : "Actualiser le prix de l'or"}
+              {refreshingGold ? t("zk.refreshing") : t("zk.refreshGold")}
             </Button>
           </div>
         ) : null}
 
         <div className={`zakat-due-banner ${live.belowNisab ? "zakat-due-banner-danger" : "zakat-due-banner-ok"}`} style={{ marginTop: 14 }}>
           <span className="zakat-due-banner-label">
-            {live.belowNisab ? "Estimation : sous le nisab, aucune Zakat due" : "Estimation : Zakat probablement due"}
+            {t(live.belowNisab ? "zk.estimateBelowNisab" : "zk.estimateDue")}
           </span>
           <span className="zakat-due-banner-value">{formatCurrency(live.zakatDue)}</span>
         </div>
         <p className="zakat-due-explain">
-          Patrimoine estimé ({formatCurrency(live.totalAssets)}) {live.belowNisab ? "<" : "≥"} nisab actuel (
-          {formatCurrency(live.nisabValue)}, 85 g d'or){live.belowNisab ? " — en dessous du seuil, aucune Zakat n'est due." : "."}
+          {t("zk.assetsVsNisab", {
+            assets: formatCurrency(live.totalAssets),
+            comparator: live.belowNisab ? "<" : "≥",
+            nisab: formatCurrency(live.nisabValue),
+            suffix: live.belowNisab ? t("zk.belowThresholdSuffix") : ".",
+          })}
         </p>
         <p className="field-hint">
-          Échéance si le hawl commençait aujourd'hui : {live.dueDateHijriLabel} ({formatDate(live.dueDate)}).
+          {t("zk.dueIfHawlToday", { hijri: live.dueDateHijriLabel, date: formatDate(live.dueDate) })}
         </p>
       </section>
 
       <section>
         <div className="inventory-heading">
           <h2 className="section-title" style={{ marginBottom: 0 }}>
-            Dernier calcul officiel
+            {t("zk.lastOfficial")}
           </h2>
           {writable ? (
             <Button variant="secondary" onClick={() => onNavigate("calculation")}>
-              {pinned ? "Refaire un calcul" : "+ Faire un calcul"}
+              {t(pinned ? "zk.redoCalculation" : "zk.newCalculation")}
             </Button>
           ) : null}
         </div>
 
         {pinned === null ? (
           <Banner tone="info">
-            Aucun calcul n'a encore été exporté vers le tableau de bord. Faites un calcul complet (caisse, déductions…) dans
-            l'onglet « Calcul de la Zakat », puis exportez-le ici.
+            {t("zk.nothingPinned")}
           </Banner>
         ) : (
           <>
             <Banner tone="info">
-              Calculé le {formatDate(pinned.calculationDate)} ({pinned.calculationHijriLabel}).
+              {t("zk.calculatedOn", {
+                date: formatDate(pinned.calculationDate),
+                hijri: pinned.calculationHijriLabel,
+              })}
             </Banner>
             <div className="stat-grid">
-              <StatCard icon={CalendarDays} label="Échéance de la Zakat" value={pinned.dueDateHijriLabel} hint={formatDate(pinned.dueDate)} />
-              <StatCard icon={Scale} label="Base nette de Zakat" value={formatCurrency(pinned.zakatableBase)} />
               <StatCard
-                label="Zakat due"
-                value={pinned.belowNisab ? "Aucune (sous le nisab)" : formatCurrency(pinned.zakatDue)}
+                icon={CalendarDays}
+                label={t("zk.dueDate")}
+                value={pinned.dueDateHijriLabel}
+                hint={formatDate(pinned.dueDate)}
+              />
+              <StatCard icon={Scale} label={t("zk.netBase")} value={formatCurrency(pinned.zakatableBase)} />
+              <StatCard
+                label={t("zk.due")}
+                value={pinned.belowNisab ? t("zk.noneBelowNisab") : formatCurrency(pinned.zakatDue)}
                 tone={pinned.belowNisab ? "ok" : pinned.paymentStatus === "PAID" ? "ok" : "warn"}
               />
               <StatCard
-                label="Statut de paiement"
-                value={<Pill tone={pinned.paymentStatus === "PAID" ? "ok" : pinned.paymentStatus === "PARTIALLY_PAID" ? "warn" : "danger"}>{ZAKAT_PAYMENT_STATUS_LABELS[pinned.paymentStatus]}</Pill>}
+                label={t("zk.paymentStatus")}
+                value={<Pill tone={pinned.paymentStatus === "PAID" ? "ok" : pinned.paymentStatus === "PARTIALLY_PAID" ? "warn" : "danger"}>{t(ZAKAT_PAYMENT_STATUS_LABELS[pinned.paymentStatus])}</Pill>}
               />
             </div>
           </>

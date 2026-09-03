@@ -13,6 +13,7 @@ import {
   type ApiUser,
 } from "../../lib/authApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
 import { UserModal } from "./UserModal";
 import { ResetPasswordModal } from "./ResetPasswordModal";
 import { RolesPanel } from "./RolesPanel";
@@ -29,6 +30,7 @@ type Modal = { kind: "none" } | { kind: "create" } | { kind: "edit"; user: ApiUs
  */
 export function UsersPage() {
   const { user: currentUser } = useAuth();
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("users");
   const [users, setUsers] = useState<ApiUser[]>([]);
   const [roles, setRoles] = useState<ApiRole[]>([]);
@@ -36,6 +38,7 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<Modal>({ kind: "none" });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(() => {
     setLoading(true);
     return Promise.all([fetchUsers(true), fetchRoles()])
@@ -44,7 +47,7 @@ export function UsersPage() {
         setRoles(nextRoles);
         setError(null);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les utilisateurs."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("adm.loadUsersFailed")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -53,14 +56,14 @@ export function UsersPage() {
   }, [load]);
 
   async function toggleActive(user: ApiUser) {
-    const verb = user.active ? "Désactiver" : "Réactiver";
-    if (!window.confirm(`${verb} le compte de ${user.fullName} ?`)) return;
+    const verb = t(user.active ? "adm.deactivate" : "adm.reactivate");
+    if (!window.confirm(t("adm.confirmToggleActive", { verb, name: user.fullName }))) return;
     setError(null);
     try {
       await setUserActive(user.id, !user.active);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Action impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.action"));
     }
   }
 
@@ -71,39 +74,39 @@ export function UsersPage() {
       <div className="toolbar">
         <div className="tab-strip">
           <button type="button" className={`tab-strip-item ${tab === "users" ? "tab-strip-item-active" : ""}`} onClick={() => setTab("users")}>
-            Utilisateurs
+            {t("adm.tabUsers")}
             {users.length > 0 ? <span className="tab-strip-badge">{users.length}</span> : null}
           </button>
           <button type="button" className={`tab-strip-item ${tab === "roles" ? "tab-strip-item-active" : ""}`} onClick={() => setTab("roles")}>
-            Rôles & permissions
+            {t("adm.tabRoles")}
           </button>
         </div>
         {tab === "users" ? (
           <div className="toolbar-actions">
             <Button variant="primary" onClick={() => setModal({ kind: "create" })}>
-              + Nouvel utilisateur
+              {t("adm.newUser")}
             </Button>
           </div>
         ) : null}
       </div>
 
       {loading ? (
-        <p className="loading-text">Chargement…</p>
+        <p className="loading-text">{t("state.loading")}</p>
       ) : tab === "roles" ? (
         <RolesPanel roles={roles} onChanged={load} />
       ) : users.length === 0 ? (
-        <EmptyState title="Aucun utilisateur" />
+        <EmptyState title={t("adm.noUsers")} />
       ) : (
         <div className="table-scroll">
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Nom</th>
-                <th>Identifiant</th>
-                <th>Rôle</th>
-                <th>Dernière connexion</th>
-                <th>Statut</th>
-                <th>Actions</th>
+                <th>{t("field.name")}</th>
+                <th>{t("login.identifier")}</th>
+                <th>{t("adm.role")}</th>
+                <th>{t("adm.col.lastLogin")}</th>
+                <th>{t("field.status")}</th>
+                <th>{t("field.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -113,28 +116,28 @@ export function UsersPage() {
                   <tr key={user.id} className={user.active ? undefined : "row-muted"}>
                     <td>
                       {user.fullName}
-                      {isSelf ? <span className="muted"> (vous)</span> : null}
+                      {isSelf ? <span className="muted"> {t("adm.you")}</span> : null}
                     </td>
                     <td className="tabular">{user.login}</td>
                     <td>{user.role.label}</td>
-                    <td className="tabular">{user.lastLoginAt ? formatDate(user.lastLoginAt) : <span className="muted">jamais</span>}</td>
+                    <td className="tabular">{user.lastLoginAt ? formatDate(user.lastLoginAt) : <span className="muted">{t("adm.never")}</span>}</td>
                     <td>
-                      <Pill tone={user.active ? "ok" : "neutral"}>{user.active ? "Actif" : "Désactivé"}</Pill>
+                      <Pill tone={user.active ? "ok" : "neutral"}>{t(user.active ? "state.active" : "adm.deactivated")}</Pill>
                     </td>
                     <td>
                       <div className="row-actions">
                         <Button variant="ghost" onClick={() => setModal({ kind: "edit", user })}>
-                          Modifier
+                          {t("action.edit")}
                         </Button>
                         <Button variant="ghost" onClick={() => setModal({ kind: "password", user })}>
-                          Mot de passe
+                          {t("adm.password")}
                         </Button>
                         {/* The backend refuses this for yourself and for the
                             last administrator; hiding it for yourself just
                             avoids offering a button that always fails. */}
                         {isSelf ? null : (
                           <Button variant={user.active ? "danger" : "secondary"} onClick={() => toggleActive(user)}>
-                            {user.active ? "Désactiver" : "Réactiver"}
+                            {t(user.active ? "adm.deactivate" : "adm.reactivate")}
                           </Button>
                         )}
                       </div>

@@ -1,4 +1,5 @@
-import { formatCurrency } from "../../lib/format";
+import { formatCurrency, formatPercent } from "../../lib/format";
+import { useI18n } from "../../state/LanguageContext";
 
 /**
  * §16/§17's totals block: subtotal, shipping, discount, tax, total.
@@ -20,22 +21,23 @@ export function OrderTotalsPanel({
     total: number;
   };
 }) {
+  const { t } = useI18n();
   const taxLabel =
     totals.taxRate != null && totals.taxRate > 0
-      ? `Taxe (${(totals.taxRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)`
-      : "Taxe";
+      ? t("totals.taxPercent", { rate: formatPercent(totals.taxRate) })
+      : t("totals.tax");
   const discountLabel =
     totals.discountType === "PERCENT" && totals.discountRate
-      ? `Remise (${(totals.discountRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)`
-      : "Remise";
+      ? t("totals.discountPercent", { rate: formatPercent(totals.discountRate) })
+      : t("totals.discount");
   return (
     <div className="totals-panel">
-      <Row label="Sous-total" value={totals.subtotal} />
-      {totals.lineDiscounts ? <Row label="dont remises par ligne" value={-totals.lineDiscounts} muted /> : null}
-      <Row label="Livraison" value={totals.shipping} />
+      <Row label={t("totals.subtotal")} value={totals.subtotal} />
+      {totals.lineDiscounts ? <Row label={t("totals.lineDiscounts")} value={-totals.lineDiscounts} muted /> : null}
+      <Row label={t("totals.shipping")} value={totals.shipping} />
       <Row label={discountLabel} value={-totals.discount} />
       <Row label={taxLabel} value={totals.tax} />
-      <Row label="Total" value={totals.total} strong />
+      <Row label={t("totals.total")} value={totals.total} strong />
     </div>
   );
 }

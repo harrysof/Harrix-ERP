@@ -3,6 +3,8 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { formatNumber } from "../../lib/format";
 import type { LossGroup, ProductionSummary } from "../../lib/productionApi";
 import { formatRate } from "./types";
+import { useI18n } from "../../state/LanguageContext";
+import type { TranslationKey } from "../../lib/i18n";
 
 /**
  * Waste and loss management: the losses that would otherwise disappear inside
@@ -13,13 +15,14 @@ import { formatRate } from "./types";
  * table is sorted worst-first by the backend.
  */
 export function LossesPanel({ summary }: { summary: ProductionSummary }) {
+  const { t } = useI18n();
   const { totals } = summary;
 
   if (totals.batchCount === 0) {
     return (
       <EmptyState
-        title="Aucune sortie déclarée sur cette période"
-        description="Les pertes et le rendement se calculent à partir des lots dont la sortie a été déclarée."
+        title={t("prod.noOutputPeriod")}
+        description={t("prod.noOutputPeriodDesc")}
       />
     );
   }
@@ -27,54 +30,81 @@ export function LossesPanel({ summary }: { summary: ProductionSummary }) {
   return (
     <div className="page-stack">
       <div className="stat-grid">
-        <StatCard label="Rendement (1er choix)" value={formatRate(totals.rates.yieldRate)} hint={`${formatNumber(totals.firstChoice)} unités`} tone="ok" />
-        <StatCard label="Taux 2ème choix" value={formatRate(totals.rates.secondChoiceRate)} hint={`${formatNumber(totals.secondChoice)} unités`} tone="warn" />
-        <StatCard label="Taux de rebut" value={formatRate(totals.rates.wasteRate)} hint={`${formatNumber(totals.waste)} unités`} tone="warn" />
         <StatCard
-          label="Taux non comptabilisé"
+          label={t("prod.yieldRate")}
+          value={formatRate(totals.rates.yieldRate)}
+          hint={t("prod.units", { count: formatNumber(totals.firstChoice) })}
+          tone="ok"
+        />
+        <StatCard
+          label={t("prod.secondRate")}
+          value={formatRate(totals.rates.secondChoiceRate)}
+          hint={t("prod.units", { count: formatNumber(totals.secondChoice) })}
+          tone="warn"
+        />
+        <StatCard
+          label={t("prod.wasteRate")}
+          value={formatRate(totals.rates.wasteRate)}
+          hint={t("prod.units", { count: formatNumber(totals.waste) })}
+          tone="warn"
+        />
+        <StatCard
+          label={t("prod.unknownRate")}
           value={formatRate(totals.rates.unknownRate)}
-          hint={`${formatNumber(totals.unknown)} unités sur ${formatNumber(totals.expected)} attendues`}
+          hint={t("prod.unitsOfExpected", {
+            count: formatNumber(totals.unknown),
+            expected: formatNumber(totals.expected),
+          })}
           tone={totals.unknown === 0 ? "ok" : "danger"}
         />
       </div>
 
       <div className="stat-grid">
-        <StatCard label="Lots comptés" value={formatNumber(totals.batchCount)} hint="Sortie déclarée" />
-        <StatCard label="Lots en cours" value={formatNumber(summary.runningBatches)} hint="Sortie pas encore déclarée" />
+        <StatCard label={t("prod.batchesCounted")} value={formatNumber(totals.batchCount)} hint={t("prod.outputDeclared")} />
         <StatCard
-          label="Investigations ouvertes"
+          label={t("prod.batchesRunning")}
+          value={formatNumber(summary.runningBatches)}
+          hint={t("prod.outputNotYet")}
+        />
+        <StatCard
+          label={t("prod.openInvestigations")}
           value={formatNumber(summary.openInvestigations)}
-          hint="Écarts sans explication enregistrée"
+          hint={t("prod.openInvestigationsHint")}
           tone={summary.openInvestigations > 0 ? "danger" : "ok"}
         />
-        <StatCard label="Total comptabilisé" value={formatNumber(totals.accounted)} hint={`sur ${formatNumber(totals.expected)} attendues`} />
+        <StatCard
+          label={t("prod.totalAccounted")}
+          value={formatNumber(totals.accounted)}
+          hint={t("prod.ofExpected", { expected: formatNumber(totals.expected) })}
+        />
       </div>
 
-      <LossTable title="Pertes par produit" groups={summary.byProduct} unitLabel="Produit" />
-      <LossTable title="Pertes par machine" groups={summary.byMachine} unitLabel="Machine" />
-      <LossTable title="Pertes par période" groups={summary.byPeriod} unitLabel="Mois" />
+      <LossTable title="prod.lossesByProduct" groups={summary.byProduct} unitLabel="prod.groupProduct" />
+      <LossTable title="prod.lossesByMachine" groups={summary.byMachine} unitLabel="prod.groupMachine" />
+      <LossTable title="prod.lossesByPeriod" groups={summary.byPeriod} unitLabel="prod.groupMonth" />
     </div>
   );
 }
 
-function LossTable({ title, groups, unitLabel }: { title: string; groups: LossGroup[]; unitLabel: string }) {
+function LossTable({ title, groups, unitLabel }: { title: TranslationKey; groups: LossGroup[]; unitLabel: TranslationKey }) {
+  const { t } = useI18n();
   if (groups.length === 0) return null;
 
   return (
     <section>
-      <h3 className="section-title">{title}</h3>
+      <h3 className="section-title">{t(title)}</h3>
       <div className="table-scroll">
         <table className="stock-table">
           <thead>
             <tr>
-              <th>{unitLabel}</th>
-              <th className="num">Lots</th>
-              <th className="num">Attendu</th>
-              <th className="num">Rebut</th>
-              <th className="num">Non comptabilisé</th>
-              <th className="num">Rendement</th>
-              <th className="num">Taux rebut</th>
-              <th className="num">Taux non compt.</th>
+              <th>{t(unitLabel)}</th>
+              <th className="num">{t("prod.col.batches")}</th>
+              <th className="num">{t("prod.col.expected")}</th>
+              <th className="num">{t("prod.col.waste")}</th>
+              <th className="num">{t("prod.col.unknown")}</th>
+              <th className="num">{t("prod.col.yield")}</th>
+              <th className="num">{t("prod.col.wasteRate")}</th>
+              <th className="num">{t("prod.col.unknownRate")}</th>
             </tr>
           </thead>
           <tbody>

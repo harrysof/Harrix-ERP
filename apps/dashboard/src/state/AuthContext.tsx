@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { configureAuth } from "../lib/api";
+import { formatLanguage } from "../lib/format";
+import { translate } from "../lib/i18n";
 import { fetchMe, login as loginRequest, readToken, writeToken, type AuthUser, type Permission } from "../lib/authApi";
 
 interface AuthContextValue {
@@ -40,7 +42,7 @@ configureAuth({
     if (!currentToken) return;
     currentToken = null;
     writeToken(null);
-    onSessionCleared?.("Votre session a expiré ou votre compte a été désactivé. Reconnectez-vous.");
+    onSessionCleared?.(translate(formatLanguage(), "session.expired"));
   },
 });
 

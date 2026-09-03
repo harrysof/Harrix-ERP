@@ -1,12 +1,13 @@
 import { IsIn, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ZAKAT_METHODOLOGIES } from '../zakat-math.js';
+import { t } from '../../i18n/messages/index.js';
 
 export class CreateZakatCalculationDto {
   @IsISO8601()
   calculationDate!: string;
 
   @IsOptional()
-  @IsIn(ZAKAT_METHODOLOGIES, { message: 'La méthodologie doit être LUNAR ou SOLAR.' })
+  @IsIn(ZAKAT_METHODOLOGIES, { message: () => t('zakat.methodologyInvalid') })
   methodology?: string;
 
   @IsNumber()

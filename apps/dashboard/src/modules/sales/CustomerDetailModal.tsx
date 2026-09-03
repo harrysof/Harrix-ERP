@@ -19,6 +19,7 @@ import {
   type CustomerDetail,
 } from "../../lib/salesApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
 
 interface Props {
   customer: ApiCustomer;
@@ -35,14 +36,16 @@ interface Props {
  */
 export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOpenOrder }: Props) {
   const { can } = useAuth();
+  const { t } = useI18n();
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(() => {
     return fetchCustomer(customer.id)
       .then(setDetail)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger la fiche client."));
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("customer.loadFailed")));
   }, [customer.id]);
 
   useEffect(() => {
@@ -58,7 +61,7 @@ export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOp
       onChanged();
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Action impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.action"));
       return false;
     } finally {
       setBusy(false);
@@ -74,11 +77,11 @@ export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOp
       width={880}
       footer={
         <>
-          <Button onClick={onClose}>Fermer</Button>
-          {writable ? <Button onClick={() => onEdit(customer)}>Modifier</Button> : null}
+          <Button onClick={onClose}>{t("action.close")}</Button>
+          {writable ? <Button onClick={() => onEdit(customer)}>{t("action.edit")}</Button> : null}
           {writable && detail ? (
             <Button variant="ghost" disabled={busy} onClick={() => run(() => setCustomerArchived(customer.id, !detail.archived))}>
-              {detail.archived ? "Désarchiver" : "Archiver"}
+              {t(detail.archived ? "action.unarchive" : "action.archive")}
             </Button>
           ) : null}
           {writable && detail && detail.orders.length === 0 ? (
@@ -86,12 +89,12 @@ export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOp
               variant="danger"
               disabled={busy}
               onClick={() => {
-                if (window.confirm(`Supprimer définitivement ${customer.fullName} ?`)) {
+                if (window.confirm(t("customer.confirmDelete", { name: customer.fullName }))) {
                   run(() => deleteCustomer(customer.id)).then((ok) => ok && onClose());
                 }
               }}
             >
-              Supprimer
+              {t("action.delete")}
             </Button>
           ) : null}
         </>
@@ -100,49 +103,63 @@ export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOp
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       {!detail ? (
-        <p className="loading-text">Chargement…</p>
+        <p className="loading-text">{t("state.loading")}</p>
       ) : (
         <div className="form-stack">
           <div className="stat-grid">
-            <StatCard label="Commandes" value={detail.summary.orderCount} hint="Hors commandes annulées" />
-            <StatCard label="Total acheté" value={formatCurrency(detail.summary.totalPurchased)} />
             <StatCard
-              label="Solde dû"
+              label={t("sales.col.orders")}
+              value={detail.summary.orderCount}
+              hint={t("customer.excludingCancelled")}
+            />
+            <StatCard label={t("sales.col.totalPurchased")} value={formatCurrency(detail.summary.totalPurchased)} />
+            <StatCard
+              label={t("sales.col.balanceDue")}
               value={formatCurrency(detail.summary.outstandingBalance)}
-              hint="Commandes non payées"
+              hint={t("customer.unpaidOrders")}
               tone={detail.summary.outstandingBalance > 0 ? "danger" : "ok"}
             />
-            <StatCard label="Client depuis" value={formatDate(detail.createdAt)} />
+            <StatCard label={t("customer.since")} value={formatDate(detail.createdAt)} />
           </div>
 
           <section>
-            <h4 className="section-title">Profil</h4>
+            <h4 className="section-title">{t("customer.profile")}</h4>
             <div className="batch-meta">
-              <Meta label="Référence" value={detail.code} />
-              <Meta label="Email" value={detail.email ?? "—"} />
-              <Meta label="Téléphone" value={detail.phone ?? "—"} />
-              <Meta label="Statut" value={<Pill tone={detail.archived ? "neutral" : "ok"}>{detail.archived ? "Archivé" : "Actif"}</Pill>} />
-              <Meta label="Adresse" value={detail.address ?? "—"} />
-              <Meta label="Ville" value={[detail.postalCode, detail.city].filter(Boolean).join(" ") || "—"} />
-              <Meta label="Wilaya / pays" value={[detail.province, detail.country].filter(Boolean).join(", ") || "—"} />
+              <Meta label={t("field.reference")} value={detail.code} />
+              <Meta label={t("field.email")} value={detail.email ?? "—"} />
+              <Meta label={t("field.phone")} value={detail.phone ?? "—"} />
+              <Meta
+                label={t("field.status")}
+                value={
+                  <Pill tone={detail.archived ? "neutral" : "ok"}>
+                    {t(detail.archived ? "state.archived" : "state.active")}
+                  </Pill>
+                }
+              />
+              <Meta label={t("field.address")} value={detail.address ?? "—"} />
+              <Meta label={t("customer.cityLabel")} value={[detail.postalCode, detail.city].filter(Boolean).join(" ") || "—"} />
+              <Meta
+                label={t("customer.provinceCountry")}
+                value={[detail.province, detail.country].filter(Boolean).join(", ") || "—"}
+              />
             </div>
             {detail.notes ? <p className="batch-notes">{detail.notes}</p> : null}
           </section>
 
           <section>
-            <h4 className="section-title">Historique des commandes</h4>
+            <h4 className="section-title">{t("customer.orderHistory")}</h4>
             {detail.orders.length === 0 ? (
-              <EmptyState title="Aucune commande" description="Ce client n'a pas encore commandé." />
+              <EmptyState title={t("sales.noOrders")} description={t("customer.neverOrdered")} />
             ) : (
               <div className="table-scroll">
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>N°</th>
-                      <th>Date</th>
-                      <th>Expédition</th>
-                      <th>Paiement</th>
-                      <th className="num">Total</th>
+                      <th>{t("field.number")}</th>
+                      <th>{t("field.date")}</th>
+                      <th>{t("sales.shipment")}</th>
+                      <th>{t("field.payment")}</th>
+                      <th className="num">{t("field.total")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -162,10 +179,10 @@ export function CustomerDetailModal({ customer, onClose, onChanged, onEdit, onOp
                         </td>
                         <td className="tabular">{formatDate(order.date)}</td>
                         <td>
-                          <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>{SHIPMENT_LABELS[order.shipmentStatus]}</Pill>
+                          <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>{t(SHIPMENT_LABELS[order.shipmentStatus])}</Pill>
                         </td>
                         <td>
-                          <Pill tone={PAYMENT_TONES[order.paymentStatus]}>{PAYMENT_LABELS[order.paymentStatus]}</Pill>
+                          <Pill tone={PAYMENT_TONES[order.paymentStatus]}>{t(PAYMENT_LABELS[order.paymentStatus])}</Pill>
                         </td>
                         <td className="tabular num">{formatCurrency(order.totals.total)}</td>
                       </tr>

@@ -3,8 +3,9 @@ import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Banner } from "../../components/ui/Banner";
+import { useI18n } from "../../state/LanguageContext";
 import { ApiError } from "../../lib/api";
-import { formatCurrency } from "../../lib/format";
+import { formatCurrency, formatPercent } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import type { ApiItem } from "../../lib/stockApi";
 import type { Supplier } from "../../lib/suppliersApi";
@@ -22,6 +23,7 @@ interface PurchaseOrderModalProps {
 
 /** §14: create or edit a purchase order. Totals update live as you type. */
 export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }: PurchaseOrderModalProps) {
+  const { t } = useI18n();
   const editing = Boolean(order);
   const [supplierId, setSupplierId] = useState(order?.supplierId ?? suppliers[0]?.id ?? "");
   const [date, setDate] = useState(order ? order.date.slice(0, 10) : todayIso());
@@ -63,15 +65,15 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
 
   async function handleSave() {
     setError(null);
-    if (!supplierId) return setError("Choisissez un fournisseur.");
-    if (activeLines.length === 0) return setError("Ajoutez au moins une ligne avec une quantité.");
+    if (!supplierId) return setError(t("po.err.supplier"));
+    if (activeLines.length === 0) return setError(t("po.err.lines"));
     for (const line of lines) {
-      if (line.itemId && line.quantity <= 0) return setError(`Indiquez une quantité pour « ${line.itemName} ».`);
+      if (line.itemId && line.quantity <= 0) return setError(t("po.err.lineQuantity", { item: line.itemName }));
     }
 
     const deposit = Number(amountPaid) || 0;
     if (!editing && deposit > totals.total) {
-      return setError(`Le paiement initial (${deposit} DZD) dépasse le total du bon de commande (${totals.total} DZD).`);
+      return setError(t("po.err.deposit", { paid: formatCurrency(deposit), total: formatCurrency(totals.total) }));
     }
 
     setSaving(true);
@@ -89,7 +91,7 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
       else await createPurchaseOrder(payload);
       onSaved();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSaving(false);
     }
@@ -97,23 +99,23 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
 
   return (
     <Modal
-      title={editing ? `Modifier ${order!.code}` : "Nouveau bon de commande"}
+      title={editing ? t("po.editTitle", { code: order!.code }) : t("po.newTitle")}
       onClose={onClose}
       width={880}
       footer={
         <>
-          <Button onClick={onClose}>Annuler</Button>
+          <Button onClick={onClose}>{t("action.cancel")}</Button>
           <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Enregistrement…" : "Enregistrer"}
+            {saving ? t("action.saving") : t("action.save")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
         <div className="form-row">
-          <Field label="Fournisseur">
+          <Field label={t("field.supplier")}>
             <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-              <option value="">— Choisir —</option>
+              <option value="">{t("po.choose")}</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -121,14 +123,14 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
               ))}
             </select>
           </Field>
-          <Field label="Date">
+          <Field label={t("field.date")}>
             <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
-          <Field label="Livraison prévue" hint="Facultatif">
+          <Field label={t("po.expectedDelivery")} hint={t("state.optional")}>
             <input className="input" type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
           </Field>
           {!editing ? (
-            <Field label="Paiement initial (DZD)" hint="Facultatif — un acompte versé au fournisseur, par ex. la moitié maintenant">
+            <Field label={t("po.deposit")} hint={t("po.depositHint")}>
               <input
                 className="input"
                 type="number"
@@ -145,11 +147,11 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
 
         <div>
           <p className="field-label" style={{ marginBottom: 8 }}>
-            Articles commandés
+            {t("po.orderedItems")}
           </p>
           {lines.map((line, i) => (
             <div className="material-line" key={i}>
-              <Field label="Article">
+              <Field label={t("field.item")}>
                 <select
                   className="input"
                   value={line.itemId}
@@ -158,15 +160,15 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
                     updateLine(i, { itemId: e.target.value, itemName: item?.name ?? "", unit: item?.unit ?? "" });
                   }}
                 >
-                  <option value="">— Choisir —</option>
+                  <option value="">{t("po.choose")}</option>
                   {items.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} ({item.reference})
+                      {t("po.itemWithReference", { name: item.name, reference: item.reference })}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label={`Quantité${line.unit ? ` (${line.unit})` : ""}`}>
+              <Field label={line.unit ? t("po.quantityWithUnit", { unit: line.unit }) : t("po.quantity")}>
                 <input
                   className="input"
                   type="number"
@@ -176,7 +178,7 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
                   onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
                 />
               </Field>
-              <Field label="Prix unitaire (DZD)">
+              <Field label={t("po.unitCostLabel")}>
                 <input
                   className="input"
                   type="number"
@@ -186,23 +188,23 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
                   onChange={(e) => updateLine(i, { unitCost: Number(e.target.value) })}
                 />
               </Field>
-              <Button variant="ghost" onClick={() => setLines((prev) => prev.filter((_, xi) => xi !== i))} aria-label="Retirer">
+              <Button variant="ghost" onClick={() => setLines((prev) => prev.filter((_, xi) => xi !== i))} aria-label={t("action.remove")}>
                 ✕
               </Button>
             </div>
           ))}
           <Button variant="ghost" onClick={() => setLines((prev) => [...prev, emptyPoLine()])} style={{ marginTop: 8 }}>
-            + Ajouter une ligne
+            {t("po.addLine")}
           </Button>
         </div>
 
         <div className="form-row">
-          <Field label="Transport (DZD)">
+          <Field label={t("po.freight")}>
             <input className="input" type="number" min={0} step="any" value={shipping} onChange={(e) => setShipping(e.target.value)} />
           </Field>
           <Field
-            label="Remise"
-            hint={discountType === "PERCENT" ? "Le taux seulement — le montant en DZD est calculé automatiquement" : undefined}
+            label={t("totals.discount")}
+            hint={discountType === "PERCENT" ? t("po.rateOnlyHint") : undefined}
           >
             <div className="field-inline-group">
               <input
@@ -212,7 +214,7 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
                 step="any"
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
-                placeholder={discountType === "PERCENT" ? "Ex. 10" : ""}
+                placeholder={discountType === "PERCENT" ? t("po.ph.discountPercent") : ""}
               />
               <select className="input" value={discountType} onChange={(e) => setDiscountType(e.target.value as DiscountType)}>
                 <option value="FIXED">DZD</option>
@@ -220,7 +222,7 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
               </select>
             </div>
           </Field>
-          <Field label="Taxe (%)" hint="Le taux seulement — le montant en DZD est calculé automatiquement">
+          <Field label={t("po.taxLabel")} hint={t("po.rateOnlyHint")}>
             <input
               className="input"
               type="number"
@@ -228,19 +230,19 @@ export function PurchaseOrderModal({ suppliers, items, order, onClose, onSaved }
               step="any"
               value={taxPercent}
               onChange={(e) => setTaxPercent(e.target.value)}
-              placeholder="Ex. 19"
+              placeholder={t("po.ph.taxPercent")}
             />
           </Field>
         </div>
 
         <TotalsPanel totals={totals} />
 
-        <Field label="Notes">
+        <Field label={t("field.notes")}>
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
 
         <Banner tone="info">
-          Enregistrer ce bon ne touche pas au stock. Le stock n'augmente qu'à la réception de la marchandise, depuis la fiche du bon.
+          {t("po.savingMovesNothing")}
         </Banner>
 
         {error ? <p className="form-error">{error}</p> : null}
@@ -264,22 +266,23 @@ export function TotalsPanel({
     lineDiscounts?: number;
   };
 }) {
+  const { t } = useI18n();
   const taxLabel =
     totals.taxRate != null && totals.taxRate > 0
-      ? `Taxe (${(totals.taxRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)`
-      : "Taxe";
+      ? t("totals.taxPercent", { rate: formatPercent(totals.taxRate) })
+      : t("totals.tax");
   const discountLabel =
     totals.discountType === "PERCENT" && totals.discountRate
-      ? `Remise (${(totals.discountRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)`
-      : "Remise";
+      ? t("totals.discountPercent", { rate: formatPercent(totals.discountRate) })
+      : t("totals.discount");
   return (
     <div className="totals-panel">
-      <TotalRow label="Sous-total" value={totals.subtotal} />
-      {totals.lineDiscounts ? <TotalRow label="dont remises par ligne" value={-totals.lineDiscounts} muted /> : null}
-      <TotalRow label="Transport" value={totals.shipping} />
+      <TotalRow label={t("totals.subtotal")} value={totals.subtotal} />
+      {totals.lineDiscounts ? <TotalRow label={t("totals.lineDiscounts")} value={-totals.lineDiscounts} muted /> : null}
+      <TotalRow label={t("po.freightRow")} value={totals.shipping} />
       <TotalRow label={discountLabel} value={-totals.discount} />
       <TotalRow label={taxLabel} value={totals.tax} />
-      <TotalRow label="Total" value={totals.total} strong />
+      <TotalRow label={t("totals.total")} value={totals.total} strong />
     </div>
   );
 }

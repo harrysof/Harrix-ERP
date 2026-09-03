@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
 import { parsePermissions } from './permissions.js';
 import type { AuthenticatedUser } from './current-user.js';
+import { t } from '../i18n/messages/index.js';
 
 /**
  * Authenticates every request. Registered globally in app.module.ts, so a new
@@ -36,19 +37,19 @@ export class JwtAuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const token = extractBearerToken(request.headers?.authorization);
-    if (!token) throw new UnauthorizedException('Authentification requise.');
+    if (!token) throw new UnauthorizedException(t('auth.authRequired'));
 
     let payload: { sub?: string };
     try {
       payload = await this.jwt.verifyAsync(token, { secret: this.config.getOrThrow<string>('JWT_SECRET') });
     } catch {
-      throw new UnauthorizedException('Session expirée ou invalide. Reconnectez-vous.');
+      throw new UnauthorizedException(t('auth.sessionExpired'));
     }
-    if (!payload.sub) throw new UnauthorizedException('Jeton invalide.');
+    if (!payload.sub) throw new UnauthorizedException(t('auth.invalidToken'));
 
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub }, include: { role: true } });
-    if (!user) throw new UnauthorizedException('Compte introuvable.');
-    if (!user.active) throw new UnauthorizedException('Ce compte a été désactivé.');
+    if (!user) throw new UnauthorizedException(t('auth.accountNotFound'));
+    if (!user.active) throw new UnauthorizedException(t('auth.accountDeactivatedShort'));
 
     const authenticated: AuthenticatedUser = {
       id: user.id,

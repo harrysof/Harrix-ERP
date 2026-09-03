@@ -6,6 +6,7 @@ import type { InventoryTypeConfig } from "../../lib/types";
 import type { Supplier } from "../../lib/suppliersApi";
 import { todayIso } from "../../lib/date";
 import { formatCurrency } from "../../lib/format";
+import { useI18n } from "../../state/LanguageContext";
 
 interface ReceiveStockModalProps {
   itemName: string;
@@ -35,6 +36,7 @@ export function ReceiveStockModal({
   onClose,
   onSubmit,
 }: ReceiveStockModalProps) {
+  const { t } = useI18n();
   const [quantity, setQuantity] = useState("");
   const [unitCost, setUnitCost] = useState(itemUnitCost != null ? String(itemUnitCost) : "");
   const [date, setDate] = useState(todayIso());
@@ -56,23 +58,23 @@ export function ReceiveStockModal({
   async function handleSubmit() {
     const quantityValue = Number(quantity);
     if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
-      setError("La quantité doit être un nombre supérieur à zéro.");
+      setError(t("receive.err.quantity"));
       return;
     }
     if (!date) {
-      setError("La date est obligatoire.");
+      setError(t("receive.err.date"));
       return;
     }
     if (inventoryType.hasBatches && !batchNumber.trim()) {
-      setError("Le numéro de lot est obligatoire pour ce type de produit.");
+      setError(t("receive.err.lotRequired"));
       return;
     }
     if (inventoryType.hasExpiry && !expiryDate) {
-      setError("La date de péremption est obligatoire pour ce type de produit.");
+      setError(t("receive.err.expiryRequired"));
       return;
     }
     if (unitCost !== "" && (!Number.isFinite(unitCostValue!) || unitCostValue! < 0)) {
-      setError("Le coût unitaire doit être un nombre positif (DZD).");
+      setError(t("item.err.unitCost"));
       return;
     }
     setError(null);
@@ -88,42 +90,42 @@ export function ReceiveStockModal({
         unitCost: unitCostValue,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
       setSubmitting(false);
     }
   }
 
   return (
     <Modal
-      title={`Réception — ${itemName}`}
+      title={t("receive.modalTitle", { item: itemName })}
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
-            Annuler
+            {t("action.cancel")}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Enregistrement…" : "Enregistrer la réception"}
+            {submitting ? t("action.saving") : t("receive.title")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
         <div className="form-row">
-          <Field label={`Quantité reçue (${itemUnit})`}>
+          <Field label={t("receive.quantityLabel", { unit: itemUnit })}>
             <input className="input" type="number" min={0} step="any" value={quantity} onChange={(e) => setQuantity(e.target.value)} autoFocus />
           </Field>
-          <Field label="Date de réception">
+          <Field label={t("receive.date")}>
             <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
         </div>
 
         <Field
-          label={`Coût unitaire (DZD / ${itemUnit})`}
+          label={t("receive.unitCostLabel", { unit: itemUnit })}
           hint={
             itemUnitCost != null
-              ? "Pré-rempli avec le coût standard de l'article. Corrigez-le si cette livraison a été payée à un autre prix — c'est ce montant qui entre dans la valeur du stock."
-              : "Ce que cette livraison coûte par unité. Laissez vide si le prix n'est pas connu — l'entrée restera visiblement non valorisée."
+              ? t("receive.unitCostPrefilled")
+              : t("receive.unitCostUnknown")
           }
         >
           <input
@@ -133,14 +135,14 @@ export function ReceiveStockModal({
             step="any"
             value={unitCost}
             onChange={(e) => setUnitCost(e.target.value)}
-            placeholder="Ex. 1200"
+            placeholder={t("item.ph.unitCost")}
           />
-          {lineTotal !== null ? <span className="field-hint">Valeur de la réception : {formatCurrency(lineTotal)}</span> : null}
+          {lineTotal !== null ? <span className="field-hint">{t("receive.lineValue", { value: formatCurrency(lineTotal) })}</span> : null}
         </Field>
 
-        <Field label="Fournisseur" hint={suppliers.length === 0 ? "Aucun fournisseur enregistré — ajoutez-en un dans l'onglet Fournisseurs" : undefined}>
+        <Field label={t("field.supplier")} hint={suppliers.length === 0 ? t("receive.noSupplier") : undefined}>
           <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-            <option value="">— Non précisé —</option>
+            <option value="">{t("receive.unspecified")}</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -151,11 +153,11 @@ export function ReceiveStockModal({
 
         {inventoryType.hasBatches ? (
           <div className="form-row">
-            <Field label="Numéro de lot">
-              <input className="input" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="Ex. L-2501" />
+            <Field label={t("field.batchNumber")}>
+              <input className="input" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder={t("item.ph.lot")} />
             </Field>
             {inventoryType.hasExpiry ? (
-              <Field label="Date de péremption">
+              <Field label={t("field.expiryDate")}>
                 <input className="input" type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
               </Field>
             ) : null}
@@ -163,12 +165,12 @@ export function ReceiveStockModal({
         ) : null}
 
         {inventoryType.hasQuality ? (
-          <Field label="Classe de qualité" hint="Comment ces unités sont classées à leur sortie de production">
+          <Field label={t("quality.classLabel")} hint={t("quality.classHint")}>
             <select className="input" value={quality} onChange={(e) => setQuality(e.target.value)}>
-              <option value="">— Non classé —</option>
-              <option value="1er">1er choix</option>
-              <option value="2ème">2ème choix</option>
-              <option value="rebut">Rebut</option>
+              <option value="">{t("receive.unclassified")}</option>
+              <option value="1er">{t("quality.first")}</option>
+              <option value="2ème">{t("quality.second")}</option>
+              <option value="rebut">{t("quality.reject")}</option>
             </select>
           </Field>
         ) : null}

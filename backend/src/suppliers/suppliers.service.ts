@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateSupplierDto } from './dto/create-supplier.dto.js';
 import { UpdateSupplierDto } from './dto/update-supplier.dto.js';
+import { t } from '../i18n/messages/index.js';
 
 @Injectable()
 export class SuppliersService {
@@ -16,7 +17,7 @@ export class SuppliersService {
 
   async findOne(id: string) {
     const supplier = await this.prisma.supplier.findUnique({ where: { id } });
-    if (!supplier) throw new NotFoundException(`Fournisseur introuvable : ${id}`);
+    if (!supplier) throw new NotFoundException(t('purchasing.supplierNotFound', { id }));
     return supplier;
   }
 

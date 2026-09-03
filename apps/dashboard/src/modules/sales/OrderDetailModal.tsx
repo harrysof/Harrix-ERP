@@ -22,6 +22,7 @@ import {
   type ReturnOrderLineInput,
 } from "../../lib/salesApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
 import { OrderTotalsPanel } from "./OrderTotalsPanel";
 
 interface OrderDetailModalProps {
@@ -41,6 +42,7 @@ interface OrderDetailModalProps {
  */
 export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDetailModalProps) {
   const { can } = useAuth();
+  const { t, tn } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [shipping, setShipping] = useState(false);
@@ -66,7 +68,7 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
       onChanged();
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Action impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.action"));
       return false;
     } finally {
       setBusy(false);
@@ -79,7 +81,7 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
       .map((l) => ({ orderLineId: l.id, quantity: Number(returnDraft[l.id]) }));
 
     if (lines.length === 0) {
-      setError("Indiquez la quantité retournée pour au moins une ligne.");
+      setError(t("order.err.returnLines"));
       return;
     }
 
@@ -96,7 +98,7 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
   async function submitPayment() {
     const amount = Number(paymentAmount);
     if (!(amount > 0)) {
-      setError("Indiquez un montant de paiement supérieur à zéro.");
+      setError(t("order.err.paymentAmount"));
       return;
     }
     const ok = await run(() => recordPayment(order.id, { amount, date: paymentDate }));
@@ -108,17 +110,17 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
 
   return (
     <Modal
-      title={`Commande ${order.code}`}
+      title={t("order.modalTitle", { code: order.code })}
       onClose={onClose}
       width={900}
       footer={
         <>
-          <Button onClick={onClose}>Fermer</Button>
-          <Button onClick={() => window.print()}>Imprimer</Button>
-          {writable && order.canEdit ? <Button onClick={onEdit}>Modifier</Button> : null}
+          <Button onClick={onClose}>{t("action.close")}</Button>
+          <Button onClick={() => window.print()}>{t("action.print")}</Button>
+          {writable && order.canEdit ? <Button onClick={onEdit}>{t("action.edit")}</Button> : null}
           {writable ? (
             <Button variant="ghost" disabled={busy} onClick={() => run(() => setOrderArchived(order.id, !order.archived))}>
-              {order.archived ? "Désarchiver" : "Archiver"}
+              {t(order.archived ? "action.unarchive" : "action.archive")}
             </Button>
           ) : null}
           {writable && order.canCancel ? (
@@ -126,12 +128,12 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
               variant="danger"
               disabled={busy}
               onClick={() => {
-                if (window.confirm(`Annuler la commande ${order.code} ?`)) {
+                if (window.confirm(t("order.confirmCancelShort", { code: order.code }))) {
                   run(() => setOrderStatus(order.id, { shipmentStatus: "CANCELLED", paymentStatus: "CANCELLED" }));
                 }
               }}
             >
-              Annuler la commande
+              {t("order.cancel")}
             </Button>
           ) : null}
           {writable && order.shipmentStatus !== "SHIPPED" ? (
@@ -139,12 +141,12 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
               variant="danger"
               disabled={busy}
               onClick={() => {
-                if (window.confirm(`Supprimer définitivement la commande ${order.code} ?`)) {
+                if (window.confirm(t("order.confirmDelete", { code: order.code }))) {
                   run(() => deleteOrder(order.id)).then((ok) => ok && onClose());
                 }
               }}
             >
-              Supprimer
+              {t("action.delete")}
             </Button>
           ) : null}
         </>
@@ -153,39 +155,50 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
       <div className="form-stack">
         <div className="invoice-head">
           <div>
-            <p className="invoice-label">Commande</p>
+            <p className="invoice-label">{t("order.label")}</p>
             <p className="invoice-code">{order.code}</p>
             <p className="muted">{formatDate(order.date)}</p>
           </div>
           <div className="invoice-status">
-            <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>Expédition : {SHIPMENT_LABELS[order.shipmentStatus]}</Pill>
-            <Pill tone={PAYMENT_TONES[order.paymentStatus]}>Paiement : {PAYMENT_LABELS[order.paymentStatus]}</Pill>
-            {order.archived ? <Pill tone="neutral">Archivée</Pill> : null}
+            <Pill tone={SHIPMENT_TONES[order.shipmentStatus]}>
+              {t("order.shipmentPill", { status: t(SHIPMENT_LABELS[order.shipmentStatus]) })}
+            </Pill>
+            <Pill tone={PAYMENT_TONES[order.paymentStatus]}>
+              {t("order.paymentPill", { status: t(PAYMENT_LABELS[order.paymentStatus]) })}
+            </Pill>
+            {order.archived ? <Pill tone="neutral">{t("order.archived")}</Pill> : null}
           </div>
         </div>
 
         {order.stockWarnings.length > 0 ? (
           <Banner tone="warn">
-            Stock insuffisant pour expédier cette commande aujourd'hui :{" "}
-            {order.stockWarnings
-              .map((w) => `${w.itemName} — ${w.available} ${w.unit} en stock, ${w.required} demandé(s)`)
-              .join(" · ")}
-            . La commande reste valable ; produisez ou réceptionnez la différence avant de l'expédier.
+            {t("order.stockShortBanner", {
+              details: order.stockWarnings
+                .map((w) =>
+                  t("order.stockShortDetail", {
+                    item: w.itemName,
+                    available: w.available,
+                    unit: w.unit,
+                    required: w.required,
+                  }),
+                )
+                .join(" · "),
+            })}
           </Banner>
         ) : null}
 
         <section>
-          <h4 className="section-title">Articles</h4>
+          <h4 className="section-title">{t("order.items")}</h4>
           <div className="table-scroll">
             <table className="stock-table">
               <thead>
                 <tr>
-                  <th>Produit</th>
-                  <th>Référence</th>
-                  <th className="num">Quantité</th>
-                  <th className="num">Prix unitaire</th>
-                  <th className="num">Remise</th>
-                  <th className="num">Total ligne</th>
+                  <th>{t("order.product")}</th>
+                  <th>{t("field.reference")}</th>
+                  <th className="num">{t("field.quantity")}</th>
+                  <th className="num">{t("field.unitPrice")}</th>
+                  <th className="num">{t("order.lineDiscount")}</th>
+                  <th className="num">{t("order.col.lineTotal")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -209,25 +222,25 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
 
         <div className="invoice-columns">
           <section>
-            <h4 className="section-title">Client</h4>
+            <h4 className="section-title">{t("field.customer")}</h4>
             <div className="invoice-block">
               <p className="invoice-block-strong">{order.customer.fullName}</p>
-              <p>{order.customer.email ?? <span className="muted">Pas d'email</span>}</p>
-              <p>{order.customer.phone ?? <span className="muted">Pas de téléphone</span>}</p>
+              <p>{order.customer.email ?? <span className="muted">{t("order.noEmail")}</span>}</p>
+              <p>{order.customer.phone ?? <span className="muted">{t("order.noPhone")}</span>}</p>
             </div>
           </section>
 
           <section>
-            <h4 className="section-title">Livraison</h4>
+            <h4 className="section-title">{t("order.delivery")}</h4>
             <div className="invoice-block">
               <p className="invoice-block-strong">{order.shipToName ?? order.customer.fullName}</p>
-              <p>{order.shipToAddress ?? <span className="muted">Pas d'adresse</span>}</p>
+              <p>{order.shipToAddress ?? <span className="muted">{t("order.noAddress")}</span>}</p>
               <p>
                 {[order.shipToPostalCode, order.shipToCity].filter(Boolean).join(" ") || <span className="muted">—</span>}
               </p>
               <p>{[order.shipToProvince, order.shipToCountry].filter(Boolean).join(", ") || <span className="muted">—</span>}</p>
               {order.shipToPhone ? <p>{order.shipToPhone}</p> : null}
-              {order.shippedAt ? <p className="muted">Expédié le {formatDate(order.shippedAt)}</p> : null}
+              {order.shippedAt ? <p className="muted">{t("order.shippedOn", { date: formatDate(order.shippedAt) })}</p> : null}
             </div>
           </section>
         </div>
@@ -236,23 +249,24 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
 
         {writable ? (
           <section>
-            <h4 className="section-title">Statut</h4>
+            <h4 className="section-title">{t("order.statusSection")}</h4>
 
             {order.canShip ? (
               shipping ? (
                 <div className="form-stack">
                   <div className="form-row">
-                    <Field label="Date d'expédition">
+                    <Field label={t("order.shipDate")}>
                       <input className="input" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)} />
                     </Field>
                   </div>
                   <label className="checkbox-row">
                     <input type="checkbox" checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />
-                    <span>Marquer aussi comme payée</span>
+                    <span>{t("order.alsoMarkPaid")}</span>
                   </label>
                   <Banner tone="warn">
-                    L'expédition sortira {order.lines.reduce((s, l) => s + l.quantity, 0)} unité(s) du stock de produits finis. Cette
-                    action ne peut pas être annulée.
+                    {t("order.shipWarning", {
+                      count: tn("order.unitCount", order.lines.reduce((s, l) => s + l.quantity, 0)),
+                    })}
                   </Banner>
                   <div className="row-actions">
                     <Button
@@ -260,27 +274,25 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
                       disabled={busy}
                       onClick={() => run(() => shipOrder(order.id, { date: shipDate, markPaid })).then((ok) => ok && setShipping(false))}
                     >
-                      {busy ? "Expédition…" : "Confirmer l'expédition"}
+                      {busy ? t("order.shipping") : t("order.confirmShipButton")}
                     </Button>
-                    <Button onClick={() => setShipping(false)}>Annuler</Button>
+                    <Button onClick={() => setShipping(false)}>{t("action.cancel")}</Button>
                   </div>
                 </div>
               ) : (
                 <Button variant="primary" onClick={() => setShipping(true)}>
-                  Expédier la commande
+                  {t("order.shipButton")}
                 </Button>
               )
             ) : null}
 
             <div className="invoice-block" style={{ marginTop: 12 }}>
               <p>
-                Payé : <strong>{formatCurrency(order.amountPaid)}</strong> sur {formatCurrency(order.totals.total)}
-                {order.balanceDue > 0 ? (
-                  <>
-                    {" "}
-                    — solde restant dû : <strong>{formatCurrency(order.balanceDue)}</strong>
-                  </>
-                ) : null}
+                {t("order.paidOf", {
+                  paid: formatCurrency(order.amountPaid),
+                  total: formatCurrency(order.totals.total),
+                })}
+                {order.balanceDue > 0 ? t("order.balanceDue", { balance: formatCurrency(order.balanceDue) }) : null}
               </p>
             </div>
 
@@ -288,7 +300,10 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
               paying ? (
                 <div className="form-stack" style={{ marginTop: 10 }}>
                   <div className="form-row">
-                    <Field label="Montant payé (DZD)" hint={`Solde restant dû : ${formatCurrency(order.balanceDue)}`}>
+                    <Field
+                      label={t("order.amountPaidLabel")}
+                      hint={t("order.balanceHint", { balance: formatCurrency(order.balanceDue) })}
+                    >
                       <input
                         className="input"
                         type="number"
@@ -299,20 +314,20 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
                         onChange={(e) => setPaymentAmount(e.target.value)}
                       />
                     </Field>
-                    <Field label="Date du paiement">
+                    <Field label={t("order.paymentDate")}>
                       <input className="input" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
                     </Field>
                   </div>
                   <div className="row-actions">
                     <Button variant="primary" disabled={busy} onClick={submitPayment}>
-                      {busy ? "Enregistrement…" : "Enregistrer le paiement"}
+                      {busy ? t("action.saving") : t("order.savePayment")}
                     </Button>
-                    <Button onClick={() => setPaying(false)}>Annuler</Button>
+                    <Button onClick={() => setPaying(false)}>{t("action.cancel")}</Button>
                   </div>
                 </div>
               ) : (
                 <Button variant="primary" style={{ marginTop: 10 }} onClick={() => setPaying(true)}>
-                  + Enregistrer un paiement
+                  {t("order.addPayment")}
                 </Button>
               )
             ) : null}
@@ -321,19 +336,19 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
 
         {order.shipmentStatus === "SHIPPED" || order.returns.length > 0 ? (
           <section>
-            <h4 className="section-title">Retours</h4>
+            <h4 className="section-title">{t("order.returnsSection")}</h4>
 
             {order.returns.length === 0 ? (
-              <p className="muted">Aucun retour enregistré.</p>
+              <p className="muted">{t("order.noReturnsRecorded")}</p>
             ) : (
               <div className="table-scroll">
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>N°</th>
-                      <th>Date</th>
-                      <th>Motif</th>
-                      <th className="num">Quantité</th>
+                      <th>{t("field.number")}</th>
+                      <th>{t("field.date")}</th>
+                      <th>{t("order.col.motive")}</th>
+                      <th className="num">{t("field.quantity")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -354,10 +369,10 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
               returning ? (
                 <div className="form-stack" style={{ marginTop: 14 }}>
                   <div className="form-row">
-                    <Field label="Date du retour">
+                    <Field label={t("order.returnDate")}>
                       <input className="input" type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
                     </Field>
-                    <Field label="Motif" hint="Facultatif — ex. « ne convient pas au client »">
+                    <Field label={t("order.col.motive")} hint={t("order.returnMotiveHint")}>
                       <input className="input" value={returnReason} onChange={(e) => setReturnReason(e.target.value)} />
                     </Field>
                   </div>
@@ -369,10 +384,10 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
                         <div className="receive-line-head">
                           <strong>{line.item.name}</strong>
                           <span className="muted">
-                            {line.returnable} {line.item.unit} retournable(s)
+                            {t("order.returnableQty", { quantity: line.returnable, unit: line.item.unit })}
                           </span>
                         </div>
-                        <Field label={`Quantité retournée (${line.item.unit})`}>
+                        <Field label={t("order.returnedQtyLabel", { unit: line.item.unit })}>
                           <input
                             className="input"
                             type="number"
@@ -386,22 +401,22 @@ export function OrderDetailModal({ order, onClose, onChanged, onEdit }: OrderDet
                       </div>
                     ))}
 
-                  <Banner tone="info">Enregistrer ce retour remettra les quantités indiquées dans le stock de produits finis.</Banner>
+                  <Banner tone="info">{t("order.returnRestocks")}</Banner>
 
                   <div className="row-actions">
                     <Button variant="primary" onClick={submitReturn} disabled={busy}>
-                      {busy ? "Enregistrement…" : "Enregistrer le retour"}
+                      {busy ? t("action.saving") : t("order.saveReturn")}
                     </Button>
-                    <Button onClick={() => setReturning(false)}>Annuler</Button>
+                    <Button onClick={() => setReturning(false)}>{t("action.cancel")}</Button>
                   </div>
                 </div>
               ) : order.lines.some((l) => l.returnable > 0) ? (
                 <Button variant="primary" style={{ marginTop: 10 }} onClick={() => setReturning(true)}>
-                  + Enregistrer un retour
+                  {t("order.addReturn")}
                 </Button>
               ) : (
                 <p className="muted" style={{ marginTop: 10 }}>
-                  Tout a déjà été retourné.
+                  {t("order.allReturned")}
                 </p>
               )
             ) : null}

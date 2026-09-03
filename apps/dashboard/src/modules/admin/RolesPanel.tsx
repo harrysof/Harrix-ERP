@@ -4,6 +4,7 @@ import { Pill } from "../../components/ui/Pill";
 import { Banner } from "../../components/ui/Banner";
 import { ApiError } from "../../lib/api";
 import { fetchPermissionGroups, updateRole, type ApiRole, type PermissionGroup } from "../../lib/authApi";
+import { useI18n } from "../../state/LanguageContext";
 
 /**
  * Shows what each role can do, and lets the gérant change it.
@@ -14,6 +15,7 @@ import { fetchPermissionGroups, updateRole, type ApiRole, type PermissionGroup }
  * edited, because it's the way back in when everything else is misconfigured.
  */
 export function RolesPanel({ roles, onChanged }: { roles: ApiRole[]; onChanged: () => void }) {
+  const { t, tn } = useI18n();
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<string[]>([]);
@@ -38,7 +40,7 @@ export function RolesPanel({ roles, onChanged }: { roles: ApiRole[]; onChanged: 
       setEditingId(null);
       onChanged();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSaving(false);
     }
@@ -46,10 +48,7 @@ export function RolesPanel({ roles, onChanged }: { roles: ApiRole[]; onChanged: 
 
   return (
     <div className="page-stack">
-      <Banner tone="info">
-        Un rôle décide de ce qu'une personne peut voir et faire. Ces règles sont appliquées par le serveur : masquer un onglet empêche une
-        erreur, seul le serveur empêche quelqu'un de curieux.
-      </Banner>
+      <Banner tone="info">{t("adm.rolesIntro")}</Banner>
 
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
@@ -61,30 +60,26 @@ export function RolesPanel({ roles, onChanged }: { roles: ApiRole[]; onChanged: 
               <div>
                 <h3 className="role-card-title">
                   {role.label}
-                  {role.isProtected ? <Pill tone="neutral">protégé</Pill> : null}
+                  {role.isProtected ? <Pill tone="neutral">{t("adm.protected")}</Pill> : null}
                 </h3>
                 <p className="role-card-desc">{role.description}</p>
                 <p className="role-card-meta">
-                  {role.userCount === 0
-                    ? "Personne n'a ce rôle"
-                    : role.userCount === 1
-                      ? "1 utilisateur"
-                      : `${role.userCount} utilisateurs`}
+                  {role.userCount === 0 ? t("adm.nobodyHasRole") : tn("adm.userCount", role.userCount)}
                 </p>
               </div>
               <div className="row-actions">
                 {role.isProtected ? (
-                  <span className="field-hint">Accès complet, non modifiable</span>
+                  <span className="field-hint">{t("adm.fullAccessLocked")}</span>
                 ) : isEditing ? (
                   <>
-                    <Button onClick={() => setEditingId(null)}>Annuler</Button>
+                    <Button onClick={() => setEditingId(null)}>{t("action.cancel")}</Button>
                     <Button variant="primary" onClick={() => save(role)} disabled={saving}>
-                      {saving ? "…" : "Enregistrer"}
+                      {saving ? "…" : t("action.save")}
                     </Button>
                   </>
                 ) : (
                   <Button variant="ghost" onClick={() => startEdit(role)}>
-                    Modifier les permissions
+                    {t("adm.editPermissions")}
                   </Button>
                 )}
               </div>

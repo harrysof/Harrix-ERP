@@ -6,6 +6,7 @@ import { formatDate, formatNumber } from "../../lib/format";
 import type { ApiItem } from "../../lib/stockApi";
 import { STATUS_LABELS, STATUS_ORDER, type ApiProductionBatch, type BatchFilters, type FilterOptions } from "../../lib/productionApi";
 import { STATUS_TONE, describeVariance } from "./types";
+import { useI18n } from "../../state/LanguageContext";
 
 interface BatchMonitorProps {
   batches: ApiProductionBatch[];
@@ -23,21 +24,22 @@ interface BatchMonitorProps {
  * not been declared, so a gap can't hide behind an empty cell.
  */
 export function BatchMonitor({ batches, products, options, filters, onFiltersChange, onOpen }: BatchMonitorProps) {
+  const { t } = useI18n();
   const set = (patch: Partial<BatchFilters>) => onFiltersChange({ ...filters, ...patch });
   const hasFilters = Object.values(filters).some(Boolean);
 
   return (
     <div className="page-stack">
       <div className="filter-bar">
-        <Field label="Du">
+        <Field label={t("field.from")}>
           <input className="input" type="date" value={filters.from ?? ""} onChange={(e) => set({ from: e.target.value })} />
         </Field>
-        <Field label="Au">
+        <Field label={t("field.to")}>
           <input className="input" type="date" value={filters.to ?? ""} onChange={(e) => set({ to: e.target.value })} />
         </Field>
-        <Field label="Produit">
+        <Field label={t("prod.filter.product")}>
           <select className="input" value={filters.productItemId ?? ""} onChange={(e) => set({ productItemId: e.target.value })}>
-            <option value="">Tous</option>
+            <option value="">{t("state.all")}</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -45,9 +47,9 @@ export function BatchMonitor({ batches, products, options, filters, onFiltersCha
             ))}
           </select>
         </Field>
-        <Field label="Machine">
+        <Field label={t("prod.filter.machine")}>
           <select className="input" value={filters.machine ?? ""} onChange={(e) => set({ machine: e.target.value })}>
-            <option value="">Toutes</option>
+            <option value="">{t("state.allFeminine")}</option>
             {options.machines.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -55,9 +57,9 @@ export function BatchMonitor({ batches, products, options, filters, onFiltersCha
             ))}
           </select>
         </Field>
-        <Field label="Superviseur">
+        <Field label={t("prod.filter.supervisor")}>
           <select className="input" value={filters.supervisor ?? ""} onChange={(e) => set({ supervisor: e.target.value })}>
-            <option value="">Tous</option>
+            <option value="">{t("state.all")}</option>
             {options.supervisors.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -65,44 +67,44 @@ export function BatchMonitor({ batches, products, options, filters, onFiltersCha
             ))}
           </select>
         </Field>
-        <Field label="Statut">
+        <Field label={t("field.status")}>
           <select className="input" value={filters.status ?? ""} onChange={(e) => set({ status: e.target.value })}>
-            <option value="">Tous</option>
+            <option value="">{t("state.all")}</option>
             {STATUS_ORDER.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABELS[s]}
+                {t(STATUS_LABELS[s])}
               </option>
             ))}
           </select>
         </Field>
         {hasFilters ? (
           <Button variant="ghost" onClick={() => onFiltersChange({})}>
-            Réinitialiser
+            {t("action.reset")}
           </Button>
         ) : null}
       </div>
 
       {batches.length === 0 ? (
         <EmptyState
-          title={hasFilters ? "Aucun lot ne correspond à ces filtres" : "Aucun lot de production"}
-          description={hasFilters ? "Élargissez la période ou réinitialisez les filtres." : "Créez un lot pour commencer à suivre la production."}
+          title={hasFilters ? t("prod.noBatchMatch") : t("prod.noBatches")}
+          description={hasFilters ? t("prod.widenPeriod") : t("prod.createFirst")}
         />
       ) : (
         <div className="table-scroll">
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Lot</th>
-                <th>Date</th>
-                <th>Produit</th>
-                <th>Machine</th>
-                <th className="num">Attendu</th>
-                <th className="num">Comptabilisé</th>
-                <th className="num">1er</th>
-                <th className="num">2ème</th>
-                <th className="num">Rebut</th>
-                <th>Non comptabilisé</th>
-                <th>Statut</th>
+                <th>{t("prod.col.batch")}</th>
+                <th>{t("field.date")}</th>
+                <th>{t("prod.filter.product")}</th>
+                <th>{t("prod.filter.machine")}</th>
+                <th className="num">{t("prod.col.expected")}</th>
+                <th className="num">{t("prod.col.accounted")}</th>
+                <th className="num">{t("prod.col.first")}</th>
+                <th className="num">{t("prod.col.second")}</th>
+                <th className="num">{t("prod.col.waste")}</th>
+                <th>{t("prod.col.unknown")}</th>
+                <th>{t("field.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -126,13 +128,18 @@ export function BatchMonitor({ batches, products, options, filters, onFiltersCha
                   <td className="tabular num">{b.outputDeclared ? formatNumber(b.waste) : "—"}</td>
                   <td>
                     {b.unknown === null ? (
-                      <span className="muted">Sortie non déclarée</span>
+                      <span className="muted">{t("prod.outputNotDeclared")}</span>
                     ) : (
-                      <Pill tone={b.unknown === 0 ? "ok" : b.needsInvestigation ? "danger" : "warn"}>{describeVariance(b.unknown)}</Pill>
+                      <Pill tone={b.unknown === 0 ? "ok" : b.needsInvestigation ? "danger" : "warn"}>
+                        {(() => {
+                          const variance = describeVariance(b.unknown);
+                          return t(variance.key, { count: variance.count });
+                        })()}
+                      </Pill>
                     )}
                   </td>
                   <td>
-                    <Pill tone={STATUS_TONE[b.status]}>{STATUS_LABELS[b.status]}</Pill>
+                    <Pill tone={STATUS_TONE[b.status]}>{t(STATUS_LABELS[b.status])}</Pill>
                   </td>
                 </tr>
               ))}

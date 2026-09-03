@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { getItemQuantity } from '../stock/stock-math.js';
+import { t } from '../i18n/messages/index.js';
 import {
   canCancel,
   canEdit,
@@ -63,7 +64,7 @@ export class SalesService {
       where: { id },
       include: { orders: { include: ORDER_INCLUDE, orderBy: [{ date: 'desc' }, { createdAt: 'desc' }] } },
     });
-    if (!customer) throw new NotFoundException(`Client introuvable : ${id}`);
+    if (!customer) throw new NotFoundException(t('sales.customerNotFound', { id }));
 
     const { orders, ...profile } = customer;
     return {
@@ -79,7 +80,7 @@ export class SalesService {
       const customer = await this.prisma.customer.create({ data: { ...dto, code } });
       return { ...customer, orderCount: 0, totalPurchased: 0, outstandingBalance: 0 };
     } catch (error) {
-      if (isUniqueConstraintError(error)) throw new ConflictException(`Un client "${code}" existe déjà.`);
+      if (isUniqueConstraintError(error)) throw new ConflictException(t('sales.customerCodeExists', { code }));
       throw error;
     }
   }
@@ -103,11 +104,9 @@ export class SalesService {
 
   async removeCustomer(id: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id }, include: { orders: true } });
-    if (!customer) throw new NotFoundException(`Client introuvable : ${id}`);
+    if (!customer) throw new NotFoundException(t('sales.customerNotFound', { id }));
     if (customer.orders.length > 0) {
-      throw new ConflictException(
-        `${customer.fullName} a ${customer.orders.length} commande(s) et ne peut pas être supprimé — son historique serait orphelin. Archivez-le à la place.`,
-      );
+      throw new ConflictException(t('sales.customerHasOrders', { name: customer.fullName, count: customer.orders.length }));
     }
     await this.prisma.customer.delete({ where: { id } });
     return { id, deleted: true };
@@ -126,7 +125,7 @@ export class SalesService {
 
   async getOrder(id: string) {
     const order = await this.prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
     return (await this.withStockWarnings([order]))[0];
   }
 
@@ -188,8 +187,8 @@ export class SalesService {
    */
   async createOrder(dto: CreateOrderDto) {
     const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
-    if (!customer) throw new BadRequestException(`Client introuvable : ${dto.customerId}`);
-    if (customer.archived) throw new BadRequestException(`Le client "${customer.fullName}" est archivé.`);
+    if (!customer) throw new BadRequestException(t('sales.orderCustomerNotFound', { id: dto.customerId }));
+    if (customer.archived) throw new BadRequestException(t('sales.customerArchived', { name: customer.fullName }));
     await this.assertSellableItems(dto.lines.map((l) => l.itemId));
     assertDiscount(dto.discountType, dto.discount);
 
@@ -198,9 +197,7 @@ export class SalesService {
     const total = orderTotals(dto.lines, dto).total;
     const amountPaid = dto.amountPaid ?? 0;
     if (amountPaid > total) {
-      throw new BadRequestException(
-        `Le paiement initial (${amountPaid} DZD) dépasse le total de la commande (${total} DZD).`,
-      );
+      throw new BadRequestException(t('sales.depositExceedsTotal', { paid: amountPaid, total }));
     }
 
     try {
@@ -237,18 +234,16 @@ export class SalesService {
       });
       return this.getOrder(created.id);
     } catch (error) {
-      if (isUniqueConstraintError(error)) throw new ConflictException(`Une commande "${code}" existe déjà.`);
+      if (isUniqueConstraintError(error)) throw new ConflictException(t('sales.orderCodeExists', { code }));
       throw error;
     }
   }
 
   async updateOrder(id: string, dto: UpdateOrderDto) {
     const order = await this.prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
     if (!canEdit(order)) {
-      throw new ConflictException(
-        `Une commande expédiée ou annulée ne peut plus être modifiée — ses lignes ont déjà bougé le stock.`,
-      );
+      throw new ConflictException(t('sales.orderNotEditable'));
     }
     if (dto.lines) await this.assertSellableItems(dto.lines.map((l) => l.itemId));
     assertDiscount(dto.discountType ?? order.discountType, dto.discount ?? order.discount);
@@ -295,13 +290,13 @@ export class SalesService {
    */
   async shipOrder(id: string, dto: ShipOrderDto) {
     const order = await this.prisma.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
     if (!canShip(order)) {
       throw new ConflictException(
-        order.shipmentStatus === 'SHIPPED' ? 'Cette commande est déjà expédiée.' : 'Cette commande est annulée.',
+        order.shipmentStatus === 'SHIPPED' ? t('sales.orderAlreadyShipped') : t('sales.orderCancelled'),
       );
     }
-    if (order.lines.length === 0) throw new BadRequestException('Cette commande ne contient aucune ligne.');
+    if (order.lines.length === 0) throw new BadRequestException(t('sales.orderNoLines'));
 
     const date = new Date(dto.date ?? new Date().toISOString());
     const itemIds = [...new Set(order.lines.map((l) => l.itemId))];
@@ -312,7 +307,7 @@ export class SalesService {
       const available = getItemQuantity(movements, line.itemId) - (claimed.get(line.itemId) ?? 0);
       if (line.quantity > available) {
         throw new BadRequestException(
-          `Stock insuffisant pour "${line.item.name}" : ${available} ${line.item.unit} disponible(s), ${line.quantity} demandé(s).`,
+          t('sales.insufficientStock', { name: line.item.name, available, unit: line.item.unit, requested: line.quantity }),
         );
       }
       claimed.set(line.itemId, (claimed.get(line.itemId) ?? 0) + line.quantity);
@@ -357,22 +352,22 @@ export class SalesService {
       where: { id },
       include: { lines: { include: { item: true, returnLines: true } } },
     });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
     if (!canReturn(order)) {
-      throw new ConflictException('Seule une commande expédiée peut faire l’objet d’un retour.');
+      throw new ConflictException(t('sales.onlyShippedReturnable'));
     }
-    if (dto.lines.length === 0) throw new BadRequestException('Indiquez au moins une ligne retournée.');
+    if (dto.lines.length === 0) throw new BadRequestException(t('sales.giveAtLeastOneReturnedLine'));
 
     // Validate every line before opening the transaction, so a bad line fails
     // with a message naming the product instead of rolling back silently.
     const plans = dto.lines.map((line) => {
       const orderLine = order.lines.find((l) => l.id === line.orderLineId);
-      if (!orderLine) throw new BadRequestException(`Ligne de commande introuvable : ${line.orderLineId}`);
+      if (!orderLine) throw new BadRequestException(t('sales.orderLineNotFound', { id: line.orderLineId }));
 
       const stillReturnable = returnableForLine(orderLine, orderLine.returnLines);
       if (line.quantity > stillReturnable) {
         throw new BadRequestException(
-          `Il ne reste que ${stillReturnable} ${orderLine.item.unit} retournable(s) pour "${orderLine.item.name}".`,
+          t('sales.onlyReturnableRemaining', { stillReturnable, unit: orderLine.item.unit, name: orderLine.item.name }),
         );
       }
       return { line, orderLine };
@@ -425,20 +420,18 @@ export class SalesService {
    */
   async setOrderStatus(id: string, dto: SetOrderStatusDto) {
     const order = await this.prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
 
     if (dto.shipmentStatus === 'SHIPPED') {
-      throw new BadRequestException("Utilisez l'action « Expédier » : l'expédition doit décrémenter le stock.");
+      throw new BadRequestException(t('sales.useShipAction'));
     }
     if (dto.shipmentStatus === 'CANCELLED' && !canCancel(order)) {
       throw new ConflictException(
-        order.shipmentStatus === 'SHIPPED'
-          ? 'Une commande expédiée ne peut pas être annulée — le stock est déjà sorti.'
-          : 'Cette commande est déjà annulée.',
+        order.shipmentStatus === 'SHIPPED' ? t('sales.shippedCannotCancel') : t('sales.orderAlreadyCancelled'),
       );
     }
     if (dto.shipmentStatus === 'PENDING' && order.shipmentStatus === 'SHIPPED') {
-      throw new ConflictException("Une commande expédiée ne peut pas revenir en attente.");
+      throw new ConflictException(t('sales.shippedCannotRevertPending'));
     }
 
     await this.prisma.order.update({
@@ -461,18 +454,16 @@ export class SalesService {
    */
   async recordPayment(id: string, dto: RecordPaymentDto) {
     const order = await this.prisma.order.findUnique({ where: { id }, include: { lines: true } });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
     if (order.paymentStatus === 'CANCELLED') {
-      throw new ConflictException('Cette commande est annulée — aucun paiement ne peut lui être associé.');
+      throw new ConflictException(t('sales.orderCancelledNoPayment'));
     }
 
     const total = orderTotals(order.lines, order).total;
     const amountPaid = round(order.amountPaid + dto.amount);
     if (amountPaid > total) {
       const remaining = round(total - order.amountPaid);
-      throw new BadRequestException(
-        `Ce paiement (${dto.amount} DZD) dépasse le solde restant dû (${remaining} DZD).`,
-      );
+      throw new BadRequestException(t('common.paymentExceedsBalance', { amount: dto.amount, remaining }));
     }
 
     await this.prisma.order.update({
@@ -490,7 +481,7 @@ export class SalesService {
    */
   async setOrderArchived(id: string, archived: boolean) {
     const order = await this.prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
     await this.prisma.order.update({ where: { id }, data: { archived, archivedAt: archived ? new Date() : null } });
     return this.getOrder(id);
   }
@@ -498,11 +489,9 @@ export class SalesService {
   /** Only an unshipped order can be deleted; a shipped one has a stock trail. */
   async removeOrder(id: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundException(`Commande introuvable : ${id}`);
+    if (!order) throw new NotFoundException(t('sales.orderNotFound', { id }));
     if (order.shipmentStatus === 'SHIPPED') {
-      throw new ConflictException(
-        'Une commande expédiée ne peut pas être supprimée — elle a généré des mouvements de stock. Son historique doit rester.',
-      );
+      throw new ConflictException(t('sales.shippedCannotDelete'));
     }
     await this.prisma.order.delete({ where: { id } });
     return { id, deleted: true };
@@ -535,7 +524,7 @@ export class SalesService {
 
   private async assertCustomerExists(id: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id } });
-    if (!customer) throw new NotFoundException(`Client introuvable : ${id}`);
+    if (!customer) throw new NotFoundException(t('sales.customerNotFound', { id }));
     return customer;
   }
 
@@ -544,10 +533,10 @@ export class SalesService {
     const unique = [...new Set(itemIds)];
     const items = await this.prisma.item.findMany({ where: { id: { in: unique } }, include: { inventoryType: true } });
     const missing = unique.filter((id) => !items.some((i) => i.id === id));
-    if (missing.length > 0) throw new BadRequestException(`Produit introuvable : ${missing.join(', ')}`);
+    if (missing.length > 0) throw new BadRequestException(t('sales.productNotFound', { names: missing.join(', ') }));
 
     const archived = items.filter((i) => i.archived);
-    if (archived.length > 0) throw new BadRequestException(`Produit archivé : ${archived.map((i) => i.name).join(', ')}`);
+    if (archived.length > 0) throw new BadRequestException(t('sales.productArchived', { names: archived.map((i) => i.name).join(', ') }));
   }
 
   private async nextCode(prefix: string, model: 'order' | 'customer' | 'orderReturn', date: Date) {
@@ -611,9 +600,7 @@ function decorateOrder<
  */
 function assertDiscount(discountType: string | undefined, discount: number | undefined): void {
   if (discountType === 'PERCENT' && (discount ?? 0) > 1) {
-    throw new BadRequestException(
-      'La remise en pourcentage se saisit en fraction (0,10 pour 10 %), pas en pourcentage brut.',
-    );
+    throw new BadRequestException(t('common.discountRateFraction'));
   }
 }
 

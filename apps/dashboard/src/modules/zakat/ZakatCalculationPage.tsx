@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Banner } from "../../components/ui/Banner";
 import { Button } from "../../components/ui/Button";
+import { useI18n } from "../../state/LanguageContext";
 import { Field } from "../../components/ui/Field";
 import { ApiError } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
@@ -57,6 +58,7 @@ function n(value: string): number {
 
 export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTab) => void }) {
   const [loadingPull, setLoadingPull] = useState(true);
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -89,7 +91,7 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
         setGoldPrice(price);
         setGoldPricePerGram(String(price.pricePerGram));
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les valeurs automatiques."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("zk.loadAutoFailed")))
       .finally(() => setLoadingPull(false));
   }, []);
 
@@ -100,7 +102,7 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
       setGoldPrice(price);
       setGoldPricePerGram(String(price.pricePerGram));
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Actualisation du prix de l'or impossible.");
+      setError(e instanceof ApiError ? e.message : t("zk.refreshGoldFailed"));
     } finally {
       setRefreshingGold(false);
     }
@@ -120,7 +122,7 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
 
   async function submit(exportAfter: boolean) {
     const goldPriceValue = n(goldPricePerGram);
-    if (goldPriceValue <= 0) return setError("Le prix de l'or (DZD/gramme) est obligatoire pour calculer le nisab.");
+    if (goldPriceValue <= 0) return setError(t("zk.err.goldPrice"));
 
     setError(null);
     setSavedId(null);
@@ -148,7 +150,7 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
         setExported(true);
       }
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSaving(false);
       setExporting(false);
@@ -160,9 +162,9 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {savedId ? (
         <Banner tone="info">
-          Calcul enregistré{exported ? " et exporté vers le tableau de bord" : ""}.{" "}
+          {t("zk.savedNotice", { suffix: exported ? t("zk.savedAndPinned") : "" })}
           <button type="button" className="link-button" onClick={() => onNavigate("history")}>
-            Voir dans l'historique
+            {t("zk.viewInHistory")}
           </button>
           {!exported ? (
             <>
@@ -176,20 +178,20 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
                     await pinZakatCalculation(savedId);
                     setExported(true);
                   } catch (e) {
-                    setError(e instanceof ApiError ? e.message : "Export impossible.");
+                    setError(e instanceof ApiError ? e.message : t("zk.pinFailed"));
                   } finally {
                     setExporting(false);
                   }
                 }}
               >
-                Exporter vers le tableau de bord
+                {t("zk.pin")}
               </button>
             </>
           ) : (
             <>
               {" · "}
               <button type="button" className="link-button" onClick={() => onNavigate("dashboard")}>
-                Voir le tableau de bord
+                {t("zk.viewDashboard")}
               </button>
             </>
           )}
@@ -197,12 +199,12 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
       ) : null}
 
       <section className="card-section">
-        <h3>Date et méthodologie</h3>
+        <h3>{t("zk.dateAndMethod")}</h3>
         <div className="form-row">
-          <Field label="Date de calcul" hint="L'ancrage du hawl">
+          <Field label={t("zk.calculationDate")} hint={t("zk.hawlAnchor")}>
             <input className="input" type="date" value={calculationDate} onChange={(e) => setCalculationDate(e.target.value)} />
           </Field>
-          <Field label="Méthodologie">
+          <Field label={t("zk.methodology")}>
             <select className="input" value={methodology} onChange={(e) => setMethodology(e.target.value as ZakatMethodology)}>
               {ZAKAT_METHODOLOGIES.map((m) => (
                 <option key={m} value={m}>
@@ -212,16 +214,20 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
             </select>
           </Field>
           <Field
-            label="Prix de l'or (DZD/gramme)"
+            label={t("zk.goldPriceLabel")}
             hint={
               goldPrice
-                ? `Sert à calculer le nisab (85 g) — ${goldPrice.source}, ${formatDate(goldPrice.fetchedAt)}${goldPrice.stale ? " (en cache)" : ""}, modifiable`
-                : "Sert à calculer le nisab (85 g)"
+                ? t("zk.goldPriceHint", {
+                    source: goldPrice.source,
+                    date: formatDate(goldPrice.fetchedAt),
+                    stale: goldPrice.stale ? t("zk.goldCached") : "",
+                  })
+                : t("zk.goldPriceHintShort")
             }
           >
             <div className="field-inline-group">
               <input className="input" type="number" min={0} step="any" value={goldPricePerGram} onChange={(e) => setGoldPricePerGram(e.target.value)} />
-              <Button variant="ghost" onClick={handleRefreshGold} disabled={refreshingGold} title="Actualiser depuis goldrate24.com">
+              <Button variant="ghost" onClick={handleRefreshGold} disabled={refreshingGold} title={t("zk.refreshFromSource")}>
                 <RefreshCw size={14} strokeWidth={2} />
               </Button>
             </div>
@@ -230,21 +236,23 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
       </section>
 
       <section className="card-section">
-        <h3>Liquidités</h3>
+        <h3>{t("zk.liquidity")}</h3>
         <div className="form-row">
-          <Field label="Caisse (DZD)" hint="Non suivie automatiquement (pas de registre de caisse)">
+          <Field label={t("zk.cashDzd")} hint={t("zk.cashHint")}>
             <input className="input" type="number" min={0} step="any" value={cash} onChange={(e) => setCash(e.target.value)} />
           </Field>
-          <Field label="Banque (DZD)" hint="Pré-rempli depuis Ventes — commandes payées, modifiable">
+          <Field label={t("zk.bankDzd")} hint={t("zk.bankHint")}>
             <input className="input" type="number" min={0} step="any" value={bank} onChange={(e) => setBank(e.target.value)} />
           </Field>
         </div>
       </section>
 
       <section className="card-section">
-        <h3>Stock de négoce {loadingPull ? <span className="field-hint">— chargement des valeurs automatiques…</span> : null}</h3>
+        <h3>
+          {t("zk.tradeStock")} {loadingPull ? <span className="field-hint">{t("zk.loadingAuto")}</span> : null}
+        </h3>
         <div className="form-row">
-          <Field label="Produits finis (DZD)" hint="Pré-rempli depuis Stock — Produits finis, modifiable">
+          <Field label={t("zk.finishedGoodsDzd")} hint={t("zk.finishedGoodsHint")}>
             <input
               className="input"
               type="number"
@@ -254,7 +262,7 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
               onChange={(e) => setFinishedGoodsValue(e.target.value)}
             />
           </Field>
-          <Field label="Matières premières éligibles (DZD)" hint="Pré-rempli depuis Stock — matières premières, modifiable">
+          <Field label={t("zk.rawMaterialsDzd")} hint={t("zk.rawMaterialsHint")}>
             <input
               className="input"
               type="number"
@@ -268,9 +276,9 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
       </section>
 
       <section className="card-section">
-        <h3>Créances et autres actifs</h3>
+        <h3>{t("zk.receivablesSection")}</h3>
         <div className="form-row">
-          <Field label="Créances recouvrables (DZD)" hint="Pré-rempli depuis Ventes — commandes expédiées non payées, modifiable">
+          <Field label={t("zk.receivablesDzd")} hint={t("zk.receivablesHint")}>
             <input
               className="input"
               type="number"
@@ -280,90 +288,90 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
               onChange={(e) => setReceivablesValue(e.target.value)}
             />
           </Field>
-          <Field label="Autres actifs éligibles (DZD)">
+          <Field label={t("zk.otherAssetsDzd")}>
             <input className="input" type="number" min={0} step="any" value={otherAssets} onChange={(e) => setOtherAssets(e.target.value)} />
           </Field>
         </div>
       </section>
 
       <section className="card-section">
-        <h3>Déductions et taux</h3>
+        <h3>{t("zk.deductionsSection")}</h3>
         <div className="form-row">
-          <Field label="Déductions éligibles (DZD)" hint="Ex. nette fournisseur — non suivi automatiquement">
+          <Field label={t("zk.deductionsDzd")} hint={t("zk.deductionsHint")}>
             <input className="input" type="number" min={0} step="any" value={deductions} onChange={(e) => setDeductions(e.target.value)} />
           </Field>
-          <Field label="Taux de Zakat (%)">
+          <Field label={t("zk.rateDzd")}>
             <input className="input" type="number" min={0} max={100} step="any" value={zakatRate} onChange={(e) => setZakatRate(e.target.value)} />
           </Field>
         </div>
-        <Field label="Notes" hint="Facultatif">
+        <Field label={t("field.notes")} hint={t("state.optional")}>
           <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
       </section>
 
       <section>
-        <h4 className="section-title">Actifs zakatables</h4>
+        <h4 className="section-title">{t("zk.zakatableAssets")}</h4>
         <div className="list-card">
           <table className="stock-table">
             <tbody>
               <tr>
-                <td>Caisse</td>
+                <td>{t("zk.cash")}</td>
                 <td className="tabular num">{formatCurrency(n(cash))}</td>
               </tr>
               <tr>
-                <td>Banque</td>
+                <td>{t("zk.bank")}</td>
                 <td className="tabular num">{formatCurrency(n(bank))}</td>
               </tr>
               <tr>
-                <td>Produits finis</td>
+                <td>{t("zk.finishedGoods")}</td>
                 <td className="tabular num">{formatCurrency(n(finishedGoodsValue))}</td>
               </tr>
               <tr>
-                <td>Matières premières éligibles</td>
+                <td>{t("zk.rawMaterials")}</td>
                 <td className="tabular num">{formatCurrency(n(rawMaterialsValue))}</td>
               </tr>
               <tr>
-                <td>Créances recouvrables</td>
+                <td>{t("zk.receivables")}</td>
                 <td className="tabular num">{formatCurrency(n(receivablesValue))}</td>
               </tr>
               <tr>
-                <td>Autres actifs éligibles</td>
+                <td>{t("zk.otherAssets")}</td>
                 <td className="tabular num">{formatCurrency(n(otherAssets))}</td>
               </tr>
               <tr className="zakat-total-row">
                 <td>
-                  <strong>TOTAL</strong>
+                  <strong>{t("zk.total")}</strong>
                 </td>
                 <td className="tabular num">
                   <strong>{formatCurrency(totals.totalAssets)}</strong>
                 </td>
               </tr>
               <tr>
-                <td>Déductions éligibles (dettes frs)</td>
+                <td>{t("zk.deductions")}</td>
                 <td className="tabular num">− {formatCurrency(n(deductions))}</td>
               </tr>
               <tr className="zakat-total-row">
                 <td>
-                  <strong>Base nette de Zakat</strong>
+                  <strong>{t("zk.netBase")}</strong>
                 </td>
                 <td className="tabular num">
                   <strong>{formatCurrency(totals.zakatableBase)}</strong>
                 </td>
               </tr>
               <tr>
-                <td>Nisab (85 g d'or)</td>
+                <td>{t("zk.nisab")}</td>
                 <td className="tabular num">{formatCurrency(totals.nisabValue)}</td>
               </tr>
               <tr>
-                <td>Taux de Zakat</td>
+                <td>{t("zk.rate")}</td>
                 <td className="tabular num">{n(zakatRate)} %</td>
               </tr>
               <tr className="zakat-total-row">
                 <td>
-                  <strong>ZAKAT DUE</strong>
+                  <strong>{t("zk.zakatDueCaps")}</strong>
                 </td>
                 <td className="tabular num">
-                  <strong>{totals.belowNisab ? "Aucune (sous le nisab)" : formatCurrency(totals.zakatDue)}</strong>
+                  <strong>{totals.belowNisab ? t("zk.noneBelowNisab") : formatCurrency(totals.zakatDue)}</strong>
                 </td>
               </tr>
             </tbody>
@@ -373,10 +381,10 @@ export function ZakatCalculationPage({ onNavigate }: { onNavigate: (tab: ZakatTa
 
       <div className="row-actions">
         <Button variant="secondary" onClick={() => submit(false)} disabled={saving || exporting}>
-          {saving ? "Enregistrement…" : "Enregistrer le calcul"}
+          {saving ? t("action.saving") : t("zk.save")}
         </Button>
         <Button variant="primary" onClick={() => submit(true)} disabled={saving || exporting}>
-          {exporting ? "Enregistrement…" : "Enregistrer et exporter vers le tableau de bord"}
+          {exporting ? t("action.saving") : t("zk.saveAndPin")}
         </Button>
       </div>
     </div>

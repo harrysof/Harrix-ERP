@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { t } from '../i18n/messages/index.js';
 import {
   amountOwed,
   CLOSED_PO_STATUSES,
@@ -55,14 +56,14 @@ export class PurchasingService {
 
   async findOne(id: string) {
     const po = await this.prisma.purchaseOrder.findUnique({ where: { id }, include: PO_INCLUDE });
-    if (!po) throw new NotFoundException(`Bon de commande introuvable : ${id}`);
+    if (!po) throw new NotFoundException(t('purchasing.poNotFound', { id }));
     return decorate(po);
   }
 
   /** §13's supplier detail page, in one call. */
   async getSupplierDetail(supplierId: string) {
     const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
-    if (!supplier) throw new NotFoundException(`Fournisseur introuvable : ${supplierId}`);
+    if (!supplier) throw new NotFoundException(t('purchasing.supplierNotFound', { id: supplierId }));
 
     const orders = await this.prisma.purchaseOrder.findMany({
       where: { supplierId },
@@ -154,8 +155,8 @@ export class PurchasingService {
 
   async create(dto: CreatePurchaseOrderDto) {
     const supplier = await this.prisma.supplier.findUnique({ where: { id: dto.supplierId } });
-    if (!supplier) throw new BadRequestException(`Fournisseur introuvable : ${dto.supplierId}`);
-    if (supplier.archived) throw new BadRequestException(`Le fournisseur "${supplier.name}" est archivé.`);
+    if (!supplier) throw new BadRequestException(t('purchasing.supplierNotFound', { id: dto.supplierId }));
+    if (supplier.archived) throw new BadRequestException(t('purchasing.supplierArchived', { name: supplier.name }));
     await this.assertItemsExist(dto.lines.map((l) => l.itemId));
     assertDiscount(dto.discountType, dto.discount);
 
@@ -164,9 +165,7 @@ export class PurchasingService {
     const total = poTotals(dto.lines, dto).total;
     const amountPaid = dto.amountPaid ?? 0;
     if (amountPaid > total) {
-      throw new BadRequestException(
-        `Le paiement initial (${amountPaid} DZD) dépasse le total du bon de commande (${total} DZD).`,
-      );
+      throw new BadRequestException(t('purchasing.depositExceedsTotal', { paid: amountPaid, total }));
     }
 
     try {
@@ -189,7 +188,7 @@ export class PurchasingService {
       });
       return this.findOne(created.id);
     } catch (error) {
-      if (isUniqueConstraintError(error)) throw new ConflictException(`Un bon de commande "${code}" existe déjà.`);
+      if (isUniqueConstraintError(error)) throw new ConflictException(t('purchasing.codeExists', { code }));
       throw error;
     }
   }
@@ -202,13 +201,11 @@ export class PurchasingService {
    */
   async update(id: string, dto: UpdatePurchaseOrderDto) {
     const po = await this.prisma.purchaseOrder.findUnique({ where: { id }, include: { lines: { include: { receiptLines: true } } } });
-    if (!po) throw new NotFoundException(`Bon de commande introuvable : ${id}`);
+    if (!po) throw new NotFoundException(t('purchasing.poNotFound', { id }));
 
     if (dto.lines) {
       if (!EDITABLE_PO_STATUSES.includes(po.status as PoStatus)) {
-        throw new ConflictException(
-          `Les lignes de ce bon de commande ne peuvent plus être modifiées (statut : ${po.status}). Créez un nouveau bon si nécessaire.`,
-        );
+        throw new ConflictException(t('purchasing.linesNotEditable', { status: po.status }));
       }
       await this.assertItemsExist(dto.lines.map((l) => l.itemId));
     }
@@ -248,22 +245,18 @@ export class PurchasingService {
    */
   async setStatus(id: string, dto: SetPoStatusDto) {
     const po = await this.prisma.purchaseOrder.findUnique({ where: { id }, include: { lines: { include: { receiptLines: true } } } });
-    if (!po) throw new NotFoundException(`Bon de commande introuvable : ${id}`);
+    if (!po) throw new NotFoundException(t('purchasing.poNotFound', { id }));
 
     if (dto.status === 'RECEIVED' || dto.status === 'PARTIALLY_RECEIVED') {
-      throw new BadRequestException(
-        'Ce statut est déterminé par les réceptions enregistrées. Enregistrez une réception plutôt que de changer le statut à la main.',
-      );
+      throw new BadRequestException(t('purchasing.statusFromReceipts'));
     }
     if (po.status === 'RECEIVED' && dto.status !== 'CANCELLED') {
-      throw new ConflictException('Ce bon de commande est entièrement reçu.');
+      throw new ConflictException(t('purchasing.poFullyReceived'));
     }
     if (dto.status === 'CANCELLED') {
       const received = po.lines.some((l) => receivedForLine(l.id, l.receiptLines) > 0);
       if (received) {
-        throw new ConflictException(
-          "Ce bon de commande a déjà des réceptions — il ne peut pas être annulé. Le stock reçu reste reçu.",
-        );
+        throw new ConflictException(t('purchasing.poHasReceiptsNoCancel'));
       }
     }
 
@@ -289,18 +282,16 @@ export class PurchasingService {
    */
   async recordPayment(id: string, dto: RecordPoPaymentDto) {
     const po = await this.prisma.purchaseOrder.findUnique({ where: { id }, include: { lines: true } });
-    if (!po) throw new NotFoundException(`Bon de commande introuvable : ${id}`);
+    if (!po) throw new NotFoundException(t('purchasing.poNotFound', { id }));
     if (po.paymentStatus === 'CANCELLED') {
-      throw new ConflictException('Ce bon de commande est annulé — aucun paiement ne peut lui être associé.');
+      throw new ConflictException(t('purchasing.poCancelledNoPayment'));
     }
 
     const total = poTotals(po.lines, po).total;
     const amountPaid = round(po.amountPaid + dto.amount);
     if (amountPaid > total) {
       const remaining = round(total - po.amountPaid);
-      throw new BadRequestException(
-        `Ce paiement (${dto.amount} DZD) dépasse le solde restant dû (${remaining} DZD).`,
-      );
+      throw new BadRequestException(t('common.paymentExceedsBalance', { amount: dto.amount, remaining }));
     }
 
     await this.prisma.purchaseOrder.update({
@@ -320,33 +311,29 @@ export class PurchasingService {
       where: { id },
       include: { lines: { include: { item: { include: { inventoryType: true } }, receiptLines: true } } },
     });
-    if (!po) throw new NotFoundException(`Bon de commande introuvable : ${id}`);
+    if (!po) throw new NotFoundException(t('purchasing.poNotFound', { id }));
     if (!RECEIVABLE_PO_STATUSES.includes(po.status as PoStatus)) {
-      throw new ConflictException(
-        `Un bon de commande au statut "${po.status}" ne peut pas être réceptionné. Approuvez-le d'abord.`,
-      );
+      throw new ConflictException(t('purchasing.poNotReceivableStatus', { status: po.status }));
     }
-    if (dto.lines.length === 0) throw new BadRequestException('Indiquez au moins une ligne reçue.');
+    if (dto.lines.length === 0) throw new BadRequestException(t('purchasing.giveAtLeastOneLine'));
 
     // Validate every line before opening the transaction, so a bad line fails
     // with a message naming the material instead of rolling back silently.
     const plans = dto.lines.map((line) => {
       const poLine = po.lines.find((l) => l.id === line.purchaseOrderLineId);
-      if (!poLine) throw new BadRequestException(`Ligne de commande introuvable : ${line.purchaseOrderLineId}`);
+      if (!poLine) throw new BadRequestException(t('purchasing.orderLineNotFound', { id: line.purchaseOrderLineId }));
 
       const stillOwed = outstandingForLine(poLine, poLine.receiptLines);
       if (line.quantity > stillOwed && !dto.allowOverDelivery) {
-        throw new BadRequestException(
-          `Il ne reste que ${stillOwed} ${poLine.item.unit} à recevoir pour "${poLine.item.name}". Cochez la sur-livraison si le fournisseur a livré davantage.`,
-        );
+        throw new BadRequestException(t('purchasing.onlyOwedRemaining', { stillOwed, unit: poLine.item.unit, name: poLine.item.name }));
       }
 
       const type = poLine.item.inventoryType;
       if (type.hasBatches && !line.batchNumber) {
-        throw new BadRequestException(`Le numéro de lot est obligatoire pour "${poLine.item.name}".`);
+        throw new BadRequestException(t('common.lotNumberRequiredFor', { item: poLine.item.name }));
       }
       if (type.hasExpiry && !line.expiryDate) {
-        throw new BadRequestException(`La date de péremption est obligatoire pour "${poLine.item.name}".`);
+        throw new BadRequestException(t('common.expiryRequiredFor', { item: poLine.item.name }));
       }
 
       return { line, poLine };
@@ -427,12 +414,12 @@ export class PurchasingService {
   /** Only an untouched draft can be deleted; anything else is cancelled. */
   async remove(id: string) {
     const po = await this.prisma.purchaseOrder.findUnique({ where: { id }, include: { receipts: true } });
-    if (!po) throw new NotFoundException(`Bon de commande introuvable : ${id}`);
+    if (!po) throw new NotFoundException(t('purchasing.poNotFound', { id }));
     if (po.receipts.length > 0) {
-      throw new ConflictException('Ce bon de commande a des réceptions et ne peut pas être supprimé. Son historique doit rester.');
+      throw new ConflictException(t('purchasing.poHasReceiptsNoDelete'));
     }
     if (po.status !== 'DRAFT') {
-      throw new ConflictException(`Seul un brouillon peut être supprimé. Annulez ce bon de commande à la place.`);
+      throw new ConflictException(t('purchasing.onlyDraftDeletable'));
     }
     await this.prisma.purchaseOrder.delete({ where: { id } });
     return { id, deleted: true };
@@ -444,10 +431,10 @@ export class PurchasingService {
     const unique = [...new Set(itemIds)];
     const items = await this.prisma.item.findMany({ where: { id: { in: unique } } });
     const missing = unique.filter((id) => !items.some((i) => i.id === id));
-    if (missing.length > 0) throw new BadRequestException(`Article introuvable : ${missing.join(', ')}`);
+    if (missing.length > 0) throw new BadRequestException(t('purchasing.itemNotFound', { ids: missing.join(', ') }));
     const archived = items.filter((i) => i.archived);
     if (archived.length > 0) {
-      throw new BadRequestException(`Article archivé : ${archived.map((i) => i.name).join(', ')}`);
+      throw new BadRequestException(t('purchasing.itemArchived', { names: archived.map((i) => i.name).join(', ') }));
     }
   }
 
@@ -472,9 +459,7 @@ export class PurchasingService {
  */
 function assertDiscount(discountType: string | undefined, discount: number | undefined): void {
   if (discountType === 'PERCENT' && (discount ?? 0) > 1) {
-    throw new BadRequestException(
-      'La remise en pourcentage se saisit en fraction (0,10 pour 10 %), pas en pourcentage brut.',
-    );
+    throw new BadRequestException(t('common.discountRateFraction'));
   }
 }
 

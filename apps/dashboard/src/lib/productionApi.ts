@@ -1,4 +1,5 @@
 import { api } from "./api";
+import type { TranslationKey } from "./i18n";
 import type { ApiItem } from "./stockApi";
 
 /**
@@ -10,13 +11,14 @@ import type { ApiItem } from "./stockApi";
 export type ProductionStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "INVESTIGATION" | "CLOSED" | "CANCELLED";
 
 /** French labels for the status strings the backend stores. */
-export const STATUS_LABELS: Record<ProductionStatus, string> = {
-  PLANNED: "Planifié",
-  IN_PROGRESS: "En cours",
-  COMPLETED: "Terminé",
-  INVESTIGATION: "Investigation requise",
-  CLOSED: "Écart justifié",
-  CANCELLED: "Annulé",
+/** Catalogue keys — the same status appears on the list, the fiche and the filter. */
+export const STATUS_LABELS: Record<ProductionStatus, TranslationKey> = {
+  PLANNED: "prodStatus.PLANNED",
+  IN_PROGRESS: "prodStatus.IN_PROGRESS",
+  COMPLETED: "prodStatus.COMPLETED",
+  INVESTIGATION: "prodStatus.INVESTIGATION",
+  CLOSED: "prodStatus.CLOSED",
+  CANCELLED: "prodStatus.CANCELLED",
 };
 
 export const STATUS_ORDER: ProductionStatus[] = ["PLANNED", "IN_PROGRESS", "COMPLETED", "INVESTIGATION", "CLOSED", "CANCELLED"];

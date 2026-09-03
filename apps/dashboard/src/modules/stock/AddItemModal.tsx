@@ -9,6 +9,8 @@ import { UnitSelect } from "../../components/ui/UnitSelect";
 import { isValidUnit } from "../../lib/units";
 import { todayIso } from "../../lib/date";
 import { Banner } from "../../components/ui/Banner";
+import { Rich } from "../../components/ui/Rich";
+import { useI18n } from "../../state/LanguageContext";
 
 interface AddItemModalProps {
   inventoryType: InventoryTypeConfig;
@@ -42,6 +44,7 @@ interface AddItemModalProps {
 }
 
 export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItemModalProps) {
+  const { t } = useI18n();
   const [name, setName] = useState(item?.name ?? "");
   const [reference, setReference] = useState(item?.reference ?? "");
   const [unit, setUnit] = useState(item?.unit ?? inventoryType.defaultUnit);
@@ -69,40 +72,40 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
 
   async function handleSubmit() {
     if (!name.trim() || !reference.trim()) {
-      setError("Le nom et la référence sont obligatoires.");
+      setError(t("item.err.nameReference"));
       return;
     }
     if (!isValidUnit(unit)) {
-      setError("Choisissez une unité de mesure (kg, litre, pièce…). Un nombre n'est pas une unité.");
+      setError(t("item.unitInvalid"));
       return;
     }
     const thresholdValue = Number(threshold);
     if (!Number.isFinite(thresholdValue) || thresholdValue < 0) {
-      setError("Le seuil de réapprovisionnement doit être un nombre positif.");
+      setError(t("item.err.threshold"));
       return;
     }
     const priceValue = price === "" ? null : Number(price);
     if (priceValue !== null && (!Number.isFinite(priceValue) || priceValue < 0)) {
-      setError("Le prix doit être un nombre positif (DZD).");
+      setError(t("item.err.price"));
       return;
     }
     const unitCostValue = unitCost === "" ? null : Number(unitCost);
     if (unitCostValue !== null && (!Number.isFinite(unitCostValue) || unitCostValue < 0)) {
-      setError("Le coût unitaire doit être un nombre positif (DZD).");
+      setError(t("item.err.unitCost"));
       return;
     }
     const quantityValue = initialQuantity === "" ? 0 : Number(initialQuantity);
     if (initialQuantity !== "" && (!Number.isFinite(quantityValue) || quantityValue < 0)) {
-      setError("La quantité initiale doit être un nombre positif.");
+      setError(t("item.err.initialQuantity"));
       return;
     }
     if (quantityValue > 0) {
       if (inventoryType.hasBatches && !initialBatch.trim()) {
-        setError("Indiquez le numéro de lot de ce stock initial — cet inventaire est suivi par lot.");
+        setError(t("item.initialLotHint"));
         return;
       }
       if (inventoryType.hasExpiry && !initialExpiry) {
-        setError("Indiquez la date de péremption de ce stock initial.");
+        setError(t("item.initialExpiryHint"));
         return;
       }
     }
@@ -138,7 +141,7 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
             : null,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
       setSubmitting(false);
     }
   }
@@ -155,42 +158,51 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
       : null;
   const unitCostPreview =
     unitCost !== "" && Number.isFinite(unitCostNumber) && unitCostNumber >= 0 && item && item.quantity > 0
-      ? `${formatQuantity(item.quantity, item.unit)} en stock — ${formatCurrency(item.quantity * unitCostNumber)}`
+      ? t("item.unitCostPreview", {
+          quantity: formatQuantity(item.quantity, item.unit),
+          value: formatCurrency(item.quantity * unitCostNumber),
+        })
       : null;
 
   return (
     <Modal
-      title={item ? `Modifier — ${item.name}` : `Nouvel article — ${inventoryType.label}`}
+      title={
+        item
+          ? t("item.editTitle", { name: item.name })
+          : t("item.newTitle", { inventory: inventoryType.label })
+      }
       onClose={onClose}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={submitting}>
-            Annuler
+            {t("action.cancel")}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Enregistrement…" : item ? "Enregistrer" : "Ajouter l'article"}
+            {submitting ? t("action.saving") : item ? t("action.save") : t("item.addTitle")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
-        <Field label="Nom">
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={`Ex. ${inventoryType.singular}`} autoFocus />
+        <Field label={t("field.name")}>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("item.namePlaceholder", { singular: inventoryType.singular })}
+            autoFocus
+          />
         </Field>
-        <Field label="Référence">
-          <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Ex. CH-004" />
+        <Field label={t("field.reference")}>
+          <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t("item.ph.reference")} />
         </Field>
         <div className="form-row">
-          <Field label="Unité" hint="Ce en quoi l'article se compte — la quantité et le coût s'expriment par unité">
+          <Field label={t("field.unit")} hint={t("item.unitHint")}>
             <UnitSelect value={unit} onChange={setUnit} />
           </Field>
-          <Field label="Seuil de réapprovisionnement" hint="Alerte quand le stock descend à ce niveau ou en dessous">
+          <Field label={t("item.thresholdLabel")} hint={t("item.thresholdHint")}>
             <input className="input" type="number" min={0} value={threshold} onChange={(e) => setThreshold(e.target.value)} />
           </Field>
         </div>
         <Field
-          label={`Coût unitaire (DZD / ${unit.trim() || inventoryType.defaultUnit})`}
-          hint="Ce que coûte une unité à l'achat. Sert de valeur par défaut aux réceptions et à valoriser le stock : la valeur affichée est la moyenne de ce qui a réellement été payé."
+          label={t("item.unitCostLabel", { unit: unit.trim() || inventoryType.defaultUnit })}
+          hint={t("item.unitCostHint")}
         >
           <input
             className="input"
@@ -199,20 +211,20 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
             step="any"
             value={unitCost}
             onChange={(e) => setUnitCost(e.target.value)}
-            placeholder="Ex. 1200"
+            placeholder={t("item.ph.unitCost")}
           />
           {unitCostPreview ? <span className="field-hint">{unitCostPreview}</span> : null}
         </Field>
         {(inventoryType.hasColor || inventoryType.hasSize) && (
           <div className="form-row">
             {inventoryType.hasColor && (
-              <Field label="Couleur">
-                <input className="input" value={color} onChange={(e) => setColor(e.target.value)} placeholder="Ex. Noir" />
+              <Field label={t("stock.col.color")}>
+                <input className="input" value={color} onChange={(e) => setColor(e.target.value)} placeholder={t("item.ph.color")} />
               </Field>
             )}
             {inventoryType.hasSize && (
-              <Field label="Taille">
-                <input className="input" value={size} onChange={(e) => setSize(e.target.value)} placeholder="Ex. 42" />
+              <Field label={t("stock.col.size")}>
+                <input className="input" value={size} onChange={(e) => setSize(e.target.value)} placeholder={t("item.ph.size")} />
               </Field>
             )}
           </div>
@@ -220,54 +232,54 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
         {(inventoryType.hasGender || inventoryType.hasPrice) && (
           <div className="form-row">
             {inventoryType.hasGender && (
-              <Field label="Sexe">
+              <Field label={t("stock.col.gender")}>
                 <select className="input" value={gender} onChange={(e) => setGender(e.target.value)}>
-                  <option value="">— Non précisé —</option>
-                  <option value="M">M (Homme)</option>
-                  <option value="F">F (Femme)</option>
+                  <option value="">{t("receive.unspecified")}</option>
+                  <option value="M">{t("item.genderM")}</option>
+                  <option value="F">{t("item.genderF")}</option>
                 </select>
               </Field>
             )}
             {inventoryType.hasPrice && (
-              <Field label="Prix de vente (DZD)" hint="Ce à quoi l'article est vendu — distinct du coût unitaire ci-dessus">
-                <input className="input" type="number" min={0} step="any" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex. 4500" />
+              <Field label={t("item.salePriceLabel")} hint={t("item.salePriceHint")}>
+                <input className="input" type="number" min={0} step="any" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={t("item.ph.price")} />
               </Field>
             )}
           </div>
         )}
         {inventoryType.hasDescription && (
-          <Field label="Description" hint="Usage, remplaçabilité… — informatif">
+          <Field label={t("field.description")} hint={t("item.descriptionHint")}>
             <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
         )}
         {inventoryType.hasMachineInfo && (
           <>
             <p className="detail-type" style={{ margin: 0 }}>
-              Machine &amp; compatibilité
+              {t("item.machineSectionShort")}
             </p>
             <div className="form-row">
-              <Field label="Machine">
-                <input className="input" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder="Ex. Machine à coudre N°3" />
+              <Field label={t("field.machine")}>
+                <input className="input" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder={t("item.ph.machine")} />
               </Field>
-              <Field label="Compatibilité">
-                <input className="input" value={compatibility} onChange={(e) => setCompatibility(e.target.value)} placeholder="Ex. Piqueuses Adler" />
-              </Field>
-            </div>
-            <div className="form-row">
-              <Field label="Fabricant">
-                <input className="input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="Ex. SKF" />
-              </Field>
-              <Field label="Localisation">
-                <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ex. Atelier — armoire B2" />
+              <Field label={t("stock.col.compatibility")}>
+                <input className="input" value={compatibility} onChange={(e) => setCompatibility(e.target.value)} placeholder={t("item.ph.compatibility")} />
               </Field>
             </div>
             <div className="form-row">
-              <Field label="Criticité" hint="Impact d'une rupture de stock sur la production">
+              <Field label={t("stock.col.manufacturer")}>
+                <input className="input" value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t("item.ph.manufacturer")} />
+              </Field>
+              <Field label={t("stock.col.location")}>
+                <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t("item.ph.location")} />
+              </Field>
+            </div>
+            <div className="form-row">
+              <Field label={t("stock.col.criticality")} hint={t("item.criticalityHint")}>
                 <select className="input" value={criticality} onChange={(e) => setCriticality(e.target.value)}>
-                  <option value="">— Non précisée —</option>
-                  <option value="Haute">Haute</option>
-                  <option value="Moyenne">Moyenne</option>
-                  <option value="Basse">Basse</option>
+                  <option value="">{t("item.unspecifiedF")}</option>
+                  <option value="Haute">{t("criticality.high")}</option>
+                  <option value="Moyenne">{t("criticality.medium")}</option>
+                  <option value="Basse">{t("criticality.low")}</option>
                 </select>
               </Field>
             </div>
@@ -276,12 +288,12 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
         {!item ? (
           <>
             <p className="detail-type" style={{ margin: 0 }}>
-              Stock déjà en place
+              {t("item.existingStock")}
             </p>
             <div className="form-row">
               <Field
-                label={`Quantité initiale (${unit.trim() || inventoryType.defaultUnit})`}
-                hint="Ce que vous avez déjà en magasin aujourd'hui. Laissez vide si l'article n'est pas encore approvisionné."
+                label={t("item.initialQuantityLabel", { unit: unit.trim() || inventoryType.defaultUnit })}
+                hint={t("item.initialQuantityHint")}
               >
                 <input
                   className="input"
@@ -290,10 +302,10 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
                   step="any"
                   value={initialQuantity}
                   onChange={(e) => setInitialQuantity(e.target.value)}
-                  placeholder="Ex. 100"
+                  placeholder={t("item.ph.threshold")}
                 />
               </Field>
-              <Field label="Date" hint="Date à laquelle ce stock est constaté">
+              <Field label={t("field.date")} hint={t("item.initialDateHint")}>
                 <input className="input" type="date" value={initialDate} onChange={(e) => setInitialDate(e.target.value)} />
               </Field>
             </div>
@@ -301,12 +313,12 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
             {Number(initialQuantity) > 0 && (inventoryType.hasBatches || inventoryType.hasExpiry) ? (
               <div className="form-row">
                 {inventoryType.hasBatches ? (
-                  <Field label="Numéro de lot">
-                    <input className="input" value={initialBatch} onChange={(e) => setInitialBatch(e.target.value)} placeholder="Ex. L-2501" />
+                  <Field label={t("field.batchNumber")}>
+                    <input className="input" value={initialBatch} onChange={(e) => setInitialBatch(e.target.value)} placeholder={t("item.ph.lot")} />
                   </Field>
                 ) : null}
                 {inventoryType.hasExpiry ? (
-                  <Field label="Date de péremption">
+                  <Field label={t("field.expiryDate")}>
                     <input className="input" type="date" value={initialExpiry} onChange={(e) => setInitialExpiry(e.target.value)} />
                   </Field>
                 ) : null}
@@ -315,24 +327,28 @@ export function AddItemModal({ inventoryType, item, onClose, onSubmit }: AddItem
 
             {initialValue !== null ? (
               <Banner tone="info">
-                Ce stock initial est enregistré comme une <strong>réception</strong> : {formatQuantity(Number(initialQuantity), unit.trim() || inventoryType.defaultUnit)}{" "}
-                valorisés à {formatCurrency(initialValue)}. Pour une livraison avec fournisseur, utilisez le bouton « Réception » de la
-                ligne — la quantité d'un article vient toujours de ses mouvements, jamais d'une case qu'on réécrit.
+                <Rich
+                  text={t("item.initialStockNote", {
+                    quantity: formatQuantity(Number(initialQuantity), unit.trim() || inventoryType.defaultUnit),
+                    value: formatCurrency(initialValue),
+                  })}
+                  parts={{ reception: <strong>{t("item.reception")}</strong> }}
+                />
               </Banner>
             ) : null}
           </>
         ) : null}
 
         <Field
-          label="Photo (URL)"
-          hint="Adresse d'une image (https…) ou image intégrée (données data:image/…). Facultatif."
+          label={t("item.photoLabel")}
+          hint={t("item.photoHint")}
         >
           {photoUrl ? (
             <div className="field-photo-preview">
               <img src={photoUrl} alt="" />
             </div>
           ) : null}
-          <input className="input" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://… ou data:image/…" />
+          <input className="input" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder={t("item.ph.photoUrl")} />
         </Field>
         {error ? <p className="form-error">{error}</p> : null}
       </div>

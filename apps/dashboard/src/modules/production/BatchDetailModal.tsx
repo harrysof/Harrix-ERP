@@ -11,6 +11,7 @@ import { addConsumption, declareOutput, updateBatch, STATUS_LABELS, type ApiProd
 import { MaterialLineEditor } from "./MaterialLineEditor";
 import { VarianceBreakdown } from "./VarianceBreakdown";
 import { STATUS_TONE, emptyMaterialLine, formatRate, type MaterialLine } from "./types";
+import { useI18n } from "../../state/LanguageContext";
 
 interface BatchDetailModalProps {
   batch: ApiProductionBatch;
@@ -26,6 +27,7 @@ interface BatchDetailModalProps {
  * where an unexplained variance gets its explanation.
  */
 export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: BatchDetailModalProps) {
+  const { t, tn } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -49,7 +51,7 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
       onChanged(await action());
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue.");
+      setError(e instanceof Error ? e.message : t("error.generic"));
       return false;
     } finally {
       setBusy(false);
@@ -57,35 +59,43 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
   }
 
   return (
-    <Modal title={`Lot ${batch.code}`} onClose={onClose} width={860} footer={<Button onClick={onClose}>Fermer</Button>}>
+    <Modal
+      title={t("prod.batchTitle", { code: batch.code })}
+      onClose={onClose}
+      width={860}
+      footer={<Button onClick={onClose}>{t("action.close")}</Button>}
+    >
       <div className="form-stack">
         <div className="batch-meta">
-          <MetaItem label="Statut" value={<Pill tone={STATUS_TONE[batch.status]}>{STATUS_LABELS[batch.status]}</Pill>} />
-          <MetaItem label="Date" value={formatDate(batch.date)} />
-          <MetaItem label="Produit" value={batch.product.name} />
-          <MetaItem label="Machine" value={batch.machine} />
-          <MetaItem label="Équipe" value={batch.shift} />
-          <MetaItem label="Superviseur" value={batch.supervisor ?? "—"} />
-          <MetaItem label="Opérateur" value={batch.operator ?? "—"} />
-          <MetaItem label="Horaire" value={batch.startTime ? `${batch.startTime} → ${batch.endTime || "…"}` : "—"} />
+          <MetaItem
+            label={t("field.status")}
+            value={<Pill tone={STATUS_TONE[batch.status]}>{t(STATUS_LABELS[batch.status])}</Pill>}
+          />
+          <MetaItem label={t("field.date")} value={formatDate(batch.date)} />
+          <MetaItem label={t("prod.filter.product")} value={batch.product.name} />
+          <MetaItem label={t("field.machine")} value={batch.machine} />
+          <MetaItem label={t("prod.shift")} value={batch.shift} />
+          <MetaItem label={t("prod.supervisor")} value={batch.supervisor ?? "—"} />
+          <MetaItem label={t("prod.operator")} value={batch.operator ?? "—"} />
+          <MetaItem label={t("prod.schedule")} value={batch.startTime ? `${batch.startTime} → ${batch.endTime || "…"}` : "—"} />
         </div>
 
         {batch.notes ? <p className="batch-notes">{batch.notes}</p> : null}
 
         <section>
-          <h4 className="section-title">Matières consommées</h4>
+          <h4 className="section-title">{t("prod.consumedMaterials")}</h4>
           {batch.consumptions.length === 0 ? (
-            <EmptyState title="Aucune matière enregistrée" description="Ce lot n'a encore consommé aucune matière première." />
+            <EmptyState title={t("prod.noMaterialsRecorded")} description={t("prod.noMaterialsDesc")} />
           ) : (
             <div className="table-scroll">
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>Matière</th>
-                    <th>Lot</th>
-                    <th>Quantité</th>
-                    <th>Coût unitaire</th>
-                    <th>Coût</th>
+                    <th>{t("prod.material")}</th>
+                    <th>{t("field.batch")}</th>
+                    <th>{t("field.quantity")}</th>
+                    <th>{t("field.unitCost")}</th>
+                    <th>{t("prod.col.materialCost")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -105,7 +115,7 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={4}>Coût matières du lot</td>
+                    <td colSpan={4}>{t("prod.materialsCost")}</td>
                     <td className="tabular">{formatCurrency(batch.materialCost)}</td>
                   </tr>
                 </tfoot>
@@ -127,14 +137,14 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                 ))}
                 <div className="row-actions">
                   <Button variant="ghost" onClick={() => setAddingMaterials((prev) => [...prev!, emptyMaterialLine()])}>
-                    + Ligne
+                    {t("prod.addRow")}
                   </Button>
                   <Button
                     variant="primary"
                     disabled={busy}
                     onClick={() => {
                       const lines = addingMaterials.filter((l) => l.itemId && l.quantity > 0);
-                      if (lines.length === 0) return setError("Ajoutez au moins une matière avec une quantité.");
+                      if (lines.length === 0) return setError(t("prod.err.materials"));
                       run(() =>
                         addConsumption(
                           batch.id,
@@ -147,21 +157,21 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                       ).then((ok) => ok && setAddingMaterials(null));
                     }}
                   >
-                    Enregistrer la consommation
+                    {t("prod.saveConsumption")}
                   </Button>
-                  <Button onClick={() => setAddingMaterials(null)}>Annuler</Button>
+                  <Button onClick={() => setAddingMaterials(null)}>{t("action.cancel")}</Button>
                 </div>
               </div>
             ) : (
               <Button variant="ghost" style={{ marginTop: 8 }} onClick={() => setAddingMaterials([emptyMaterialLine()])}>
-                + Ajouter une consommation
+                {t("prod.addConsumption")}
               </Button>
             )
           ) : null}
         </section>
 
         <section>
-          <h4 className="section-title">Sortie de production</h4>
+          <h4 className="section-title">{t("prod.outputSection")}</h4>
 
           {batch.outputDeclared ? (
             <>
@@ -174,56 +184,60 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
               />
               <div className="detail-stats" style={{ marginBottom: 12 }}>
                 <div className="stat-card">
-                  <span className="stat-card-label">Coût matières du lot</span>
+                  <span className="stat-card-label">{t("prod.materialsCost")}</span>
                   <span className="stat-card-value">{formatCurrency(batch.materialCost)}</span>
                   <span className="stat-card-hint">
                     {batch.uncostedConsumptionCount > 0
-                      ? `${batch.uncostedConsumptionCount} matière(s) sans coût connu — non comptée(s)`
-                      : "Matières premières consommées, au coût du stock"}
+                      ? t("prod.missingCosts", {
+                          count: tn("prod.materialCount", batch.uncostedConsumptionCount),
+                        })
+                      : t("prod.materialsAtStockCost")}
                   </span>
                 </div>
                 <div className="stat-card">
-                  <span className="stat-card-label">Coût matières / unité</span>
+                  <span className="stat-card-label">{t("prod.unitMaterialCost")}</span>
                   <span className="stat-card-value">
                     {batch.unitMaterialCost !== null ? formatCurrency(batch.unitMaterialCost) : "—"}
                   </span>
                   <span className="stat-card-hint">
-                    Réparti sur les unités vendables — le rebut n'en absorbe aucune part
+                    {t("prod.spreadNoWaste")}
                   </span>
                 </div>
               </div>
 
               <Banner tone="warn">
-                Coût matières uniquement : main-d'œuvre, énergie, amortissement des machines et frais généraux ne sont pas comptés. C'est
-                aussi ce montant qui devient le coût matières estimé du produit fini dans l'onglet Stock.
+                {t("prod.materialCostOnly")}
               </Banner>
 
               <div className="rate-row">
-                <RateItem label="Rendement (1er choix)" value={formatRate(batch.rates.yieldRate)} />
-                <RateItem label="Taux 2ème choix" value={formatRate(batch.rates.secondChoiceRate)} />
-                <RateItem label="Taux de rebut" value={formatRate(batch.rates.wasteRate)} />
-                <RateItem label="Taux non comptabilisé" value={formatRate(batch.rates.unknownRate)} tone={batch.unknown ? "danger" : "ok"} />
+                <RateItem label={t("prod.yieldRate")} value={formatRate(batch.rates.yieldRate)} />
+                <RateItem label={t("prod.secondRate")} value={formatRate(batch.rates.secondChoiceRate)} />
+                <RateItem label={t("prod.wasteRate")} value={formatRate(batch.rates.wasteRate)} />
+                <RateItem
+                  label={t("prod.unknownRate")}
+                  value={formatRate(batch.rates.unknownRate)}
+                  tone={batch.unknown ? "danger" : "ok"}
+                />
               </div>
             </>
           ) : (
             <div className="form-stack">
               <Banner tone="info">
-                La sortie de ce lot n'a pas encore été déclarée. Tant qu'elle ne l'est pas, l'écart n'est pas calculé — un lot non compté
-                n'est pas un lot dont tout manque.
+                {t("prod.outputNotDeclaredYet")}
               </Banner>
               {canDeclare ? (
                 <>
                   <div className="output-grid">
-                    <Field label="Quantité attendue" hint="Corrigez si le compteur a été relevé après coup">
+                    <Field label={t("prod.expectedShort")} hint={t("prod.expectedCorrectHint")}>
                       <input className="input" type="number" min={0} value={expectedOverride} onChange={(e) => setExpectedOverride(e.target.value)} />
                     </Field>
-                    <Field label="1er choix">
+                    <Field label={t("quality.first")}>
                       <input className="input" type="number" min={0} value={firstChoice} onChange={(e) => setFirstChoice(e.target.value)} />
                     </Field>
-                    <Field label="2ème choix">
+                    <Field label={t("quality.second")}>
                       <input className="input" type="number" min={0} value={secondChoice} onChange={(e) => setSecondChoice(e.target.value)} />
                     </Field>
-                    <Field label="Rebut">
+                    <Field label={t("quality.reject")}>
                       <input className="input" type="number" min={0} value={waste} onChange={(e) => setWaste(e.target.value)} />
                     </Field>
                   </div>
@@ -235,8 +249,8 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                     unit={batch.product.unit}
                   />
                   {draftUnknown !== 0 ? (
-                    <Field label="Note sur l'écart (facultatif)">
-                      <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex. compteur machine recalibré" />
+                    <Field label={t("prod.varianceNote")}>
+                      <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("prod.ph.varianceNote")} />
                     </Field>
                   ) : null}
                   <div>
@@ -255,7 +269,7 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
                         )
                       }
                     >
-                      {busy ? "Enregistrement…" : "Déclarer la sortie"}
+                      {busy ? t("action.saving") : t("prod.declareOutput")}
                     </Button>
                   </div>
                 </>
@@ -266,18 +280,22 @@ export function BatchDetailModal({ batch, materialItems, onClose, onChanged }: B
 
         {batch.outputDeclared && batch.unknown !== null && batch.unknown !== 0 ? (
           <section>
-            <h4 className="section-title">Écart de production</h4>
+            <h4 className="section-title">{t("prod.varianceSection")}</h4>
             <Banner tone={batch.needsInvestigation ? "danger" : "info"}>
               {batch.needsInvestigation
-                ? `${Math.abs(batch.unknown)} ${batch.product.unit} ${batch.unknown > 0 ? "ne sont pas comptabilisées" : "sont en excédent"}. Une vérification est nécessaire — notez ci-dessous ce que l'investigation a établi.`
-                : "Cet écart a été justifié."}
+                ? t("prod.varianceNeedsCheck", {
+                    quantity: Math.abs(batch.unknown),
+                    unit: batch.product.unit,
+                    direction: t(batch.unknown > 0 ? "prod.varianceMissing" : "prod.varianceSurplus"),
+                  })
+                : t("prod.varianceJustified")}
             </Banner>
-            <Field label="Conclusion de l'investigation">
-              <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ce que la vérification a établi" />
+            <Field label={t("prod.investigationConclusion")}>
+              <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("prod.ph.conclusion")} />
             </Field>
             <div className="row-actions">
               <Button variant="primary" disabled={busy || !note.trim()} onClick={() => run(() => updateBatch(batch.id, { varianceNote: note.trim() }))}>
-                Enregistrer la conclusion
+                {t("prod.saveConclusion")}
               </Button>
             </div>
           </section>

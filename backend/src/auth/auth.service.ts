@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { parsePermissions } from './permissions.js';
+import { t } from '../i18n/messages/index.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { AuthenticatedUser } from './current-user.js';
 
@@ -39,11 +40,11 @@ export class AuthService {
 
     if (!user || !passwordMatches) {
       await this.recordFailedLogin(login);
-      throw new UnauthorizedException('Identifiants incorrects.');
+      throw new UnauthorizedException(t('auth.invalidCredentials'));
     }
     if (!user.active) {
       await this.recordFailedLogin(login);
-      throw new UnauthorizedException('Ce compte a été désactivé. Contactez le gérant.');
+      throw new UnauthorizedException(t('auth.accountDeactivated'));
     }
 
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
@@ -78,7 +79,7 @@ export class AuthService {
 
   async getProfile(user: AuthenticatedUser) {
     const found = await this.prisma.user.findUnique({ where: { id: user.id }, include: { role: true } });
-    if (!found) throw new UnauthorizedException('Compte introuvable.');
+    if (!found) throw new UnauthorizedException(t('auth.accountNotFound'));
     return this.toProfile(found);
   }
 
@@ -88,10 +89,10 @@ export class AuthService {
    */
   async changeOwnPassword(user: AuthenticatedUser, currentPassword: string, newPassword: string) {
     const found = await this.prisma.user.findUnique({ where: { id: user.id } });
-    if (!found) throw new UnauthorizedException('Compte introuvable.');
+    if (!found) throw new UnauthorizedException(t('auth.accountNotFound'));
 
     if (!(await bcrypt.compare(currentPassword, found.passwordHash))) {
-      throw new UnauthorizedException('Mot de passe actuel incorrect.');
+      throw new UnauthorizedException(t('auth.currentPasswordWrong'));
     }
 
     await this.prisma.user.update({

@@ -1,4 +1,5 @@
 import { IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { t } from '../../i18n/messages/index.js';
 
 export class UpdateItemDto {
   @IsOptional()
@@ -15,7 +16,7 @@ export class UpdateItemDto {
    * cost labelled "DZD / 100" — the frontend offers a list, this is the rule
    * behind it.
    */
-  @Matches(/\p{L}/u, { message: "L'unité doit être une unité de mesure (kg, litre, pièce…), pas un nombre." })
+  @Matches(/\p{L}/u, { message: () => t('common.unitMustBeUnit') })
   @IsOptional()
   @IsString()
   unit?: string;

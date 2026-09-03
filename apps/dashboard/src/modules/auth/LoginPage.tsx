@@ -47,7 +47,7 @@ export function LoginPage() {
           <img className="login-brand-mark" src="/logo.png" alt="" />
           <div>
             <h1 className="login-title">{t("brand.name")}</h1>
-            <p className="login-subtitle">{t("login.subtitle")}</p>
+            <p className="login-subtitle">{t("brand.tagline")}</p>
           </div>
         </div>
 

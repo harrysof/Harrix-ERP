@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateFactoryCostDto } from './dto/factory-cost.dto.js';
+import { t } from '../i18n/messages/index.js';
 
 /**
  * §Finance's factory-costs ledger — general operating costs (rent,
@@ -35,7 +36,7 @@ export class FinanceService {
 
   async deleteCost(id: string) {
     const cost = await this.prisma.factoryCost.findUnique({ where: { id } });
-    if (!cost) throw new NotFoundException(`Coût introuvable : ${id}`);
+    if (!cost) throw new NotFoundException(t('finance.costNotFound', { id }));
     await this.prisma.factoryCost.delete({ where: { id } });
     return { id, deleted: true };
   }
@@ -47,11 +48,11 @@ export class FinanceService {
    * of which month it lands in.
    */
   async copyMonth(from: string, to: string) {
-    if (from === to) throw new BadRequestException('Choisissez un mois différent du mois affiché.');
+    if (from === to) throw new BadRequestException(t('finance.chooseDifferentMonth'));
     const source = await this.prisma.factoryCost.findMany({
       where: { date: { gte: monthRange(from).start, lt: monthRange(from).end } },
     });
-    if (source.length === 0) throw new BadRequestException(`Aucun coût enregistré pour ${from}.`);
+    if (source.length === 0) throw new BadRequestException(t('finance.noCostsForMonth', { month: from }));
 
     const { start: toStart } = monthRange(to);
     await this.prisma.$transaction(
@@ -62,7 +63,7 @@ export class FinanceService {
 }
 
 function monthRange(month: string): { start: Date; end: Date } {
-  if (!/^\d{4}-\d{2}$/.test(month)) throw new BadRequestException('Mois invalide (format AAAA-MM attendu).');
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new BadRequestException(t('common.invalidMonth'));
   const [year, m] = month.split('-').map(Number);
   return { start: new Date(Date.UTC(year, m - 1, 1)), end: new Date(Date.UTC(year, m, 1)) };
 }

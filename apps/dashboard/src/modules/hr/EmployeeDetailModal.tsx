@@ -17,6 +17,9 @@ import {
   type ApiEmployeeDetail,
 } from "../../lib/hrApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
+import { Rich } from "../../components/ui/Rich";
+import type { TranslationKey } from "../../lib/i18n";
 
 interface EmployeeDetailModalProps {
   employeeId: string;
@@ -25,12 +28,15 @@ interface EmployeeDetailModalProps {
   onEdit: (employee: ApiEmployee) => void;
 }
 
-function tenureLabel(t: ApiEmployeeDetail["tenure"]): string {
-  if (t.totalDays === 0) return "Aujourd'hui";
+function tenureLabel(
+  tenure: ApiEmployeeDetail["tenure"],
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string,
+): string {
+  if (tenure.totalDays === 0) return t("hr.today");
   const parts: string[] = [];
-  if (t.years > 0) parts.push(`${t.years} an${t.years > 1 ? "s" : ""}`);
-  if (t.months > 0) parts.push(`${t.months} mois`);
-  if (t.years === 0) parts.push(`${t.days} j`);
+  if (tenure.years > 0) parts.push(t("hr.tenureYears", { count: tenure.years }));
+  if (tenure.months > 0) parts.push(t("hr.tenureMonths", { count: tenure.months }));
+  if (tenure.years === 0) parts.push(t("hr.tenureDays", { count: tenure.days }));
   return parts.join(" ");
 }
 
@@ -41,6 +47,7 @@ function tenureLabel(t: ApiEmployeeDetail["tenure"]): string {
  */
 export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: EmployeeDetailModalProps) {
   const { can } = useAuth();
+  const { t, tn } = useI18n();
   const canWrite = can("hr:write");
   const [employee, setEmployee] = useState<ApiEmployeeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +63,7 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
     setLoading(true);
     fetchEmployee(employeeId)
       .then(setEmployee)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger la fiche."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("hr.loadFileFailed")))
       .finally(() => setLoading(false));
   }
 
@@ -69,7 +76,7 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
       onChanged();
       load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Action impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.action"));
     } finally {
       setBusy(false);
     }
@@ -77,8 +84,8 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
 
   if (loading || !employee) {
     return (
-      <Modal title="Fiche employé" onClose={onClose} width={860}>
-        {error ? <Banner tone="danger">{error}</Banner> : <p className="loading-text">Chargement…</p>}
+      <Modal title={t("hr.fileTitle")} onClose={onClose} width={860}>
+        {error ? <Banner tone="danger">{error}</Banner> : <p className="loading-text">{t("state.loading")}</p>}
       </Modal>
     );
   }
@@ -101,12 +108,12 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
       width={860}
       footer={
         <>
-          <Button onClick={onClose}>Fermer</Button>
+          <Button onClick={onClose}>{t("action.close")}</Button>
           {canWrite ? (
             <>
-              <Button onClick={() => onEdit(employee)}>Modifier</Button>
+              <Button onClick={() => onEdit(employee)}>{t("action.edit")}</Button>
               <Button variant={employee.archived ? "secondary" : "danger"} onClick={toggleArchive} disabled={busy}>
-                {employee.archived ? "Désarchiver" : "Archiver"}
+                {t(employee.archived ? "action.unarchive" : "action.archive")}
               </Button>
             </>
           ) : null}
@@ -117,50 +124,65 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
         {error ? <Banner tone="danger">{error}</Banner> : null}
 
         <div className="batch-meta">
-          <Meta label="Statut" value={<Pill tone={employee.archived ? "neutral" : "ok"}>{employee.archived ? "Archivé" : "Actif"}</Pill>} />
-          <Meta label="Contrat" value={CONTRACT_TYPE_LABELS[employee.contractType]} />
-          <Meta label="Embauché le" value={formatDate(employee.hireDate)} />
-          <Meta label="Ancienneté" value={tenureLabel(employee.tenure)} />
-          <Meta label="Heures prévues / jour" value={`${employee.expectedHoursPerDay} h`} />
+          <Meta
+            label={t("field.status")}
+            value={
+              <Pill tone={employee.archived ? "neutral" : "ok"}>
+                {t(employee.archived ? "state.archived" : "state.active")}
+              </Pill>
+            }
+          />
+          <Meta label={t("hr.col.contract")} value={t(CONTRACT_TYPE_LABELS[employee.contractType])} />
+          <Meta label={t("hr.col.hiredOn")} value={formatDate(employee.hireDate)} />
+          <Meta label={t("hr.tenure")} value={tenureLabel(employee.tenure, t)} />
+          <Meta label={t("hr.hoursPerDay")} value={`${employee.expectedHoursPerDay} ${t("unit.hours")}`} />
         </div>
 
         {employee.contractType === "CDD" && employee.contractEndDate ? (
           <Banner tone={contractSoonEnding ? "warn" : "info"}>
-            Contrat à durée déterminée — fin le {formatDate(employee.contractEndDate)}
-            {contractSoonEnding ? ". Moins de 30 jours restants." : "."}
+            {t("hr.cddBanner", {
+              date: formatDate(employee.contractEndDate),
+              warning: contractSoonEnding ? t("hr.cddSoon") : ".",
+            })}
           </Banner>
         ) : null}
 
         <div className="stat-grid">
-          <StatCard label="Salaire brut" value={formatCurrency(employee.payEstimate.gross)} hint="Mensuel" />
-          <StatCard label="CNAS salarié" value={formatCurrency(employee.payEstimate.cnas)} hint="9 % du brut" />
-          <StatCard label="IRG estimé" value={formatCurrency(employee.payEstimate.irg)} hint="Estimation — voir avertissement" tone="warn" />
-          <StatCard label="Net estimé" value={formatCurrency(employee.payEstimate.net)} hint="Brut − CNAS − IRG" />
+          <StatCard label={t("hr.grossPay")} value={formatCurrency(employee.payEstimate.gross)} hint={t("hr.monthly")} />
+          <StatCard label={t("hr.cnasEmployee")} value={formatCurrency(employee.payEstimate.cnas)} hint={t("hr.cnasRate")} />
+          <StatCard
+            label={t("hr.irgEstimate")}
+            value={formatCurrency(employee.payEstimate.irg)}
+            hint={t("hr.irgHint")}
+            tone="warn"
+          />
+          <StatCard label={t("hr.netEstimate")} value={formatCurrency(employee.payEstimate.net)} hint={t("hr.netFormula")} />
         </div>
 
         <Banner tone="warn">
-          L'IRG affiché est une <strong>estimation de planification</strong>, calculée par tranches sur le barème simplifié de
-          2022, sans le lissage (décote) que la loi applique à l'entrée de chaque tranche. Vérifiez avec votre expert-comptable
-          avant toute utilisation sur un bulletin de paie réel.
+          <Rich text={t("hr.irgWarning")} parts={{ lead: <strong>{t("hr.irgWarningLead")}</strong> }} />
         </Banner>
 
         <section>
-          <h4 className="section-title">Identité et administratif</h4>
+          <h4 className="section-title">{t("hr.identityAdmin")}</h4>
           <div className="detail-grid">
-            <DetailField label="Téléphone" value={employee.phone} />
-            <DetailField label="Adresse" value={employee.address} />
-            <DetailField label="Date de naissance" value={employee.birthDate ? formatDate(employee.birthDate) : null} />
-            <DetailField label="NIN" value={employee.nin} />
-            <DetailField label="N° CNAS" value={employee.cnasNumber} />
-            <DetailField label="Situation familiale" value={employee.maritalStatus ? MARITAL_STATUS_LABELS[employee.maritalStatus] : null} />
-            <DetailField label="Enfants à charge" value={String(employee.dependentChildren)} />
-            <DetailField label="RIB" value={employee.bankRib} />
+            <DetailField label={t("field.phone")} value={employee.phone} />
+            <DetailField label={t("field.address")} value={employee.address} />
+            <DetailField label={t("hr.birthDate")} value={employee.birthDate ? formatDate(employee.birthDate) : null} />
+            <DetailField label={t("hr.nin")} value={employee.nin} />
+            <DetailField label={t("hr.cnasNumber")} value={employee.cnasNumber} />
+            <DetailField
+              label={t("hr.maritalStatus")}
+              value={employee.maritalStatus ? t(MARITAL_STATUS_LABELS[employee.maritalStatus]) : null}
+            />
+            <DetailField label={t("hr.dependents")} value={String(employee.dependentChildren)} />
+            <DetailField label={t("hr.rib")} value={employee.bankRib} />
           </div>
         </section>
 
         {employee.emergencyContactName || employee.emergencyContactPhone ? (
           <section>
-            <h4 className="section-title">Contact d'urgence</h4>
+            <h4 className="section-title">{t("hr.emergencyContact")}</h4>
             <p className="batch-notes">
               {employee.emergencyContactName ?? "—"}
               {employee.emergencyContactPhone ? ` · ${employee.emergencyContactPhone}` : ""}
@@ -170,31 +192,31 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
 
         {employee.notes ? (
           <section>
-            <h4 className="section-title">Notes</h4>
+            <h4 className="section-title">{t("field.notes")}</h4>
             <p className="batch-notes">{employee.notes}</p>
           </section>
         ) : null}
 
         <section>
-          <h4 className="section-title">Heures récentes</h4>
+          <h4 className="section-title">{t("hr.recentHours")}</h4>
           {employee.timeEntries.length === 0 ? (
-            <p className="muted">Aucune heure enregistrée.</p>
+            <p className="muted">{t("hr.noHours")}</p>
           ) : (
             <div className="table-scroll">
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th className="num">Heures</th>
-                    <th>Source</th>
+                    <th>{t("field.date")}</th>
+                    <th className="num">{t("att.hours")}</th>
+                    <th>{t("hr.source")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {employee.timeEntries.map((t) => (
-                    <tr key={t.id}>
-                      <td className="tabular">{formatDate(t.date)}</td>
-                      <td className="tabular num">{t.hoursWorked}</td>
-                      <td>{t.source === "device" ? "Pointeuse" : "Manuel"}</td>
+                  {employee.timeEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="tabular">{formatDate(entry.date)}</td>
+                      <td className="tabular num">{entry.hoursWorked}</td>
+                      <td>{t(entry.source === "device" ? "hr.sourceDevice" : "hr.sourceManual")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -204,18 +226,18 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
         </section>
 
         <section>
-          <h4 className="section-title">Heures supplémentaires récentes</h4>
+          <h4 className="section-title">{t("hr.recentOvertime")}</h4>
           {employee.overtimeEntries.length === 0 ? (
-            <p className="muted">Aucune heure supplémentaire enregistrée.</p>
+            <p className="muted">{t("hr.noOvertime")}</p>
           ) : (
             <div className="table-scroll">
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>Du</th>
-                    <th>Au</th>
-                    <th className="num">Heures</th>
-                    <th>Raison</th>
+                    <th>{t("field.from")}</th>
+                    <th>{t("field.to")}</th>
+                    <th className="num">{t("att.hours")}</th>
+                    <th>{t("field.reason")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -234,21 +256,21 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
         </section>
 
         <section>
-          <h4 className="section-title">Congés</h4>
+          <h4 className="section-title">{t("hr.leave")}</h4>
           {leaveAbsences.length === 0 ? (
-            <p className="muted">Aucun congé enregistré.</p>
+            <p className="muted">{t("hr.noLeave")}</p>
           ) : (
             <>
               <p className="field-hint" style={{ marginTop: -4 }}>
-                {leaveDaysTotal} jour{leaveDaysTotal > 1 ? "s" : ""} de congé au total sur les entrées ci-dessous.
+                {t("hr.leaveTotal", { count: tn("hr.dayCount", leaveDaysTotal) })}
               </p>
               <div className="table-scroll">
                 <table className="stock-table">
                   <thead>
                     <tr>
-                      <th>Du</th>
-                      <th>Au</th>
-                      <th>Raison</th>
+                      <th>{t("field.from")}</th>
+                      <th>{t("field.to")}</th>
+                      <th>{t("field.reason")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -267,25 +289,25 @@ export function EmployeeDetailModal({ employeeId, onClose, onChanged, onEdit }: 
         </section>
 
         <section>
-          <h4 className="section-title">Absences récentes</h4>
+          <h4 className="section-title">{t("hr.recentAbsences")}</h4>
           {otherAbsences.length === 0 ? (
-            <p className="muted">Aucune absence enregistrée.</p>
+            <p className="muted">{t("hr.noAbsences")}</p>
           ) : (
             <div className="table-scroll">
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>Type</th>
-                    <th>Du</th>
-                    <th>Au</th>
-                    <th>Raison</th>
+                    <th>{t("field.type")}</th>
+                    <th>{t("field.from")}</th>
+                    <th>{t("field.to")}</th>
+                    <th>{t("field.reason")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {otherAbsences.map((a) => (
                     <tr key={a.id}>
                       <td>
-                        <Pill tone={a.type === "INJUSTIFIEE" ? "danger" : "warn"}>{ABSENCE_TYPE_LABELS[a.type]}</Pill>
+                        <Pill tone={a.type === "INJUSTIFIEE" ? "danger" : "warn"}>{t(ABSENCE_TYPE_LABELS[a.type])}</Pill>
                       </td>
                       <td className="tabular">{formatDate(a.startDate)}</td>
                       <td className="tabular">{formatDate(a.endDate)}</td>

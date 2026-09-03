@@ -21,6 +21,7 @@ import {
   type ReceiptLineInput,
 } from "../../lib/purchasingApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
 import { TotalsPanel } from "./PurchaseOrderModal";
 
 interface DetailProps {
@@ -47,6 +48,7 @@ const NEXT_STATUSES: Partial<Record<PoStatus, PoStatus[]>> = {
  */
 export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: DetailProps) {
   const { can } = useAuth();
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [receiving, setReceiving] = useState(false);
@@ -71,7 +73,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
       onChanged();
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Action impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.action"));
       return false;
     } finally {
       setBusy(false);
@@ -96,7 +98,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
       });
 
     if (lines.length === 0) {
-      setError("Indiquez la quantité reçue pour au moins une ligne.");
+      setError(t("po.err.receiptLines"));
       return;
     }
 
@@ -119,7 +121,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
   async function submitPayment() {
     const amount = Number(paymentAmount);
     if (!(amount > 0)) {
-      setError("Indiquez un montant de paiement supérieur à zéro.");
+      setError(t("po.err.paymentAmount"));
       return;
     }
     const ok = await run(() => recordPurchasePayment(order.id, { amount, date: paymentDate }));
@@ -131,27 +133,27 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
 
   return (
     <Modal
-      title={`Bon de commande ${order.code}`}
+      title={t("po.modalTitle", { code: order.code })}
       onClose={onClose}
       width={900}
       footer={
         <>
-          <Button onClick={onClose}>Fermer</Button>
-          <Button onClick={() => window.print()}>Imprimer</Button>
+          <Button onClick={onClose}>{t("action.close")}</Button>
+          <Button onClick={() => window.print()}>{t("action.print")}</Button>
           {order.status === "DRAFT" && can("purchasing:write") && onEdit ? (
-            <Button onClick={onEdit}>Modifier</Button>
+            <Button onClick={onEdit}>{t("action.edit")}</Button>
           ) : null}
           {order.status === "DRAFT" && can("purchasing:write") ? (
             <Button
               variant="danger"
               disabled={busy}
               onClick={() => {
-                if (window.confirm(`Supprimer le brouillon ${order.code} ?`)) {
+                if (window.confirm(t("po.confirmDeleteDraft", { code: order.code }))) {
                   run(() => deletePurchaseOrder(order.id)).then((ok) => ok && onClose());
                 }
               }}
             >
-              Supprimer
+              {t("action.delete")}
             </Button>
           ) : null}
         </>
@@ -159,19 +161,22 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
     >
       <div className="form-stack">
         <div className="batch-meta">
-          <Meta label="Statut" value={<Pill tone={PO_STATUS_TONES[order.status]}>{PO_STATUS_LABELS[order.status]}</Pill>} />
           <Meta
-            label="Paiement"
-            value={<Pill tone={PO_PAYMENT_TONES[order.paymentStatus]}>{PO_PAYMENT_LABELS[order.paymentStatus]}</Pill>}
+            label={t("field.status")}
+            value={<Pill tone={PO_STATUS_TONES[order.status]}>{t(PO_STATUS_LABELS[order.status])}</Pill>}
           />
-          <Meta label="Fournisseur" value={order.supplier.name} />
-          <Meta label="Date" value={formatDate(order.date)} />
-          <Meta label="Livraison prévue" value={order.expectedDate ? formatDate(order.expectedDate) : "—"} />
+          <Meta
+            label={t("field.payment")}
+            value={<Pill tone={PO_PAYMENT_TONES[order.paymentStatus]}>{t(PO_PAYMENT_LABELS[order.paymentStatus])}</Pill>}
+          />
+          <Meta label={t("field.supplier")} value={order.supplier.name} />
+          <Meta label={t("field.date")} value={formatDate(order.date)} />
+          <Meta label={t("po.col.expected")} value={order.expectedDate ? formatDate(order.expectedDate) : "—"} />
         </div>
 
         {order.supplier.contactName || order.supplier.phone ? (
           <p className="batch-notes">
-            Contact : {order.supplier.contactName ?? "—"}
+            {t("po.contactLine", { name: order.supplier.contactName ?? "—" })}
             {order.supplier.phone ? ` · ${order.supplier.phone}` : ""}
             {order.supplier.email ? ` · ${order.supplier.email}` : ""}
           </p>
@@ -180,17 +185,17 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
         {order.notes ? <p className="batch-notes">{order.notes}</p> : null}
 
         <section>
-          <h4 className="section-title">Articles commandés</h4>
+          <h4 className="section-title">{t("po.orderedItems")}</h4>
           <div className="table-scroll">
             <table className="stock-table">
               <thead>
                 <tr>
-                  <th>Article</th>
-                  <th className="num">Commandé</th>
-                  <th className="num">Reçu</th>
-                  <th className="num">Reste</th>
-                  <th className="num">Prix unitaire</th>
-                  <th className="num">Total ligne</th>
+                  <th>{t("field.item")}</th>
+                  <th className="num">{t("po.col.orderedQty")}</th>
+                  <th className="num">{t("po.col.receivedQty")}</th>
+                  <th className="num">{t("po.col.remainingQty")}</th>
+                  <th className="num">{t("field.unitPrice")}</th>
+                  <th className="num">{t("po.col.lineTotal")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,7 +220,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
 
         {nextStatuses.length > 0 && can("purchasing:approve") ? (
           <section>
-            <h4 className="section-title">Changer le statut</h4>
+            <h4 className="section-title">{t("po.changeStatus")}</h4>
             <div className="row-actions">
               {nextStatuses.map((status) => (
                 <Button
@@ -224,7 +229,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
                   disabled={busy}
                   onClick={() => run(() => setPurchaseOrderStatus(order.id, status))}
                 >
-                  {PO_STATUS_LABELS[status]}
+                  {t(PO_STATUS_LABELS[status])}
                 </Button>
               ))}
             </div>
@@ -233,16 +238,14 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
 
         {can("purchasing:write") ? (
           <section>
-            <h4 className="section-title">Paiement</h4>
+            <h4 className="section-title">{t("field.payment")}</h4>
             <div className="invoice-block">
               <p>
-                Payé : <strong>{formatCurrency(order.amountPaid)}</strong> sur {formatCurrency(order.totals.total)}
-                {order.balanceDue > 0 ? (
-                  <>
-                    {" "}
-                    — solde restant dû : <strong>{formatCurrency(order.balanceDue)}</strong>
-                  </>
-                ) : null}
+                {t("po.paidOf", {
+                  paid: formatCurrency(order.amountPaid),
+                  total: formatCurrency(order.totals.total),
+                })}
+                {order.balanceDue > 0 ? t("po.balanceDue", { balance: formatCurrency(order.balanceDue) }) : null}
               </p>
             </div>
 
@@ -250,7 +253,10 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
               paying ? (
                 <div className="form-stack" style={{ marginTop: 10 }}>
                   <div className="form-row">
-                    <Field label="Montant payé (DZD)" hint={`Solde restant dû : ${formatCurrency(order.balanceDue)}`}>
+                    <Field
+                      label={t("po.amountPaidLabel")}
+                      hint={t("po.balanceHint", { balance: formatCurrency(order.balanceDue) })}
+                    >
                       <input
                         className="input"
                         type="number"
@@ -261,20 +267,20 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
                         onChange={(e) => setPaymentAmount(e.target.value)}
                       />
                     </Field>
-                    <Field label="Date du paiement">
+                    <Field label={t("po.paymentDate")}>
                       <input className="input" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
                     </Field>
                   </div>
                   <div className="row-actions">
                     <Button variant="primary" disabled={busy} onClick={submitPayment}>
-                      {busy ? "Enregistrement…" : "Enregistrer le paiement"}
+                      {busy ? t("action.saving") : t("po.savePayment")}
                     </Button>
-                    <Button onClick={() => setPaying(false)}>Annuler</Button>
+                    <Button onClick={() => setPaying(false)}>{t("action.cancel")}</Button>
                   </div>
                 </div>
               ) : (
                 <Button variant="primary" style={{ marginTop: 10 }} onClick={() => setPaying(true)}>
-                  + Enregistrer un paiement
+                  {t("po.addPayment")}
                 </Button>
               )
             ) : null}
@@ -282,19 +288,19 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
         ) : null}
 
         <section>
-          <h4 className="section-title">Réceptions</h4>
+          <h4 className="section-title">{t("po.receipts")}</h4>
 
           {order.receipts.length === 0 ? (
-            <p className="muted">Aucune réception enregistrée.</p>
+            <p className="muted">{t("po.noReceipts")}</p>
           ) : (
             <div className="table-scroll">
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>N°</th>
-                    <th>Date</th>
-                    <th>Bon de livraison</th>
-                    <th className="num">Lignes</th>
+                    <th>{t("field.number")}</th>
+                    <th>{t("field.date")}</th>
+                    <th>{t("po.deliveryNote")}</th>
+                    <th className="num">{t("po.col.lines")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -315,10 +321,10 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
             receiving ? (
               <div className="form-stack" style={{ marginTop: 14 }}>
                 <div className="form-row">
-                  <Field label="Date de réception">
+                  <Field label={t("po.receiptDate")}>
                     <input className="input" type="date" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
                   </Field>
-                  <Field label="Bon de livraison" hint="Numéro du fournisseur, facultatif">
+                  <Field label={t("po.deliveryNote")} hint={t("po.deliveryNoteHint")}>
                     <input className="input" value={deliveryNote} onChange={(e) => setDeliveryNote(e.target.value)} />
                   </Field>
                 </div>
@@ -334,11 +340,11 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
                         <div className="receive-line-head">
                           <strong>{line.item.name}</strong>
                           <span className="muted">
-                            {line.outstanding} {line.item.unit} restant(s)
+                            {t("po.remainingQty", { quantity: line.outstanding, unit: line.item.unit })}
                           </span>
                         </div>
                         <div className="form-row">
-                          <Field label={`Quantité reçue (${line.item.unit})`}>
+                          <Field label={t("po.receivedQtyLabel", { unit: line.item.unit })}>
                             <input
                               className="input"
                               type="number"
@@ -349,7 +355,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
                             />
                           </Field>
                           {needsBatch ? (
-                            <Field label="Numéro de lot" hint="Obligatoire pour ce produit">
+                            <Field label={t("field.batchNumber")} hint={t("po.requiredForProduct")}>
                               <input
                                 className="input"
                                 value={d.batchNumber}
@@ -358,7 +364,7 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
                             </Field>
                           ) : null}
                           {needsExpiry ? (
-                            <Field label="Péremption" hint="Obligatoire pour ce produit">
+                            <Field label={t("inv.opt.expiry")} hint={t("po.requiredForProduct")}>
                               <input
                                 className="input"
                                 type="date"
@@ -375,29 +381,27 @@ export function PurchaseOrderDetailModal({ order, onClose, onChanged, onEdit }: 
                 <label className="checkbox-row">
                   <input type="checkbox" checked={allowOver} onChange={(e) => setAllowOver(e.target.checked)} />
                   <span>
-                    Accepter une sur-livraison
-                    <span className="checkbox-hint">
-                      À cocher seulement si le fournisseur a réellement livré plus que commandé — sinon c'est probablement une faute de frappe.
-                    </span>
+                    {t("po.acceptOverDelivery")}
+                    <span className="checkbox-hint">{t("po.overDeliveryHint")}</span>
                   </span>
                 </label>
 
-                <Banner tone="info">Enregistrer cette réception augmentera le stock immédiatement.</Banner>
+                <Banner tone="info">{t("po.receiptIncreasesStock")}</Banner>
 
                 <div className="row-actions">
                   <Button variant="primary" onClick={submitReceipt} disabled={busy}>
-                    {busy ? "Enregistrement…" : "Enregistrer la réception"}
+                    {busy ? t("action.saving") : t("po.saveReceipt")}
                   </Button>
-                  <Button onClick={() => setReceiving(false)}>Annuler</Button>
+                  <Button onClick={() => setReceiving(false)}>{t("action.cancel")}</Button>
                 </div>
               </div>
             ) : (
               <Button variant="primary" style={{ marginTop: 10 }} onClick={() => setReceiving(true)}>
-                + Enregistrer une réception
+                {t("po.addReceipt")}
               </Button>
             )
           ) : order.status === "DRAFT" || order.status === "SUBMITTED" ? (
-            <Banner tone="info">Ce bon doit être approuvé avant de pouvoir enregistrer une réception.</Banner>
+            <Banner tone="info">{t("po.mustApprove")}</Banner>
           ) : null}
         </section>
 

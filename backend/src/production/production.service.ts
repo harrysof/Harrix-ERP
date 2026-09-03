@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { t } from '../i18n/messages/index.js';
 import { getAverageUnitCost, getBatchesWithRemaining, getBatchUnitCost, getItemQuantity, roundMoney } from '../stock/stock-math.js';
 import {
   getRates,
@@ -56,7 +57,7 @@ export class ProductionService {
         consumptions: { include: { item: true, stockBatch: true } },
       },
     });
-    if (!batch) throw new NotFoundException(`Lot de production introuvable : ${id}`);
+    if (!batch) throw new NotFoundException(t('production.batchNotFound', { id }));
     return decorate(batch);
   }
 
@@ -124,8 +125,8 @@ export class ProductionService {
       where: { id: dto.productItemId },
       include: { inventoryType: true },
     });
-    if (!product) throw new BadRequestException(`Produit introuvable : ${dto.productItemId}`);
-    if (product.archived) throw new BadRequestException(`Le produit "${product.name}" est archivé.`);
+    if (!product) throw new BadRequestException(t('production.productNotFound', { id: dto.productItemId }));
+    if (product.archived) throw new BadRequestException(t('production.productArchived', { name: product.name }));
 
     const lines = dto.consumptions ?? [];
     const plans = await this.planConsumption(
@@ -186,7 +187,7 @@ export class ProductionService {
       return this.getBatch(created.id);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
-        throw new ConflictException(`Un lot de production nommé "${code}" existe déjà.`);
+        throw new ConflictException(t('production.codeExists', { code }));
       }
       throw error;
     }
@@ -195,7 +196,7 @@ export class ProductionService {
   /** Metadata edits only — the output figures go through declareOutput instead. */
   async updateBatch(id: string, dto: UpdateBatchDto) {
     const existing = await this.prisma.productionBatch.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException(`Lot de production introuvable : ${id}`);
+    if (!existing) throw new NotFoundException(t('production.batchNotFound', { id }));
 
     const data: Record<string, unknown> = { ...dto };
     if (dto.date) data.date = new Date(dto.date);
@@ -227,9 +228,9 @@ export class ProductionService {
    */
   async addConsumption(id: string, dto: AddConsumptionDto) {
     const batch = await this.prisma.productionBatch.findUnique({ where: { id } });
-    if (!batch) throw new NotFoundException(`Lot de production introuvable : ${id}`);
+    if (!batch) throw new NotFoundException(t('production.batchNotFound', { id }));
     if (batch.status === 'CANCELLED') {
-      throw new BadRequestException('Ce lot est annulé — aucune matière ne peut plus y être ajoutée.');
+      throw new BadRequestException(t('production.batchCancelledNoMaterial'));
     }
 
     const date = dto.date ?? batch.date.toISOString();
@@ -255,12 +256,12 @@ export class ProductionService {
    */
   async declareOutput(id: string, dto: DeclareOutputDto) {
     const batch = await this.prisma.productionBatch.findUnique({ where: { id } });
-    if (!batch) throw new NotFoundException(`Lot de production introuvable : ${id}`);
+    if (!batch) throw new NotFoundException(t('production.batchNotFound', { id }));
     if (batch.outputDeclared) {
-      throw new ConflictException('La sortie de ce lot a déjà été déclarée.');
+      throw new ConflictException(t('production.outputAlreadyDeclared'));
     }
     if (batch.status === 'CANCELLED') {
-      throw new BadRequestException('Ce lot est annulé — sa sortie ne peut pas être déclarée.');
+      throw new BadRequestException(t('production.batchCancelledNoOutput'));
     }
 
     const figures: OutputFigures = {
@@ -315,27 +316,27 @@ export class ProductionService {
 
     return lines.map((line, i) => {
       const item = items.find((it) => it.id === line.itemId);
-      if (!item) throw new BadRequestException(`Matière introuvable : ${line.itemId}`);
+      if (!item) throw new BadRequestException(t('production.materialNotFound', { id: line.itemId }));
       if (!item.inventoryType.isProductionInput) {
-        throw new BadRequestException(`"${item.name}" n'est pas une matière de production.`);
+        throw new BadRequestException(t('production.notProductionMaterial', { name: item.name }));
       }
 
       if (item.inventoryType.hasBatches) {
-        if (!line.stockBatchId) throw new BadRequestException(`Choisissez un lot pour "${item.name}".`);
+        if (!line.stockBatchId) throw new BadRequestException(t('production.chooseBatchFor', { name: item.name }));
         const withRemaining = getBatchesWithRemaining(stockBatches, movements, item.id, today);
         const stockBatch = withRemaining.find((b) => b.id === line.stockBatchId);
-        if (!stockBatch) throw new BadRequestException(`Lot introuvable pour "${item.name}" : ${line.stockBatchId}`);
+        if (!stockBatch) throw new BadRequestException(t('production.batchNotFoundFor', { name: item.name, id: line.stockBatchId }));
         const available = stockBatch.remaining - (claimed.get(line.stockBatchId) ?? 0);
         if (line.quantity > available) {
           throw new BadRequestException(
-            `Il ne reste que ${available} ${item.unit} dans le lot ${stockBatch.batchNumber} de "${item.name}".`,
+            t('production.onlyRemainingInLot', { available, unit: item.unit, batchNumber: stockBatch.batchNumber, name: item.name }),
           );
         }
         claim(line.stockBatchId, line.quantity);
       } else {
         const available = getItemQuantity(movements, item.id) - (claimed.get(item.id) ?? 0);
         if (line.quantity > available) {
-          throw new BadRequestException(`Il ne reste que ${available} ${item.unit} de "${item.name}".`);
+          throw new BadRequestException(t('production.onlyRemaining', { available, unit: item.unit, name: item.name }));
         }
         claim(item.id, line.quantity);
       }
@@ -477,7 +478,7 @@ function decorate<
 function assertOutputFits(figures: OutputFigures) {
   const accounted = figures.firstChoice + figures.secondChoice + figures.waste;
   if (figures.expectedQuantity <= 0 && accounted > 0) {
-    throw new BadRequestException('Indiquez la quantité annoncée par la machine avant de déclarer la sortie.');
+    throw new BadRequestException(t('production.declareExpectedQuantity'));
   }
 }
 

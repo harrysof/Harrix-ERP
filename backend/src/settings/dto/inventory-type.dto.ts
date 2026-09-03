@@ -1,4 +1,5 @@
 import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { t } from '../../i18n/messages/index.js';
 
 /**
  * The four inventories the factory started with are data, not code (see
@@ -18,9 +19,7 @@ export class CreateInventoryTypeDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)
-  @Matches(/^[a-z0-9-]+$/, {
-    message: 'La clé ne peut contenir que des minuscules, des chiffres et des tirets (ex. "emballages").',
-  })
+  @Matches(/^[a-z0-9-]+$/, { message: () => t('settings.keyPattern') })
   key!: string;
 
   @IsString()
@@ -45,7 +44,7 @@ export class CreateInventoryTypeDto {
    * cost labelled "DZD / 100" — the frontend offers a list, this is the rule
    * behind it.
    */
-  @Matches(/\p{L}/u, { message: "L'unité doit être une unité de mesure (kg, litre, pièce…), pas un nombre." })
+  @Matches(/\p{L}/u, { message: () => t('common.unitMustBeUnit') })
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
@@ -76,7 +75,7 @@ export class UpdateInventoryTypeDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
-  @Matches(/\p{L}/u, { message: "L'unité doit être une unité de mesure (kg, litre, pièce…), pas un nombre." })
+  @Matches(/\p{L}/u, { message: () => t('common.unitMustBeUnit') })
   defaultUnit?: string;
 
   @IsOptional() @IsBoolean() hasBatches?: boolean;

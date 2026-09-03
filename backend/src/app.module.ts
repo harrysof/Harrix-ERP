@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller.js';
@@ -14,12 +14,14 @@ import { SalesModule } from './sales/sales.module.js';
 import { HrModule } from './hr/hr.module.js';
 import { FinanceModule } from './finance/finance.module.js';
 import { ZakatModule } from './zakat/zakat.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { PermissionsGuard } from './auth/permissions.guard.js';
 import { AuditInterceptor } from './audit/audit.interceptor.js';
+import { LanguageMiddleware } from './i18n/middleware.js';
 
 @Module({
   imports: [
@@ -38,6 +40,7 @@ import { AuditInterceptor } from './audit/audit.interceptor.js';
     HrModule,
     FinanceModule,
     ZakatModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -51,4 +54,8 @@ import { AuditInterceptor } from './audit/audit.interceptor.js';
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LanguageMiddleware).forRoutes('*');
+  }
+}

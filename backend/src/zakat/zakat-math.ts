@@ -9,6 +9,8 @@
  * every read. Same reasoning as payroll-math.ts's tenure/pay estimate.
  */
 
+import { t, type MessageKey } from '../i18n/messages/index.js';
+
 // ---------------------------------------------------------------------------
 // Vocabulary
 // ---------------------------------------------------------------------------
@@ -102,20 +104,20 @@ export interface HijriDate {
   day: number;
 }
 
-export const HIJRI_MONTH_NAMES = [
-  'Mouharram',
-  'Safar',
-  "Rabi' al-Awwal",
-  "Rabi' ath-Thani",
-  'Joumada al-Oula',
-  'Joumada ath-Thania',
-  'Rajab',
-  "Cha'ban",
-  'Ramadan',
-  'Chawwal',
-  "Dhou al-Qi'da",
-  'Dhou al-Hijja',
-] as const;
+const HIJRI_MONTH_KEYS = [
+  'zakat.hijriMonth.1',
+  'zakat.hijriMonth.2',
+  'zakat.hijriMonth.3',
+  'zakat.hijriMonth.4',
+  'zakat.hijriMonth.5',
+  'zakat.hijriMonth.6',
+  'zakat.hijriMonth.7',
+  'zakat.hijriMonth.8',
+  'zakat.hijriMonth.9',
+  'zakat.hijriMonth.10',
+  'zakat.hijriMonth.11',
+  'zakat.hijriMonth.12',
+] as const satisfies readonly MessageKey[];
 
 /** Julian Day Number of 1 Muharram, year 1 AH — the tabular calendar's epoch. */
 const ISLAMIC_EPOCH_JDN = 1948440;
@@ -172,7 +174,7 @@ export function hijriToGregorian(hijri: HijriDate): Date {
 }
 
 export function formatHijri(hijri: HijriDate): string {
-  return `${hijri.day} ${HIJRI_MONTH_NAMES[hijri.month - 1]} ${hijri.year}`;
+  return `${hijri.day} ${t(HIJRI_MONTH_KEYS[hijri.month - 1])} ${hijri.year}`;
 }
 
 /**

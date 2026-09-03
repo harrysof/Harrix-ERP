@@ -1,32 +1,33 @@
 import { api } from "./api";
+import type { TranslationKey } from "./i18n";
 
 /** Typed client for /api/hr — employees, hours worked, absences. */
 
 export const CONTRACT_TYPES = ["CDI", "CDD"] as const;
 export type ContractType = (typeof CONTRACT_TYPES)[number];
 
-export const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
-  CDI: "CDI — durée indéterminée",
-  CDD: "CDD — durée déterminée",
+export const CONTRACT_TYPE_LABELS: Record<ContractType, TranslationKey> = {
+  CDI: "contract.CDI",
+  CDD: "contract.CDD",
 };
 
 export const MARITAL_STATUSES = ["CELIBATAIRE", "MARIE", "DIVORCE", "VEUF"] as const;
 export type MaritalStatus = (typeof MARITAL_STATUSES)[number];
 
-export const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {
-  CELIBATAIRE: "Célibataire",
-  MARIE: "Marié(e)",
-  DIVORCE: "Divorcé(e)",
-  VEUF: "Veuf/Veuve",
+export const MARITAL_STATUS_LABELS: Record<MaritalStatus, TranslationKey> = {
+  CELIBATAIRE: "marital.CELIBATAIRE",
+  MARIE: "marital.MARIE",
+  DIVORCE: "marital.DIVORCE",
+  VEUF: "marital.VEUF",
 };
 
 export const ABSENCE_TYPES = ["CONGE", "MALADIE", "INJUSTIFIEE"] as const;
 export type AbsenceType = (typeof ABSENCE_TYPES)[number];
 
-export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
-  CONGE: "Congé",
-  MALADIE: "Maladie",
-  INJUSTIFIEE: "Absence injustifiée",
+export const ABSENCE_TYPE_LABELS: Record<AbsenceType, TranslationKey> = {
+  CONGE: "absence.CONGE",
+  MALADIE: "absence.MALADIE",
+  INJUSTIFIEE: "absence.INJUSTIFIEE",
 };
 
 export const EXPECTED_HOURS_PER_DAY = 8;

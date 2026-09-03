@@ -1,4 +1,5 @@
 import { api } from "./api";
+import type { TranslationKey } from "./i18n";
 import type { ApiItem, ApiMovement } from "./stockApi";
 import type { ApiSupplier } from "./suppliersApi";
 
@@ -6,13 +7,14 @@ import type { ApiSupplier } from "./suppliersApi";
 
 export type PoStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
 
-export const PO_STATUS_LABELS: Record<PoStatus, string> = {
-  DRAFT: "Brouillon",
-  SUBMITTED: "Envoyé",
-  APPROVED: "Approuvé",
-  PARTIALLY_RECEIVED: "Partiellement reçu",
-  RECEIVED: "Reçu",
-  CANCELLED: "Annulé",
+/** Catalogue keys, not text — the same status is shown on three screens. */
+export const PO_STATUS_LABELS: Record<PoStatus, TranslationKey> = {
+  DRAFT: "poStatus.DRAFT",
+  SUBMITTED: "poStatus.SUBMITTED",
+  APPROVED: "poStatus.APPROVED",
+  PARTIALLY_RECEIVED: "poStatus.PARTIALLY_RECEIVED",
+  RECEIVED: "poStatus.RECEIVED",
+  CANCELLED: "poStatus.CANCELLED",
 };
 
 export const PO_STATUS_ORDER: PoStatus[] = ["DRAFT", "SUBMITTED", "APPROVED", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"];
@@ -32,11 +34,11 @@ export const SETTABLE_PO_STATUSES: PoStatus[] = ["DRAFT", "SUBMITTED", "APPROVED
 /** Independent of PoStatus above — a supplier can be paid regardless of what has arrived. */
 export type PoPaymentStatus = "PENDING" | "PARTIAL" | "PAID" | "CANCELLED";
 
-export const PO_PAYMENT_LABELS: Record<PoPaymentStatus, string> = {
-  PENDING: "En attente",
-  PARTIAL: "Partiellement payé",
-  PAID: "Payé",
-  CANCELLED: "Annulé",
+export const PO_PAYMENT_LABELS: Record<PoPaymentStatus, TranslationKey> = {
+  PENDING: "poPayment.PENDING",
+  PARTIAL: "poPayment.PARTIAL",
+  PAID: "poPayment.PAID",
+  CANCELLED: "poPayment.CANCELLED",
 };
 
 export const PO_PAYMENT_TONES: Record<PoPaymentStatus, "ok" | "warn" | "danger" | "neutral"> = {

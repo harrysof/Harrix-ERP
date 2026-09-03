@@ -1,6 +1,16 @@
 import type { ProductionStatus } from "../../lib/productionApi";
+import type { TranslationKey } from "../../lib/i18n";
 
-export const SHIFTS = ["Matin", "Après-midi", "Nuit"];
+/**
+ * The shift written on a batch stays the French word — it is stored on every
+ * past batch and grouped on by the losses report — while its label follows the
+ * interface language.
+ */
+export const SHIFTS: Array<{ value: string; key: TranslationKey }> = [
+  { value: "Matin", key: "shift.morning" },
+  { value: "Après-midi", key: "shift.afternoon" },
+  { value: "Nuit", key: "shift.night" },
+];
 
 /** One editable material row in the new-batch form / add-materials modal. */
 export interface MaterialLine {
@@ -65,9 +75,9 @@ export function formatRate(rate: number | null): string {
  * A negative gap (more counted than announced) is just as much a reason to
  * look as a positive one.
  */
-export function describeVariance(unknown: number | null): string {
-  if (unknown === null) return "Sortie non déclarée";
-  if (unknown === 0) return "Entièrement justifié";
-  if (unknown > 0) return `${unknown} non comptabilisées`;
-  return `${Math.abs(unknown)} en excédent`;
+export function describeVariance(unknown: number | null): { key: TranslationKey; count: number } {
+  if (unknown === null) return { key: "prod.outputNotDeclared", count: 0 };
+  if (unknown === 0) return { key: "prod.fullyAccounted", count: 0 };
+  if (unknown > 0) return { key: "prod.unaccountedCount", count: unknown };
+  return { key: "prod.surplusCount", count: Math.abs(unknown) };
 }

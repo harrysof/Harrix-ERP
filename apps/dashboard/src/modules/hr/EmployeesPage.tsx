@@ -10,23 +10,30 @@ import { ApiError } from "../../lib/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { archiveEmployee, CONTRACT_TYPE_LABELS, fetchEmployees, unarchiveEmployee, type ApiEmployee } from "../../lib/hrApi";
 import { useAuth } from "../../state/AuthContext";
+import { useI18n } from "../../state/LanguageContext";
+import type { TranslationKey } from "../../lib/i18n";
 import { EmployeeModal } from "./EmployeeModal";
 import { EmployeeDetailModal } from "./EmployeeDetailModal";
 
 type ModalState = { kind: "none" } | { kind: "add" } | { kind: "edit"; employee: ApiEmployee } | { kind: "detail"; employeeId: string };
 
-/** Ancienneté, rendered the way a factory actually says it. */
-function tenureLabel(t: ApiEmployee["tenure"]): string {
-  if (t.totalDays === 0) return "Aujourd'hui";
+/**
+ * Ancienneté, rendered the way a factory actually says it ("3 ans 2 mois").
+ * Takes `t` rather than importing it: this runs inside a `.map()` in the table
+ * body, where a hook cannot be called.
+ */
+function tenureLabel(tenure: ApiEmployee["tenure"], t: (key: TranslationKey, vars?: Record<string, string | number>) => string): string {
+  if (tenure.totalDays === 0) return t("hr.today");
   const parts: string[] = [];
-  if (t.years > 0) parts.push(`${t.years} an${t.years > 1 ? "s" : ""}`);
-  if (t.months > 0) parts.push(`${t.months} mois`);
-  if (t.years === 0 && t.months === 0) parts.push(`${t.days} j`);
+  if (tenure.years > 0) parts.push(t("hr.tenureYears", { count: tenure.years }));
+  if (tenure.months > 0) parts.push(t("hr.tenureMonths", { count: tenure.months }));
+  if (tenure.years === 0 && tenure.months === 0) parts.push(t("hr.tenureDays", { count: tenure.days }));
   return parts.join(" ");
 }
 
 export function EmployeesPage() {
   const { can } = useAuth();
+  const { t } = useI18n();
   const canWrite = can("hr:write");
   const [employees, setEmployees] = useState<ApiEmployee[]>([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -35,12 +42,13 @@ export function EmployeesPage() {
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
     return fetchEmployees({ includeArchived: true })
       .then(setEmployees)
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les employés."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("hr.loadFailed")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -67,7 +75,7 @@ export function EmployeesPage() {
       else await archiveEmployee(employee.id);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Action impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.action"));
     }
   }
 
@@ -76,14 +84,24 @@ export function EmployeesPage() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <div className="stat-grid">
-        <StatCard icon={Users} label="Employés actifs" value={active.length} hint={`${employees.length - active.length} archivé(s)`} />
-        <StatCard icon={UserCheck} label="Sous contrat CDI" value={active.filter((e) => e.contractType === "CDI").length} />
-        <StatCard icon={Wallet} label="Masse salariale brute" value={formatCurrency(totalGrossPayroll)} hint="Mensuelle, employés actifs" />
+        <StatCard
+          icon={Users}
+          label={t("hr.activeEmployees")}
+          value={active.length}
+          hint={t("hr.archivedCount", { count: employees.length - active.length })}
+        />
+        <StatCard icon={UserCheck} label={t("hr.onCDI")} value={active.filter((e) => e.contractType === "CDI").length} />
+        <StatCard
+          icon={Wallet}
+          label={t("hr.grossPayroll")}
+          value={formatCurrency(totalGrossPayroll)}
+          hint={t("hr.grossPayrollHint")}
+        />
         <StatCard
           icon={CalendarClock}
-          label="CDD arrivant à échéance"
+          label={t("hr.cddEnding")}
           value={cddSoonEnding.length}
-          hint="Dans les 30 prochains jours"
+          hint={t("hr.cddEndingHint")}
           tone={cddSoonEnding.length > 0 ? "warn" : "ok"}
         />
       </div>
@@ -91,32 +109,32 @@ export function EmployeesPage() {
       <div className="toolbar">
         <input
           className="input toolbar-search"
-          placeholder="Rechercher un employé…"
+          placeholder={t("hr.search")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <div className="toolbar-actions">
           <label className="checkbox-row" style={{ margin: 0 }}>
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-            <span>Afficher les archivés</span>
+            <span>{t("action.showArchived")}</span>
           </label>
           {canWrite ? (
             <Button variant="primary" onClick={() => setModal({ kind: "add" })}>
-              + Nouvel employé
+              {t("hr.newEmployee")}
             </Button>
           ) : null}
         </div>
       </div>
 
       {loading ? (
-        <p className="loading-text">Chargement…</p>
+        <p className="loading-text">{t("state.loading")}</p>
       ) : visible.length === 0 ? (
         <EmptyState
-          title={search ? "Aucun employé ne correspond à la recherche" : "Aucun employé enregistré"}
+          title={search ? t("hr.noMatch") : t("hr.none")}
           action={
             !search && canWrite ? (
               <Button variant="primary" onClick={() => setModal({ kind: "add" })}>
-                + Nouvel employé
+                {t("hr.newEmployee")}
               </Button>
             ) : undefined
           }
@@ -127,14 +145,14 @@ export function EmployeesPage() {
             <table className="stock-table">
               <thead>
                 <tr>
-                  <th>Nom</th>
-                  <th>Poste</th>
-                  <th>Contrat</th>
-                  <th>Embauché le</th>
-                  <th>Ancienneté</th>
-                  <th className="num">Salaire brut</th>
-                  <th>Statut</th>
-                  <th aria-label="Actions" />
+                  <th>{t("field.name")}</th>
+                  <th>{t("hr.col.position")}</th>
+                  <th>{t("hr.col.contract")}</th>
+                  <th>{t("hr.col.hiredOn")}</th>
+                  <th>{t("hr.col.tenure")}</th>
+                  <th className="num">{t("hr.col.grossSalary")}</th>
+                  <th>{t("field.status")}</th>
+                  <th aria-label={t("field.actions")} />
                 </tr>
               </thead>
               <tbody>
@@ -149,19 +167,19 @@ export function EmployeesPage() {
                       </div>
                     </td>
                     <td>{e.position}</td>
-                    <td>{CONTRACT_TYPE_LABELS[e.contractType]}</td>
+                    <td>{t(CONTRACT_TYPE_LABELS[e.contractType])}</td>
                     <td className="tabular">{formatDate(e.hireDate)}</td>
-                    <td className="tabular">{tenureLabel(e.tenure)}</td>
+                    <td className="tabular">{tenureLabel(e.tenure, t)}</td>
                     <td className="tabular num">{formatCurrency(e.salary)}</td>
                     <td>
-                      <Pill tone={e.archived ? "neutral" : "ok"}>{e.archived ? "Archivé" : "Actif"}</Pill>
+                      <Pill tone={e.archived ? "neutral" : "ok"}>{t(e.archived ? "state.archived" : "state.active")}</Pill>
                     </td>
                     <td>
                       <div className="row-actions">
                         <button
                           type="button"
                           className="icon-button"
-                          title="Fiche"
+                          title={t("sales.file")}
                           onClick={() => setModal({ kind: "detail", employeeId: e.id })}
                         >
                           <Eye size={16} strokeWidth={2} />
@@ -171,7 +189,7 @@ export function EmployeesPage() {
                             <button
                               type="button"
                               className="icon-button"
-                              title="Modifier"
+                              title={t("action.edit")}
                               onClick={() => setModal({ kind: "edit", employee: e })}
                             >
                               <Pencil size={16} strokeWidth={2} />
@@ -179,7 +197,7 @@ export function EmployeesPage() {
                             <button
                               type="button"
                               className="icon-button"
-                              title={e.archived ? "Désarchiver" : "Archiver"}
+                              title={t(e.archived ? "action.unarchive" : "action.archive")}
                               onClick={() => toggleArchive(e)}
                             >
                               {e.archived ? <ArchiveRestore size={16} strokeWidth={2} /> : <Archive size={16} strokeWidth={2} />}

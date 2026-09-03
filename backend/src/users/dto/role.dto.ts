@@ -1,10 +1,11 @@
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { t } from '../../i18n/messages/index.js';
 
 export class CreateRoleDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(40)
-  @Matches(/^[a-z0-9-]+$/, { message: 'La clé du rôle doit être en minuscules, sans espaces (ex. "chef-equipe").' })
+  @Matches(/^[a-z0-9-]+$/, { message: () => t('users.roleKeyPattern') })
   key!: string;
 
   @IsString()

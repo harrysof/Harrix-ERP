@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Coins, ClipboardList, Copy, Trash2 } from "lucide-react";
 import { Banner } from "../../components/ui/Banner";
 import { Button } from "../../components/ui/Button";
+import { useI18n } from "../../state/LanguageContext";
 import { Field } from "../../components/ui/Field";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { StatCard } from "../../components/ui/StatCard";
 import { ApiError } from "../../lib/api";
-import { formatCurrency, formatDate } from "../../lib/format";
+import { formatCurrency, formatDate, formatMonthYear } from "../../lib/format";
 import { todayIso } from "../../lib/date";
 import {
   copyFactoryCosts,
@@ -20,11 +21,6 @@ import { useAuth } from "../../state/AuthContext";
 
 function currentMonth(): string {
   return todayIso().slice(0, 7);
-}
-
-function monthLabel(month: string): string {
-  const [year, m] = month.split("-").map(Number);
-  return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(new Date(Date.UTC(year, m - 1, 1)));
 }
 
 /**
@@ -42,6 +38,7 @@ export function FactoryCostsPage() {
   const [data, setData] = useState<MonthlyCosts | null>(null);
   const [monthsWithCosts, setMonthsWithCosts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
   const [label, setLabel] = useState("");
@@ -60,7 +57,7 @@ export function FactoryCostsPage() {
         setData(costs);
         setMonthsWithCosts(months);
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les coûts."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("fin.loadCostsFailed")))
       .finally(() => setLoading(false));
   }, [month]);
 
@@ -76,8 +73,8 @@ export function FactoryCostsPage() {
 
   async function submitCost() {
     const amountValue = Number(amount);
-    if (!label.trim()) return setError("Le type de coût est obligatoire.");
-    if (!Number.isFinite(amountValue) || amountValue <= 0) return setError("Le montant doit être un nombre positif.");
+    if (!label.trim()) return setError(t("fin.err.costType"));
+    if (!Number.isFinite(amountValue) || amountValue <= 0) return setError(t("fin.err.amount"));
 
     setError(null);
     setSaving(true);
@@ -87,19 +84,19 @@ export function FactoryCostsPage() {
       setAmount("");
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSaving(false);
     }
   }
 
   async function removeCost(id: string, costLabel: string) {
-    if (!window.confirm(`Supprimer le coût « ${costLabel} » ?`)) return;
+    if (!window.confirm(t("fin.confirmDeleteCost", { label: costLabel }))) return;
     try {
       await deleteFactoryCost(id);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Suppression impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.delete"));
     }
   }
 
@@ -112,7 +109,7 @@ export function FactoryCostsPage() {
       setCopyFrom("");
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Copie impossible.");
+      setError(e instanceof ApiError ? e.message : t("fin.copyFailed"));
     } finally {
       setCopying(false);
     }
@@ -125,69 +122,70 @@ export function FactoryCostsPage() {
       {error ? <Banner tone="danger">{error}</Banner> : null}
 
       <div className="toolbar">
-        <Field label="Mois">
+        <Field label={t("fin.monthLabel")}>
           <input className="input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ maxWidth: 200 }} />
         </Field>
         {writable && copyableMonths.length > 0 ? (
           <div className="toolbar-actions">
             <select className="input" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} style={{ width: 200 }}>
-              <option value="">Copier depuis…</option>
+              <option value="">{t("fin.copyFrom")}</option>
               {copyableMonths.map((m) => (
                 <option key={m} value={m}>
-                  {monthLabel(m)}
+                  {formatMonthYear(m)}
                 </option>
               ))}
             </select>
             <Button variant="secondary" onClick={submitCopy} disabled={!copyFrom || copying}>
               <Copy size={16} strokeWidth={2} />
-              {copying ? "Copie…" : `Copier vers ${monthLabel(month)}`}
+              {copying ? "Copie…" : `Copier vers ${formatMonthYear(month)}`}
             </Button>
           </div>
         ) : null}
       </div>
 
       <div className="stat-grid">
-        <StatCard icon={Coins} label="Coût total du mois" value={formatCurrency(data?.total ?? 0)} hint={monthLabel(month)} />
-        <StatCard icon={ClipboardList} label="Postes de coûts" value={data?.costs.length ?? 0} />
+        <StatCard
+          icon={Coins}
+          label={t("fin.monthTotal")}
+          value={formatCurrency(data?.total ?? 0)}
+          hint={formatMonthYear(month)}
+        />
+        <StatCard icon={ClipboardList} label={t("fin.costLines")} value={data?.costs.length ?? 0} />
       </div>
 
       {writable ? (
         <section className="card-section">
-          <h3>Ajouter un coût</h3>
+          <h3>{t("fin.addCostTitle")}</h3>
           <div className="form-row">
-            <Field label="Type de coût">
+            <Field label={t("fin.costType")}>
               <input
                 className="input"
-                placeholder="Ex. loyer, électricité, salaires indirects…"
+                placeholder={t("fin.ph.costType")}
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
               />
             </Field>
-            <Field label="Montant (DZD)">
+            <Field label={t("fin.amountDzd")}>
               <input className="input" type="number" min={0} step="any" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </Field>
-            <Field label="Date">
+            <Field label={t("field.date")}>
               <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </Field>
           </div>
           <div>
             <Button variant="primary" onClick={submitCost} disabled={saving}>
-              {saving ? "Enregistrement…" : "+ Ajouter le coût"}
+              {saving ? t("action.saving") : t("fin.addCostButton")}
             </Button>
           </div>
         </section>
       ) : null}
 
       {loading ? (
-        <p className="loading-text">Chargement…</p>
+        <p className="loading-text">{t("state.loading")}</p>
       ) : !data || data.costs.length === 0 ? (
         <EmptyState
-          title="Aucun coût enregistré pour ce mois"
-          description={
-            copyableMonths.length > 0
-              ? "Ajoutez un coût ci-dessus, ou copiez ceux d'un autre mois."
-              : "Ajoutez le premier coût de l'usine ci-dessus."
-          }
+          title={t("fin.noCosts")}
+          description={t(copyableMonths.length > 0 ? "fin.addOrCopy" : "fin.addFirstCost")}
         />
       ) : (
         <div className="list-card">
@@ -195,10 +193,10 @@ export function FactoryCostsPage() {
             <table className="stock-table">
               <thead>
                 <tr>
-                  <th>Type de coût</th>
-                  <th>Date</th>
+                  <th>{t("fin.costType")}</th>
+                  <th>{t("field.date")}</th>
                   <th className="num">Montant</th>
-                  {writable ? <th aria-label="Actions" /> : null}
+                  {writable ? <th aria-label={t("field.actions")} /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -210,7 +208,7 @@ export function FactoryCostsPage() {
                     {writable ? (
                       <td>
                         <div className="row-actions">
-                          <button type="button" className="icon-button" title="Supprimer" onClick={() => removeCost(c.id, c.label)}>
+                          <button type="button" className="icon-button" title={t("action.delete")} onClick={() => removeCost(c.id, c.label)}>
                             <Trash2 size={16} strokeWidth={2} />
                           </button>
                         </div>

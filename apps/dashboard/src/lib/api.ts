@@ -1,3 +1,6 @@
+import { formatLanguage } from "./format";
+import { translate } from "./i18n";
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
 export class ApiError extends Error {
@@ -32,12 +35,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        "Accept-Language": formatLanguage(),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
     });
   } catch {
-    throw new ApiError(0, "Impossible de joindre le serveur. Vérifiez que le backend est démarré.");
+    throw new ApiError(0, translate(formatLanguage(), "error.serverUnreachable"));
   }
 
   if (!response.ok) {

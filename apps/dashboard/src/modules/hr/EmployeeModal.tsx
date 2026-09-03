@@ -3,6 +3,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Field } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
 import { Banner } from "../../components/ui/Banner";
+import { useI18n } from "../../state/LanguageContext";
 import { todayIso } from "../../lib/date";
 import { ApiError } from "../../lib/api";
 import {
@@ -31,6 +32,7 @@ interface EmployeeModalProps {
  * on day one (name, poste, date d'embauche, salaire).
  */
 export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps) {
+  const { t } = useI18n();
   const [fullName, setFullName] = useState(employee?.fullName ?? "");
   const [phone, setPhone] = useState(employee?.phone ?? "");
   const [address, setAddress] = useState(employee?.address ?? "");
@@ -55,18 +57,18 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
 
   async function handleSubmit() {
     if (!fullName.trim() || !position.trim()) {
-      return setError("Le nom complet et le poste sont obligatoires.");
+      return setError(t("hr.err.nameAndPosition"));
     }
     const salaryValue = Number(salary);
     if (!Number.isFinite(salaryValue) || salaryValue < 0) {
-      return setError("Le salaire doit être un nombre positif.");
+      return setError(t("hr.err.salary"));
     }
     const expectedHoursValue = Number(expectedHoursPerDay);
     if (!Number.isFinite(expectedHoursValue) || expectedHoursValue < 1 || expectedHoursValue > 24) {
-      return setError("Les heures prévues par jour doivent être comprises entre 1 et 24.");
+      return setError(t("hr.err.hours"));
     }
     if (contractType === "CDD" && !contractEndDate) {
-      return setError("Un CDD doit avoir une date de fin de contrat.");
+      return setError(t("hr.err.cddEnd"));
     }
     const childrenValue = Number(dependentChildren) || 0;
 
@@ -97,7 +99,7 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
       else await createEmployee(input);
       onSaved();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSaving(false);
     }
@@ -105,16 +107,16 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
 
   return (
     <Modal
-      title={employee ? `Modifier — ${employee.fullName}` : "Nouvel employé"}
+      title={employee ? t("hr.editTitle", { name: employee.fullName }) : t("hr.newTitle")}
       onClose={onClose}
       width={680}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
-            Annuler
+            {t("action.cancel")}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? "Enregistrement…" : employee ? "Enregistrer" : "Ajouter l'employé"}
+            {saving ? t("action.saving") : employee ? t("action.save") : t("hr.add")}
           </Button>
         </>
       }
@@ -123,68 +125,68 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
         {error ? <Banner tone="danger">{error}</Banner> : null}
 
         <p className="detail-type" style={{ margin: 0 }}>
-          Identité
+          {t("hr.identity")}
         </p>
-        <Field label="Nom complet">
+        <Field label={t("field.fullName")}>
           <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} autoFocus />
         </Field>
         <div className="form-row">
-          <Field label="Téléphone">
+          <Field label={t("field.phone")}>
             <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </Field>
-          <Field label="Poste">
+          <Field label={t("hr.col.position")}>
             <input className="input" value={position} onChange={(e) => setPosition(e.target.value)} />
           </Field>
-          <Field label="Date de naissance" hint="Facultatif">
+          <Field label={t("hr.birthDate")} hint={t("state.optional")}>
             <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           </Field>
         </div>
-        <Field label="Adresse">
+        <Field label={t("field.address")}>
           <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
         </Field>
         <div className="form-row">
-          <Field label="NIN" hint="Numéro d'identification nationale, facultatif">
+          <Field label={t("hr.nin")} hint={t("hr.ninHint")}>
             <input className="input" value={nin} onChange={(e) => setNin(e.target.value)} />
           </Field>
-          <Field label="N° CNAS" hint="Immatriculation sécurité sociale, facultatif">
+          <Field label={t("hr.cnasNumber")} hint={t("hr.cnasHint")}>
             <input className="input" value={cnasNumber} onChange={(e) => setCnasNumber(e.target.value)} />
           </Field>
         </div>
 
         <p className="detail-type" style={{ margin: "8px 0 0" }}>
-          Contrat
+          {t("hr.contractSection")}
         </p>
         <div className="form-row">
-          <Field label="Date d'embauche">
+          <Field label={t("hr.hireDate")}>
             <input className="input" type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} />
           </Field>
-          <Field label="Type de contrat">
+          <Field label={t("hr.contractType")}>
             <select className="input" value={contractType} onChange={(e) => setContractType(e.target.value as ContractType)}>
-              {CONTRACT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {CONTRACT_TYPE_LABELS[t]}
+              {CONTRACT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {t(CONTRACT_TYPE_LABELS[type])}
                 </option>
               ))}
             </select>
           </Field>
           {contractType === "CDD" ? (
-            <Field label="Fin de contrat">
+            <Field label={t("hr.contractEnd")}>
               <input className="input" type="date" value={contractEndDate} onChange={(e) => setContractEndDate(e.target.value)} />
             </Field>
           ) : null}
         </div>
         <div className="form-row">
-          <Field label="Situation familiale" hint="Utile pour l'allocation familiale CNAS">
+          <Field label={t("hr.maritalStatus")} hint={t("hr.maritalHint")}>
             <select className="input" value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value as MaritalStatus | "")}>
-              <option value="">— Non précisé —</option>
+              <option value="">{t("hr.unspecified")}</option>
               {MARITAL_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {MARITAL_STATUS_LABELS[s]}
+                  {t(MARITAL_STATUS_LABELS[s])}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Enfants à charge">
+          <Field label={t("hr.dependents")}>
             <input
               className="input"
               type="number"
@@ -197,13 +199,13 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
         </div>
 
         <p className="detail-type" style={{ margin: "8px 0 0" }}>
-          Rémunération
+          {t("hr.paySection")}
         </p>
         <div className="form-row">
-          <Field label="Salaire brut (DZD/mois)">
+          <Field label={t("hr.salary")}>
             <input className="input" type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} />
           </Field>
-          <Field label="Heures prévues / jour" hint="Utilisé pour le résumé du mois">
+          <Field label={t("hr.expectedHours")} hint={t("hr.expectedHoursHint")}>
             <input
               className="input"
               type="number"
@@ -214,24 +216,24 @@ export function EmployeeModal({ employee, onClose, onSaved }: EmployeeModalProps
               onChange={(e) => setExpectedHoursPerDay(e.target.value)}
             />
           </Field>
-          <Field label="RIB" hint="Compte de versement du salaire, facultatif">
+          <Field label={t("hr.rib")} hint={t("hr.ribHint")}>
             <input className="input" value={bankRib} onChange={(e) => setBankRib(e.target.value)} />
           </Field>
         </div>
 
         <p className="detail-type" style={{ margin: "8px 0 0" }}>
-          Contact d'urgence
+          {t("hr.emergencyContact")}
         </p>
         <div className="form-row">
-          <Field label="Nom">
+          <Field label={t("field.name")}>
             <input className="input" value={emergencyContactName} onChange={(e) => setEmergencyContactName(e.target.value)} />
           </Field>
-          <Field label="Téléphone">
+          <Field label={t("field.phone")}>
             <input className="input" value={emergencyContactPhone} onChange={(e) => setEmergencyContactPhone(e.target.value)} />
           </Field>
         </div>
 
-        <Field label="Notes">
+        <Field label={t("field.notes")}>
           <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
       </div>

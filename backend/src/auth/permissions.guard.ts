@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from './require-permission.decorator.js';
 import { hasAllPermissions, type Permission } from './permissions.js';
 import type { AuthenticatedUser } from './current-user.js';
+import { t } from '../i18n/messages/index.js';
 
 /**
  * Enforces @RequirePermissions on the backend — the build plan's "hiding a
@@ -26,12 +27,10 @@ export class PermissionsGuard implements CanActivate {
     const user: AuthenticatedUser | undefined = context.switchToHttp().getRequest().user;
     // No user here means the route is @Public but also permission-guarded,
     // which is a wiring mistake rather than something to let through.
-    if (!user) throw new ForbiddenException('Accès refusé.');
+    if (!user) throw new ForbiddenException(t('auth.accessDenied'));
 
     if (!hasAllPermissions(user.permissions, required)) {
-      throw new ForbiddenException(
-        `Votre rôle (${user.roleLabel}) ne permet pas cette action. Contactez le gérant si vous pensez que c'est une erreur.`,
-      );
+      throw new ForbiddenException(t('auth.roleForbids', { role: user.roleLabel }));
     }
     return true;
   }

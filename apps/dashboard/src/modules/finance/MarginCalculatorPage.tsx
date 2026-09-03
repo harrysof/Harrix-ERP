@@ -5,6 +5,7 @@ import { ApiError } from "../../lib/api";
 import { formatCurrency } from "../../lib/format";
 import { Field } from "../../components/ui/Field";
 import { Button } from "../../components/ui/Button";
+import { useI18n } from "../../state/LanguageContext";
 import { Banner } from "../../components/ui/Banner";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { StatCard } from "../../components/ui/StatCard";
@@ -32,6 +33,7 @@ export function MarginCalculatorPage() {
   const { types, loading: typesLoading } = useInventoryTypes();
   const [items, setItems] = useState<ApiItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -47,7 +49,7 @@ export function MarginCalculatorPage() {
     setError(null);
     return fetchItems(typeId)
       .then((data) => setItems([...data].sort((a, b) => a.name.localeCompare(b.name, "fr"))))
-      .catch((e) => setError(e instanceof ApiError ? e.message : "Impossible de charger les produits finis."))
+      .catch((e) => setError(e instanceof ApiError ? e.message : t("fin.loadProductsFailed")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -108,13 +110,13 @@ export function MarginCalculatorPage() {
   const realMarginPct = realPrice && realPrice > 0 && unitCost >= 0 ? ((realPrice - unitCost) / realPrice) * 100 : null;
   const gapVsSuggested = realPrice != null && suggestedPrice != null ? realPrice - suggestedPrice : null;
 
-  if (typesLoading || loading) return <p className="loading-text">Chargement…</p>;
+  if (typesLoading || loading) return <p className="loading-text">{t("state.loading")}</p>;
 
   if (!finishedGoodsType) {
     return (
       <EmptyState
-        title="Aucun inventaire « Produits finis » n'est configuré"
-        description="Le calculateur de marge compare toujours au prix de vente d'un produit fini du Stock. Créez d'abord cet inventaire."
+        title={t("fin.noFinishedGoodsInventory")}
+        description={t("fin.calculatorNeedsInventory")}
       />
     );
   }
@@ -126,15 +128,15 @@ export function MarginCalculatorPage() {
       <div className="toolbar">
         <input
           className="input toolbar-search"
-          placeholder="Rechercher un produit fini…"
+          placeholder={t("fin.searchProduct")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      <Field label="Produit" hint="Le prix de vente affiché à droite vient de Stock — Produits finis">
+      <Field label={t("fin.product")} hint={t("fin.currentPriceHint")}>
         <select className="input" value={selectedItemId} onChange={(e) => selectItem(e.target.value)}>
-          <option value="">— Choisir un produit —</option>
+          <option value="">{t("fin.chooseProduct")}</option>
           {visibleItems.map((i) => (
             <option key={i.id} value={i.id}>
               {i.name} ({i.reference})
@@ -146,23 +148,25 @@ export function MarginCalculatorPage() {
       </Field>
 
       {!selectedItem ? (
-        <EmptyState title="Sélectionnez un produit pour commencer" description="Le calcul de coût et de marge apparaîtra ici." />
+        <EmptyState title={t("fin.selectToStart")} description={t("fin.calcAppearsHere")} />
       ) : (
         <>
           <div className="detail-pills">
             {selectedItem.color ? <Pill>{selectedItem.color}</Pill> : null}
             {selectedItem.size ? <Pill>{selectedItem.size}</Pill> : null}
             {selectedItem.gender ? <Pill>{selectedItem.gender}</Pill> : null}
-            <Pill tone="neutral">Stock actuel : {selectedItem.quantity} {selectedItem.unit}</Pill>
+            <Pill tone="neutral">
+              {t("fin.currentStock", { quantity: `${selectedItem.quantity} ${selectedItem.unit}` })}
+            </Pill>
           </div>
 
           <div className="order-lines-editor">
-            <p className="order-lines-title">Coûts</p>
+            <p className="order-lines-title">{t("fin.costs")}</p>
             {lines.map((line) => (
               <div key={line.id} className="order-line-editor">
                 <input
                   className="input"
-                  placeholder="Ex. matières, main-d'œuvre, énergie…"
+                  placeholder={t("fin.ph.costLabel")}
                   value={line.label}
                   onChange={(e) => updateLine(line.id, { label: e.target.value })}
                 />
@@ -171,22 +175,22 @@ export function MarginCalculatorPage() {
                   type="number"
                   min={0}
                   step="any"
-                  placeholder="Montant"
+                  placeholder={t("fin.amount")}
                   value={line.amount}
                   onChange={(e) => updateLine(line.id, { amount: e.target.value })}
                 />
                 <Button variant="ghost" onClick={() => removeLine(line.id)}>
-                  Suppr.
+                  {t("fin.removeShort")}
                 </Button>
               </div>
             ))}
             <Button variant="secondary" onClick={addLine}>
-              + Ajouter un coût
+              {t("fin.addCost")}
             </Button>
-            <p className="order-lines-total">Coût total : {formatCurrency(totalCost)}</p>
+            <p className="order-lines-total">{t("fin.totalCostLine", { value: formatCurrency(totalCost) })}</p>
           </div>
 
-          <Field label="Quantité produite" hint="Le coût total ci-dessus est divisé par cette quantité pour obtenir le coût unitaire">
+          <Field label={t("fin.quantityProduced")} hint={t("fin.quantityHint")}>
             <input
               className="input"
               type="number"
@@ -198,7 +202,7 @@ export function MarginCalculatorPage() {
             />
           </Field>
 
-          <Field label="Marge cible (%)" hint="Sert à calculer le prix suggéré ci-dessous">
+          <Field label={t("fin.targetMargin")} hint={t("fin.targetMarginHint")}>
             <input
               className="input"
               type="number"
@@ -211,47 +215,55 @@ export function MarginCalculatorPage() {
           </Field>
 
           {totalCost <= 0 ? (
-            <Banner tone="info">Ajoutez au moins un coût pour obtenir un prix suggéré et une marge.</Banner>
+            <Banner tone="info">{t("fin.addCostForSuggestion")}</Banner>
           ) : !quantityValid ? (
-            <Banner tone="warn">La quantité produite doit être un nombre positif.</Banner>
+            <Banner tone="warn">{t("fin.err.quantity")}</Banner>
           ) : !marginValid ? (
-            <Banner tone="warn">La marge cible doit être comprise entre 0 et 99 %.</Banner>
+            <Banner tone="warn">{t("fin.err.margin")}</Banner>
           ) : (
             <>
               <div className="stat-grid">
-                <StatCard label="Coût total" value={formatCurrency(totalCost)} hint={quantityValue !== 1 ? `Pour ${quantityValue} unités` : undefined} />
-                <StatCard label="Coût unitaire" value={formatCurrency(unitCost)} hint="Coût total ÷ quantité" />
                 <StatCard
-                  label={`Prix suggéré (marge ${marginPct}%)`}
+                  label={t("fin.totalCost")}
+                  value={formatCurrency(totalCost)}
+                  hint={quantityValue !== 1 ? t("fin.forQuantity", { quantity: quantityValue }) : undefined}
+                />
+                <StatCard label={t("fin.unitCost")} value={formatCurrency(unitCost)} hint={t("fin.totalCostForQuantity")} />
+                <StatCard
+                  label={t("fin.suggestedPrice", { margin: marginPct })}
                   value={suggestedPrice != null ? formatCurrency(suggestedPrice) : "—"}
-                  hint="Par unité"
+                  hint={t("fin.perUnit")}
                 />
                 <StatCard
-                  label="Prix de vente actuel (stock)"
+                  label={t("fin.currentPrice")}
                   value={realPrice != null ? formatCurrency(realPrice) : "—"}
-                  hint={realPrice == null ? "Aucun prix renseigné sur cet article" : undefined}
+                  hint={realPrice == null ? t("fin.noPriceSet") : undefined}
                 />
                 <StatCard
-                  label="Marge réelle actuelle"
+                  label={t("fin.actualMargin")}
                   value={realMarginPct != null ? `${realMarginPct.toFixed(1)} %` : "—"}
                   tone={realMarginPct == null ? "neutral" : realMarginPct < 0 ? "danger" : realMarginPct < marginPct ? "warn" : "ok"}
-                  hint={realMarginPct != null ? `Objectif : ${marginPct}%` : undefined}
+                  hint={realMarginPct != null ? t("fin.targetLabel", { margin: marginPct }) : undefined}
                 />
               </div>
 
               {realPrice != null && realPrice < unitCost ? (
                 <Banner tone="danger">
-                  Le prix de vente actuel ({formatCurrency(realPrice)}) est inférieur au coût unitaire ({formatCurrency(unitCost)}) : ce
-                  produit se vend à perte.
+                  {t("fin.sellingAtLoss", {
+                    price: formatCurrency(realPrice),
+                    cost: formatCurrency(unitCost),
+                  })}
                 </Banner>
               ) : gapVsSuggested != null && gapVsSuggested < 0 ? (
                 <Banner tone="warn">
-                  Le prix de vente actuel est {formatCurrency(-gapVsSuggested)} en dessous du prix suggéré pour atteindre {marginPct}% de
-                  marge.
+                  {t("fin.belowSuggested", {
+                    gap: formatCurrency(-gapVsSuggested),
+                    margin: marginPct,
+                  })}
                 </Banner>
               ) : gapVsSuggested != null ? (
                 <Banner tone="info">
-                  Le prix de vente actuel dépasse le prix suggéré de {formatCurrency(gapVsSuggested)}.
+                  {t("fin.aboveSuggested", { gap: formatCurrency(gapVsSuggested) })}
                 </Banner>
               ) : null}
             </>

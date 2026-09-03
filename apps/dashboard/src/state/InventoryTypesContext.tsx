@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { InventoryTypeConfig } from "../lib/types";
 import { fetchInventoryTypes } from "../lib/stockApi";
 import { ApiError } from "../lib/api";
+import { useI18n } from "./LanguageContext";
 
 interface InventoryTypesContextValue {
   types: InventoryTypeConfig[];
@@ -15,17 +16,19 @@ interface InventoryTypesContextValue {
 const InventoryTypesContext = createContext<InventoryTypesContextValue | null>(null);
 
 export function InventoryTypesProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [types, setTypes] = useState<InventoryTypeConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const reload = useCallback(async () => {
     try {
       const data = await fetchInventoryTypes();
       setTypes([...data].sort((a, b) => a.sortOrder - b.sortOrder));
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Impossible de charger les types d'inventaire.");
+      setError(e instanceof ApiError ? e.message : t("stock.loadTypesFailed"));
     } finally {
       setLoading(false);
     }

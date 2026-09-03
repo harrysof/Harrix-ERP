@@ -1,4 +1,5 @@
 import { formatNumber } from "../../lib/format";
+import { useI18n } from "../../state/LanguageContext";
 
 interface VarianceBreakdownProps {
   expectedQuantity: number;
@@ -19,20 +20,21 @@ interface VarianceBreakdownProps {
  * comptabilisé", never "volé".
  */
 export function VarianceBreakdown({ expectedQuantity, firstChoice, secondChoice, waste, unit }: VarianceBreakdownProps) {
+  const { t } = useI18n();
   const accounted = firstChoice + secondChoice + waste;
   const unknown = Math.round((expectedQuantity - accounted) * 100) / 100;
 
   return (
     <div className="variance-strip">
-      <Term label="Attendu (machine)" value={expectedQuantity} unit={unit} />
+      <Term label={t("prod.expectedMachine")} value={expectedQuantity} unit={unit} />
       <Operator>−</Operator>
-      <Term label="1er choix" value={firstChoice} />
+      <Term label={t("quality.first")} value={firstChoice} />
       <Operator>−</Operator>
-      <Term label="2ème choix" value={secondChoice} />
+      <Term label={t("quality.second")} value={secondChoice} />
       <Operator>−</Operator>
-      <Term label="Rebut" value={waste} />
+      <Term label={t("quality.reject")} value={waste} />
       <Operator>=</Operator>
-      <Term label="Non comptabilisé" value={unknown} tone={unknown === 0 ? "ok" : "danger"} />
+      <Term label={t("prod.col.unknown")} value={unknown} tone={unknown === 0 ? "ok" : "danger"} />
     </div>
   );
 }

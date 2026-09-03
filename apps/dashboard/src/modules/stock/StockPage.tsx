@@ -21,6 +21,9 @@ import { Button } from "../../components/ui/Button";
 import { Pill } from "../../components/ui/Pill";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Banner } from "../../components/ui/Banner";
+import { Rich } from "../../components/ui/Rich";
+import { useI18n } from "../../state/LanguageContext";
+import type { TranslationKey } from "../../lib/i18n";
 import { AddItemModal } from "./AddItemModal";
 import { ReceiveStockModal } from "./ReceiveStockModal";
 import { LogUsageModal } from "./LogUsageModal";
@@ -28,17 +31,31 @@ import { ItemDetailModal } from "./ItemDetailModal";
 import { SupplierOrdersModal } from "./SupplierOrdersModal";
 import { InventoryTypeModal } from "./InventoryTypeModal";
 
+/** Criticality is stored as the French word it was created with; only its label translates. */
+const CRITICALITY: Record<string, { tone: "danger" | "warn" | "ok"; key: TranslationKey }> = {
+  Haute: { tone: "danger", key: "criticality.high" },
+  Moyenne: { tone: "warn", key: "criticality.medium" },
+  Basse: { tone: "ok", key: "criticality.low" },
+};
+
 function CriticalityPill({ value }: { value: string }) {
-  const tone = value === "Haute" ? "danger" : value === "Moyenne" ? "warn" : value === "Basse" ? "ok" : "neutral";
-  return <Pill tone={tone}>{value}</Pill>;
+  const { t } = useI18n();
+  const known = CRITICALITY[value];
+  if (!known) return <Pill tone="neutral">{value}</Pill>;
+  return <Pill tone={known.tone}>{t(known.key)}</Pill>;
 }
 
 /** Compact per-product quality classification: 1er / 2ème / rebut, plus the
  * unaccounted warning that surfaces the reconciliation problem at a glance. */
 function QualityCell({ item }: { item: ApiItem }) {
+  const { t, tn } = useI18n();
   const q = item.qualityBreakdown;
   if (!q) return null;
-  const bits = [`1er ${q["1er"]}`, `2e ${q["2ème"]}`, `rebut ${q.rebut}`];
+  const bits = [
+    t("quality.firstShort", { count: q["1er"] }),
+    t("quality.secondShortCount", { count: q["2ème"] }),
+    t("quality.rejectShortCount", { count: q.rebut }),
+  ];
   return (
     <div className="fifo-cell">
       <span className="quality-bits">
@@ -48,7 +65,7 @@ function QualityCell({ item }: { item: ApiItem }) {
           </span>
         ))}
       </span>
-      {!!item.unaccounted && <Pill tone="danger">{item.unaccounted} inconnues</Pill>}
+      {!!item.unaccounted && <Pill tone="danger">{tn("stock.unknownUnits", item.unaccounted)}</Pill>}
     </div>
   );
 }
@@ -62,6 +79,7 @@ function QualityCell({ item }: { item: ApiItem }) {
  * "worth nothing" and is shown as such.
  */
 function ValueCell({ item }: { item: ApiItem }) {
+  const { t } = useI18n();
   if (item.averageUnitCost === null) {
     return <span className="field-hint">—</span>;
   }
@@ -69,8 +87,11 @@ function ValueCell({ item }: { item: ApiItem }) {
     <span className="value-cell">
       <span className="tabular">{formatCurrency(item.stockValue ?? 0)}</span>
       {item.uncostedQuantity > 0 ? (
-        <span className="field-hint" title={`${formatQuantity(item.uncostedQuantity, item.unit)} sont entrés sans prix connu — la valeur ci-dessus ne les compte pas.`}>
-          partiel
+        <span
+          className="field-hint"
+          title={t("stock.partialTitle", { quantity: formatQuantity(item.uncostedQuantity, item.unit) })}
+        >
+          {t("stock.partial")}
         </span>
       ) : null}
     </span>
@@ -89,6 +110,7 @@ type ModalState =
   | { kind: "detail"; item: ApiItem };
 
 export function StockPage() {
+  const { t, tn } = useI18n();
   const { types, loading: typesLoading, error: typesError, reload: reloadTypes } = useInventoryTypes();
   const [activeTypeId, setActiveTypeId] = useState<string | null>(null);
   const [items, setItems] = useState<ApiItem[]>([]);
@@ -103,12 +125,13 @@ export function StockPage() {
     if (types.length > 0 && !activeTypeId) setActiveTypeId(types[0].id);
   }, [types, activeTypeId]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const loadItems = useCallback(() => {
     setItemsLoading(true);
     setLoadError(null);
     return fetchItems(undefined, true)
       .then(setItems)
-      .catch((e) => setLoadError(e instanceof ApiError ? e.message : "Impossible de charger le stock."))
+      .catch((e) => setLoadError(e instanceof ApiError ? e.message : t("stock.loadFailed")))
       .finally(() => setItemsLoading(false));
   }, []);
 
@@ -123,15 +146,13 @@ export function StockPage() {
    * PROJECT_CONTEXT.md §4.
    */
   async function removeItem(item: ApiItem) {
-    if (!window.confirm(`Supprimer définitivement « ${item.name} » ? Cet article n'a aucun historique, la suppression est donc sans effet sur le stock.`)) {
-      return;
-    }
+    if (!window.confirm(t("stock.confirmDeleteItem", { name: item.name }))) return;
     setLoadError(null);
     try {
       await deleteItem(item.id);
       await loadItems();
     } catch (e) {
-      setLoadError(e instanceof ApiError ? e.message : "Suppression impossible.");
+      setLoadError(e instanceof ApiError ? e.message : t("error.delete"));
     }
   }
 
@@ -146,16 +167,14 @@ export function StockPage() {
    * pointing at nothing — so this only ever succeeds on an empty one.
    */
   async function removeType(type: InventoryTypeConfig) {
-    if (!window.confirm(`Supprimer l'inventaire « ${type.label} » ? Cette action n'est possible que s'il ne contient aucun article.`)) {
-      return;
-    }
+    if (!window.confirm(t("stock.confirmDeleteType", { label: type.label }))) return;
     setLoadError(null);
     try {
       await deleteInventoryType(type.id);
       setActiveTypeId(null);
       await reloadTypes();
     } catch (e) {
-      setLoadError(e instanceof ApiError ? e.message : "Suppression impossible.");
+      setLoadError(e instanceof ApiError ? e.message : t("error.delete"));
     }
   }
 
@@ -198,16 +217,14 @@ export function StockPage() {
   }, [items, activeTypeId, search, showArchived]);
 
   if (typesError) return <Banner tone="danger">{typesError}</Banner>;
-  if (typesLoading || !inventoryType) return <p className="loading-text">Chargement…</p>;
+  if (typesLoading || !inventoryType) return <p className="loading-text">{t("state.loading")}</p>;
 
   // Finished goods are not bought, they are made: their "cost" is what the
   // production batches that made them consumed in raw materials, and calling
   // it anything less qualified would overstate what the figure knows.
   const isFinishedGoods = inventoryType.key === "finished-goods";
-  const costColumnLabel = isFinishedGoods ? "Coût matières" : "Coût unit.";
-  const costColumnHint = isFinishedGoods
-    ? "Coût matières premières par unité, moyenne des lots de production qui l'ont fabriqué. Hors main-d'œuvre, énergie et frais généraux."
-    : "Coût moyen pondéré d'une unité, calculé sur ce qui est réellement entré en stock";
+  const costColumnLabel = t(isFinishedGoods ? "stock.materialCost" : "stock.col.unitCostShort");
+  const costColumnHint = t(isFinishedGoods ? "stock.producedCostHint" : "stock.weightedAverage");
 
   return (
     <div className="page-stack">
@@ -215,17 +232,9 @@ export function StockPage() {
 
       {(totalLowStock > 0 || watchBatchCount > 0) && (
         <Banner tone="warn">
-          {totalLowStock > 0 && (
-            <span>
-              <strong>{totalLowStock}</strong> article{totalLowStock > 1 ? "s" : ""} en stock faible
-            </span>
-          )}
+          {totalLowStock > 0 && <span>{tn("stock.lowStock", totalLowStock)}</span>}
           {totalLowStock > 0 && watchBatchCount > 0 && <span className="banner-sep">·</span>}
-          {watchBatchCount > 0 && (
-            <span>
-              <strong>{watchBatchCount}</strong> lot{watchBatchCount > 1 ? "s" : ""} de produits chimiques à surveiller
-            </span>
-          )}
+          {watchBatchCount > 0 && <span>{tn("stock.watchBatch", watchBatchCount)}</span>}
         </Banner>
       )}
 
@@ -250,9 +259,9 @@ export function StockPage() {
           type="button"
           className="tab-strip-item tab-strip-add"
           onClick={() => setModal({ kind: "add-type" })}
-          title="Ajouter un inventaire (un nouvel onglet de stock)"
+          title={t("stock.newInventoryTitle")}
         >
-          + Inventaire
+          {t("stock.newInventory")}
         </button>
       </div>
 
@@ -260,48 +269,46 @@ export function StockPage() {
         <p className="inventory-description">{inventoryType.description}</p>
         <div className="row-actions">
           <Button variant="ghost" onClick={() => setModal({ kind: "edit-type", type: inventoryType })}>
-            Configurer cet inventaire
+            {t("stock.configureInventory")}
           </Button>
           <Button variant="ghost" onClick={() => removeType(inventoryType)}>
-            Supprimer l'inventaire
+            {t("stock.deleteInventory")}
           </Button>
         </div>
       </div>
 
       <div className="detail-stats">
         <div className="stat-card">
-          <span className="stat-card-label">Valeur de cet inventaire</span>
+          <span className="stat-card-label">{t("stock.inventoryValue")}</span>
           <span className="stat-card-value">{formatCurrency(typeStockValue)}</span>
           <span className="stat-card-hint">
-            {unpricedCount > 0
-              ? `${unpricedCount} article${unpricedCount > 1 ? "s" : ""} en stock sans coût connu — non compté${unpricedCount > 1 ? "s" : ""} ici`
-              : "Coût moyen pondéré de ce qui est réellement entré"}
+            {unpricedCount > 0 ? tn("stock.unpricedItems", unpricedCount) : t("stock.weightedAverageShort")}
           </span>
         </div>
         <div className="stat-card">
-          <span className="stat-card-label">Valeur totale du stock</span>
+          <span className="stat-card-label">{t("stock.totalValue")}</span>
           <span className="stat-card-value">{formatCurrency(totalStockValue)}</span>
-          <span className="stat-card-hint">Tous inventaires confondus</span>
+          <span className="stat-card-hint">{t("stock.allInventories")}</span>
         </div>
       </div>
 
       <div className="toolbar">
         <input
           className="input toolbar-search"
-          placeholder="Rechercher par nom ou référence…"
+          placeholder={t("stock.search")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <div className="toolbar-actions">
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-soft)" }}>
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-            Afficher les archivés
+            {t("action.showArchived")}
           </label>
           <Button variant="secondary" onClick={() => setModal({ kind: "orders" })}>
-            Commandes fournisseurs
+            {t("stock.supplierOrders")}
           </Button>
           <Button variant="primary" onClick={() => setModal({ kind: "add" })}>
-            + Nouvel article
+            {t("stock.newItem")}
           </Button>
         </div>
       </div>
@@ -309,26 +316,27 @@ export function StockPage() {
       {inventoryType.key === "finished-goods" && (
         <>
           <Banner tone="info">
-            Ce module sera alimenté automatiquement par la Production (onglet Production). En attendant, vous pouvez ajouter des articles à la main.
+            {t("stock.productionFed")}
           </Banner>
           <Banner tone="warn">
-            Le coût affiché ici est un <strong>coût matières estimé</strong> : il ne comprend que les matières premières consommées par les
-            lots de production qui ont fabriqué ces articles. Main-d'œuvre, énergie, amortissement des machines et frais généraux n'y sont
-            pas — le coût de revient réel est plus élevé.
+            <Rich
+              text={t("stock.finishedGoodsWarning")}
+              parts={{ lead: <strong>{t("stock.materialCostLead")}</strong> }}
+            />
           </Banner>
         </>
       )}
 
       {itemsLoading ? (
-        <p className="loading-text">Chargement du stock…</p>
+        <p className="loading-text">{t("stock.loading")}</p>
       ) : visibleItems.length === 0 ? (
         <EmptyState
-          title={search ? "Aucun article ne correspond à la recherche" : `Aucun ${inventoryType.singular} enregistré`}
-          description={!search ? `Ajoutez le premier article de "${inventoryType.label}" pour commencer à suivre le stock.` : undefined}
+          title={search ? t("stock.noMatch") : t("stock.emptyTitle", { singular: inventoryType.singular })}
+          description={!search ? t("stock.emptyDesc", { label: inventoryType.label }) : undefined}
           action={
             !search ? (
               <Button variant="primary" onClick={() => setModal({ kind: "add" })}>
-                + Nouvel article
+                {t("stock.newItem")}
               </Button>
             ) : undefined
           }
@@ -338,29 +346,31 @@ export function StockPage() {
           <table className="stock-table">
             <thead>
               <tr>
-                <th>Photo</th>
-                <th>Article</th>
-                <th>Référence</th>
-                {inventoryType.hasColor ? <th>Couleur</th> : null}
-                {inventoryType.hasSize ? <th>Taille</th> : null}
-                {inventoryType.hasGender ? <th>Sexe</th> : null}
-                {inventoryType.hasPrice ? <th>Prix vente</th> : null}
-                {inventoryType.hasDescription ? <th>Description</th> : null}
-                {inventoryType.hasMachineInfo ? <th>Machine</th> : null}
-                {inventoryType.hasMachineInfo ? <th>Fabricant</th> : null}
-                {inventoryType.hasMachineInfo ? <th>Localisation</th> : null}
-                {inventoryType.hasMachineInfo ? <th>Criticité</th> : null}
-                {inventoryType.hasBatches ? <th>{inventoryType.hasExpiry ? "Prochain lot (FEFO)" : "Prochain lot (FIFO)"}</th> : null}
-                {inventoryType.hasQuality ? <th>Qualité</th> : null}
-                <th>Fournisseur</th>
-                <th>Acheté</th>
-                <th>Utilisé</th>
-                <th>Restant</th>
+                <th>{t("field.photo")}</th>
+                <th>{t("stock.col.item")}</th>
+                <th>{t("field.reference")}</th>
+                {inventoryType.hasColor ? <th>{t("stock.col.color")}</th> : null}
+                {inventoryType.hasSize ? <th>{t("stock.col.size")}</th> : null}
+                {inventoryType.hasGender ? <th>{t("stock.col.gender")}</th> : null}
+                {inventoryType.hasPrice ? <th>{t("stock.col.salePriceShort")}</th> : null}
+                {inventoryType.hasDescription ? <th>{t("field.description")}</th> : null}
+                {inventoryType.hasMachineInfo ? <th>{t("field.machine")}</th> : null}
+                {inventoryType.hasMachineInfo ? <th>{t("stock.col.manufacturer")}</th> : null}
+                {inventoryType.hasMachineInfo ? <th>{t("stock.col.location")}</th> : null}
+                {inventoryType.hasMachineInfo ? <th>{t("stock.col.criticality")}</th> : null}
+                {inventoryType.hasBatches ? (
+                  <th>{t(inventoryType.hasExpiry ? "stock.lot.nextFefo" : "stock.lot.nextFifo")}</th>
+                ) : null}
+                {inventoryType.hasQuality ? <th>{t("stock.col.quality")}</th> : null}
+                <th>{t("field.supplier")}</th>
+                <th>{t("stock.col.purchased")}</th>
+                <th>{t("stock.col.used")}</th>
+                <th>{t("stock.col.remaining")}</th>
                 <th title={costColumnHint}>{costColumnLabel}</th>
-                <th title="Quantité restante × coût unitaire moyen">Valeur stock</th>
-                <th>Réapp.</th>
-                <th>Statut</th>
-                <th aria-label="Actions" />
+                <th title={t("stock.remainingTimesCost")}>{t("stock.col.stockValue")}</th>
+                <th>{t("stock.col.reorderShort")}</th>
+                <th>{t("field.status")}</th>
+                <th aria-label={t("field.actions")} />
               </tr>
             </thead>
             <tbody>
@@ -369,7 +379,7 @@ export function StockPage() {
                   key={item.id}
                   className="stock-row-clickable"
                   onClick={() => setModal({ kind: "detail", item })}
-                  title="Voir les détails"
+                  title={t("stock.viewDetails")}
                 >
                   <td onClick={(e) => e.stopPropagation()}>
                     {item.photoUrl ? (
@@ -420,12 +430,20 @@ export function StockPage() {
                           <span>
                             {item.fifoBatch.batchNumber} · {formatQuantity(item.fifoBatch.remaining, item.unit)}
                           </span>
-                          {item.fifoBatch.status === "expired" && <Pill tone="danger">Périmé</Pill>}
-                          {item.fifoBatch.status === "warning" && <Pill tone="warn">Expire le {formatDate(item.fifoBatch.expiryDate!)}</Pill>}
-                          {item.fifoBatch.status === "ok" && <span className="field-hint">exp. {formatDate(item.fifoBatch.expiryDate!)}</span>}
+                          {item.fifoBatch.status === "expired" && <Pill tone="danger">{t("stock.lot.expired")}</Pill>}
+                          {item.fifoBatch.status === "warning" && (
+                            <Pill tone="warn">
+                              {t("stock.lot.expiresOn", { date: formatDate(item.fifoBatch.expiryDate!) })}
+                            </Pill>
+                          )}
+                          {item.fifoBatch.status === "ok" && (
+                            <span className="field-hint">
+                              {t("stock.lot.expiryShort", { date: formatDate(item.fifoBatch.expiryDate!) })}
+                            </span>
+                          )}
                         </span>
                       ) : (
-                        <span className="field-hint">Aucun lot disponible</span>
+                        <span className="field-hint">{t("stock.lot.none")}</span>
                       )}
                     </td>
                   ) : null}
@@ -438,51 +456,51 @@ export function StockPage() {
                   <td className="tabular">{formatQuantity(item.purchased, item.unit)}</td>
                   <td className="tabular">{formatQuantity(item.used, item.unit)}</td>
                   <td className="tabular stock-row-remaining">{formatQuantity(item.quantity, item.unit)}</td>
-                  <td className="tabular" title={item.averageUnitCost !== null ? costColumnHint : "Aucune entrée valorisée pour cet article"}>
+                  <td className="tabular" title={item.averageUnitCost !== null ? costColumnHint : t("stock.noValuedEntry")}>
                     {item.averageUnitCost !== null ? formatCurrency(item.averageUnitCost) : <span className="field-hint">—</span>}
                   </td>
                   <td className="tabular">
                     <ValueCell item={item} />
                   </td>
-                  <td className="tabular" title={`Seuil de réapprovisionnement : ${formatQuantity(item.reorderThreshold, item.unit)}`}>
+                  <td className="tabular" title={t("stock.reorderTitle", { quantity: formatQuantity(item.reorderThreshold, item.unit) })}>
                     {formatQuantity(item.reorderThreshold, item.unit)}
                   </td>
                   <td>
                     {item.archived ? (
-                      <Pill tone="neutral">Archivé</Pill>
+                      <Pill tone="neutral">{t("state.archived")}</Pill>
                     ) : (
                       <span className="fifo-cell">
                         {item.stockStatus === "low" ? (
-                          <Pill tone="danger">Faible</Pill>
+                          <Pill tone="danger">{t("stock.state.low")}</Pill>
                         ) : item.stockStatus === "mid" ? (
-                          <Pill tone="warn">Moyen</Pill>
+                          <Pill tone="warn">{t("stock.state.mid")}</Pill>
                         ) : (
-                          <Pill tone="ok">Bien</Pill>
+                          <Pill tone="ok">{t("stock.state.good")}</Pill>
                         )}
-                        {item.low ? <Pill tone="danger">Réapprovisionner</Pill> : null}
+                        {item.low ? <Pill tone="danger">{t("stock.reorderAction")}</Pill> : null}
                       </span>
                     )}
                   </td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="row-actions">
                       <Button variant="secondary" onClick={() => setModal({ kind: "receive", item })} disabled={item.archived}>
-                        Réception
+                        {t("stock.receive")}
                       </Button>
                       <Button variant="secondary" onClick={() => setModal({ kind: "usage", item })} disabled={item.archived || item.quantity <= 0}>
-                        Sortie
+                        {t("stock.issue")}
                       </Button>
                       <Button variant="ghost" onClick={() => setModal({ kind: "detail", item })}>
-                        Détails
+                        {t("action.details")}
                       </Button>
                       <Button variant="ghost" onClick={() => setModal({ kind: "edit", item })}>
-                        Modifier
+                        {t("action.edit")}
                       </Button>
                       <Button variant="ghost" onClick={() => toggleArchive(item)}>
-                        {item.archived ? "Désarchiver" : "Archiver"}
+                        {t(item.archived ? "action.unarchive" : "action.archive")}
                       </Button>
                       {item.deletable ? (
                         <Button variant="danger" onClick={() => removeItem(item)}>
-                          Supprimer
+                          {t("action.delete")}
                         </Button>
                       ) : null}
                     </div>
@@ -514,9 +532,10 @@ export function StockPage() {
                 await loadItems();
                 setModal({ kind: "none" });
                 setLoadError(
-                  `« ${created.name} » a bien été créé, mais sa quantité initiale n'a pas pu être enregistrée : ${
-                    e instanceof ApiError ? e.message : "erreur inconnue"
-                  } Utilisez le bouton « Réception » sur sa ligne.`,
+                  t("stock.createdButStockFailed", {
+                    name: created.name,
+                    reason: e instanceof ApiError ? e.message : t("stock.unknownError"),
+                  }),
                 );
                 return;
               }

@@ -9,6 +9,7 @@ import { todayIso } from "../../lib/date";
 import type { ApiItem } from "../../lib/stockApi";
 import { createOrder, updateOrder, type ApiCustomer, type ApiOrder, type DiscountType } from "../../lib/salesApi";
 import { OrderTotalsPanel } from "./OrderTotalsPanel";
+import { useI18n } from "../../state/LanguageContext";
 
 interface OrderLineDraft {
   itemId: string;
@@ -36,6 +37,7 @@ interface OrderModalProps {
  * two can't disagree.
  */
 export function OrderModal({ customers, products, order, onClose, onSaved }: OrderModalProps) {
+  const { t } = useI18n();
   const editing = Boolean(order);
   const [customerId, setCustomerId] = useState(order?.customerId ?? customers[0]?.id ?? "");
   const [date, setDate] = useState(order ? order.date.slice(0, 10) : todayIso());
@@ -102,12 +104,14 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
 
   async function handleSave() {
     setError(null);
-    if (!customerId) return setError("Choisissez un client.");
-    if (activeLines.length === 0) return setError("Ajoutez au moins un produit avec une quantité.");
+    if (!customerId) return setError(t("order.err.customer"));
+    if (activeLines.length === 0) return setError(t("order.err.products"));
 
     const deposit = Number(amountPaid) || 0;
     if (!editing && deposit > totals.total) {
-      return setError(`Le paiement initial (${deposit} DZD) dépasse le total de la commande (${totals.total} DZD).`);
+      return setError(
+        t("order.err.deposit", { paid: formatCurrency(deposit), total: formatCurrency(totals.total) }),
+      );
     }
 
     setSaving(true);
@@ -129,7 +133,7 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
       else await createOrder(payload);
       onSaved();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Enregistrement impossible.");
+      setError(e instanceof ApiError ? e.message : t("error.save"));
     } finally {
       setSaving(false);
     }
@@ -137,23 +141,23 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
 
   return (
     <Modal
-      title={editing ? `Modifier ${order!.code}` : "Nouvelle commande"}
+      title={editing ? t("order.editTitle", { code: order!.code }) : t("order.newTitle")}
       onClose={onClose}
       width={900}
       footer={
         <>
-          <Button onClick={onClose}>Annuler</Button>
+          <Button onClick={onClose}>{t("action.cancel")}</Button>
           <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Enregistrement…" : "Enregistrer"}
+            {saving ? t("action.saving") : t("action.save")}
           </Button>
         </>
       }
     >
       <div className="form-stack">
         <div className="form-row">
-          <Field label="Client" hint={customers.length === 0 ? "Créez d'abord un client" : undefined}>
+          <Field label={t("field.customer")} hint={customers.length === 0 ? t("order.customerFirstHint") : undefined}>
             <select className="input" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">— Choisir —</option>
+              <option value="">{t("order.choose")}</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.fullName}
@@ -162,11 +166,11 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
               ))}
             </select>
           </Field>
-          <Field label="Date">
+          <Field label={t("field.date")}>
             <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
           {!editing ? (
-            <Field label="Paiement initial (DZD)" hint="Facultatif — un acompte payé à la commande, par ex. la moitié maintenant">
+            <Field label={t("order.deposit")} hint={t("order.depositHint")}>
               <input
                 className="input"
                 type="number"
@@ -183,11 +187,11 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
 
         <div>
           <p className="field-label" style={{ marginBottom: 8 }}>
-            Produits
+            {t("order.products")}
           </p>
           {lines.map((line, i) => (
             <div className="order-line" key={i}>
-              <Field label="Produit">
+              <Field label={t("order.product")}>
                 <select
                   className="input"
                   value={line.itemId}
@@ -196,15 +200,18 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
                     updateLine(i, { itemId: e.target.value, itemName: item?.name ?? "", unit: item?.unit ?? "" });
                   }}
                 >
-                  <option value="">— Choisir —</option>
+                  <option value="">{t("order.choose")}</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({formatQuantity(p.quantity, p.unit)} en stock)
+                      {t("order.productInStock", {
+                        name: p.name,
+                        quantity: formatQuantity(p.quantity, p.unit),
+                      })}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label={`Qté${line.unit ? ` (${line.unit})` : ""}`}>
+              <Field label={line.unit ? t("order.qtyWithUnit", { unit: line.unit }) : t("order.qty")}>
                 <input
                   className="input"
                   type="number"
@@ -214,7 +221,7 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
                   onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
                 />
               </Field>
-              <Field label="Prix unitaire">
+              <Field label={t("field.unitPrice")}>
                 <input
                   className="input"
                   type="number"
@@ -224,7 +231,7 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
                   onChange={(e) => updateLine(i, { unitPrice: Number(e.target.value) })}
                 />
               </Field>
-              <Field label="Remise ligne">
+              <Field label={t("order.lineDiscountLabel")}>
                 <input
                   className="input"
                   type="number"
@@ -237,23 +244,23 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
               <div className="order-line-total tabular">
                 {formatCurrency(Math.max(0, line.quantity * line.unitPrice - line.discount))}
               </div>
-              <Button variant="ghost" onClick={() => setLines((prev) => prev.filter((_, xi) => xi !== i))} aria-label="Retirer">
+              <Button variant="ghost" onClick={() => setLines((prev) => prev.filter((_, xi) => xi !== i))} aria-label={t("action.remove")}>
                 ✕
               </Button>
             </div>
           ))}
           <Button variant="ghost" onClick={() => setLines((prev) => [...prev, emptyLine()])} style={{ marginTop: 8 }}>
-            + Ajouter un produit
+            {t("order.addProduct")}
           </Button>
         </div>
 
         <div className="form-row">
-          <Field label="Livraison (DZD)">
+          <Field label={t("order.shippingLabel")}>
             <input className="input" type="number" min={0} step="any" value={shipping} onChange={(e) => setShipping(e.target.value)} />
           </Field>
           <Field
-            label="Remise globale"
-            hint={discountType === "PERCENT" ? "Le taux seulement — le montant en DZD est calculé automatiquement" : undefined}
+            label={t("order.globalDiscount")}
+            hint={discountType === "PERCENT" ? t("order.rateOnlyHint") : undefined}
           >
             <div className="field-inline-group">
               <input
@@ -263,7 +270,7 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
                 step="any"
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
-                placeholder={discountType === "PERCENT" ? "Ex. 10" : ""}
+                placeholder={discountType === "PERCENT" ? t("order.ph.discountPercent") : ""}
               />
               <select className="input" value={discountType} onChange={(e) => setDiscountType(e.target.value as DiscountType)}>
                 <option value="FIXED">DZD</option>
@@ -271,7 +278,7 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
               </select>
             </div>
           </Field>
-          <Field label="Taxe (%)" hint="Le taux seulement — le montant en DZD est calculé automatiquement">
+          <Field label={t("order.taxLabel")} hint={t("order.rateOnlyHint")}>
             <input
               className="input"
               type="number"
@@ -279,19 +286,19 @@ export function OrderModal({ customers, products, order, onClose, onSaved }: Ord
               step="any"
               value={taxPercent}
               onChange={(e) => setTaxPercent(e.target.value)}
-              placeholder="Ex. 19"
+              placeholder={t("order.ph.taxPercent")}
             />
           </Field>
         </div>
 
         <OrderTotalsPanel totals={totals} />
 
-        <Field label="Notes">
+        <Field label={t("field.notes")}>
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
 
         <Banner tone="info">
-          Enregistrer une commande ne sort rien du stock. Le stock ne diminue qu'à l'expédition, depuis la fiche de la commande.
+          {t("order.savingMovesNothing")}
         </Banner>
 
         {error ? <p className="form-error">{error}</p> : null}
